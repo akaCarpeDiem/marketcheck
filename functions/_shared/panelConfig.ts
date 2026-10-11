@@ -7,6 +7,9 @@ import { findHeroAsset, type HeroAssetDef, type HeroUnit } from './heroCatalog';
 export type PanelMode =
   | 'movers_up'
   | 'movers_down'
+  | 'stocks_up'
+  | 'stocks_down'
+  | 'watchlist'
   | 'curated'
   | 'filter_crypto'
   | 'filter_stocks'
@@ -45,6 +48,9 @@ export type PanelsLayout = {
 const MODES = new Set<PanelMode>([
   'movers_up',
   'movers_down',
+  'stocks_up',
+  'stocks_down',
+  'watchlist',
   'curated',
   'filter_crypto',
   'filter_stocks',
@@ -76,7 +82,7 @@ export const METALS_PRESET: PanelAssetRef[] = [
 ];
 
 export const DEFAULT_PANEL_LEFT: PanelConfig = {
-  title: 'Top 10 Pumps',
+  title: 'Crypto gainers',
   mode: 'movers_up',
   size: 10,
   sort: 'change',
@@ -85,7 +91,7 @@ export const DEFAULT_PANEL_LEFT: PanelConfig = {
 };
 
 export const DEFAULT_PANEL_RIGHT: PanelConfig = {
-  title: 'Top 10 Dumps',
+  title: 'Crypto losers',
   mode: 'movers_down',
   size: 10,
   sort: 'change',

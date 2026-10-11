@@ -1,157 +1,113 @@
 /**
- * Cloudflare Pages Function — Bubble-map movers by category + timeframe.
- * GET /api/bubbles?category=cryptos|solana|stocks|etfs&tf=1h|4h|8h|12h|24h|7d|30d|1y
- * Default category: stocks (reliable Yahoo). Cryptos: CoinGecko 1h/24h/7d/30d/1y.
- * No API keys.
+ * GET /api/bubbles?category=cryptos|solana|stocks|etfs&tf=…&limit=50
+ * The biggest movers in a category over a timeframe, for the bubble map.
+ *
+ *   cryptos  CoinGecko universe            1h 24h 7d 30d 1y
+ *   solana   Jupiter verified tokens       1h 6h 24h
+ *   stocks   Yahoo, the site's stock list  24h (1D) 7d 30d ytd 1y
+ *   etfs     Yahoo, the site's ETF list    24h (1D) 7d 30d ytd 1y
+ *
+ * A timeframe the category cannot answer (kept in some saved layouts) falls
+ * back to the nearest one it can; `effectiveTf` says which was used.
+ * The site itself builds crypto / stock / ETF bubbles in the browser from
+ * /api/cryptos and /api/equities and only calls this for Solana.
  */
 
-import { getCryptoMovers } from '../_shared/coingecko';
+import { cryptoTf, getCryptoUniverse, topMovers, type DataEnv } from '../_shared/cryptoUniverse';
+import { jsonResponse, type WaitUntil } from '../_shared/edgeCache';
+import { equityTf, getEquityUniverse } from '../_shared/equityUniverse';
 import { getSolanaMovers } from '../_shared/solanaMovers';
-import { getEquityMovers } from '../_shared/yahooEquity';
-import { CRYPTO_TFS, type BubbleCategory, type Timeframe } from '../_shared/universes';
 
-const VALID_CAT = new Set<BubbleCategory>(['cryptos', 'solana', 'stocks', 'etfs']);
-const VALID_TF = new Set<Timeframe>(['1h', '4h', '8h', '12h', '24h', '7d', '30d', '1y']);
-const CRYPTO_TF = new Set<Timeframe>(CRYPTO_TFS);
+type Ctx = { request: Request; env?: DataEnv; waitUntil?: WaitUntil };
 
-export async function onRequestGet(context: { request: Request }): Promise<Response> {
+const CATEGORIES = new Set(['cryptos', 'solana', 'stocks', 'etfs']);
+const EQUITY_LABEL: Record<string, string> = { '24h': '1D', '7d': '1W', '30d': '1M', ytd: 'YTD', '1y': '1Y' };
+
+export async function onRequestGet(context: Ctx): Promise<Response> {
   const url = new URL(context.request.url);
-  const category = (url.searchParams.get('category') ?? 'stocks') as BubbleCategory;
-  const tf = (url.searchParams.get('tf') ?? '24h') as Timeframe;
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit') ?? '50') || 50));
-
-  if (!VALID_CAT.has(category) || !VALID_TF.has(tf)) {
-    return new Response(JSON.stringify({ error: 'invalid category or tf' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  if ((category === 'cryptos' || category === 'solana') && !CRYPTO_TF.has(tf)) {
-    return new Response(
-      JSON.stringify({
-        category,
-        tf,
-        limit,
-        items: [],
-        effectiveTf: tf,
-        tfLabel: tf,
-        rateLimited: false,
-        stale: false,
-        note: null,
-        limitation: `Cryptos only support ${CRYPTO_TFS.join(', ')} (CoinGecko free markets fields). ${tf} is not available and is not approximated.`,
-        fetchedAt: new Date().toISOString(),
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=60',
-          'Access-Control-Allow-Origin': '*',
-        },
-      },
-    );
+  const category = url.searchParams.get('category') ?? 'cryptos';
+  const tf = url.searchParams.get('tf') ?? '24h';
+  const limit = Math.min(60, Math.max(1, Number(url.searchParams.get('limit')) || 50));
+  if (!CATEGORIES.has(category) || !/^[a-z0-9]{2,4}$/.test(tf)) {
+    return jsonResponse({ error: 'invalid category or tf' }, { status: 400 });
   }
 
   try {
-    let payload: {
-      items: unknown[];
-      effectiveTf: string;
-      tfLabel: string;
-      note: string | null;
-      limitation: string;
-      rateLimited?: boolean;
-      stale?: boolean;
-    };
-
+    let body: Record<string, unknown>;
     if (category === 'cryptos') {
-      const m = await getCryptoMovers(tf, limit, false);
-      payload = {
-        items: m.items,
-        effectiveTf: m.effectiveTf,
-        tfLabel: m.tfLabel,
-        note: m.note,
-        limitation: m.limitation,
-        rateLimited: m.rateLimited,
-        stale: m.stale,
+      const eff = cryptoTf(tf);
+      const u = await getCryptoUniverse(context.env, context.waitUntil);
+      body = {
+        items: topMovers(u.coins, eff, limit).map((c) => ({
+          id: c.id,
+          symbol: c.symbol,
+          name: c.name,
+          image: c.image,
+          price: c.price,
+          changePercent: c.ch[eff],
+          volume: c.volume,
+          volumeIsUsd: true,
+          marketCap: c.marketCap,
+          ok: true,
+        })),
+        effectiveTf: eff,
+        tfLabel: eff,
+        note: eff !== tf ? `${tf} is not published for crypto; showing ${eff}.` : null,
+        limitation: 'Largest moves among the 250 biggest coins on CoinGecko with real trading volume.',
+        stale: u.stale,
+        fetchedAt: new Date(u.at).toISOString(),
       };
     } else if (category === 'solana') {
       const m = await getSolanaMovers(tf, limit);
-      payload = {
-        items: m.items,
-        effectiveTf: m.effectiveTf,
-        tfLabel: m.tfLabel,
-        note: m.note,
-        limitation: m.limitation,
-        rateLimited: m.rateLimited,
-        stale: m.stale,
-      };
+      body = { ...m, fetchedAt: new Date().toISOString() };
     } else {
-      const m = await getEquityMovers(category, tf, limit);
-      payload = {
-        items: m.items,
-        effectiveTf: m.effectiveTf,
-        tfLabel: m.tfLabel,
-        note: m.note,
-        limitation: m.limitation,
-        rateLimited: false,
-        stale: false,
+      const eff = equityTf(tf);
+      const kind = category === 'stocks' ? 'stock' : 'etf';
+      const u = await getEquityUniverse(context.env, context.waitUntil);
+      const items = u.items
+        .filter((e) => e.kind === kind && e.ok && e.ch[eff] != null)
+        .sort((a, b) => Math.abs(b.ch[eff]!) - Math.abs(a.ch[eff]!))
+        .slice(0, limit)
+        .map((e) => ({
+          id: e.symbol,
+          symbol: e.symbol,
+          name: e.name,
+          image: null,
+          price: e.price,
+          changePercent: e.ch[eff],
+          volume: null,
+          marketCap: e.marketCap,
+          ok: true,
+        }));
+      body = {
+        items,
+        effectiveTf: eff,
+        tfLabel: EQUITY_LABEL[eff] ?? eff,
+        note: eff !== tf ? `${tf} is not available for ${category}; showing ${EQUITY_LABEL[eff]}.` : null,
+        limitation: `Largest moves in the site's ${category === 'stocks' ? 'large-cap stock' : 'ETF'} list (Yahoo Finance).`,
+        stale: u.stale,
+        fetchedAt: new Date(u.at).toISOString(),
       };
     }
-
-    const cacheControl =
-      category === 'cryptos' || category === 'solana'
-        ? 'public, max-age=120, s-maxage=180'
-        : 'public, max-age=30, s-maxage=60';
-
-    // Keep empty arrays — do not throw away; surface limitation for UI
-    if (!payload.items?.length && !payload.limitation) {
-      payload.limitation = `No movers for ${category} / ${tf}. Try another timeframe or category.`;
-    }
-
-    return new Response(
-      JSON.stringify({
-        category,
-        tf,
-        limit,
-        ...payload,
-        fetchedAt: new Date().toISOString(),
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': cacheControl,
-          'Access-Control-Allow-Origin': '*',
-        },
-      },
+    return jsonResponse(
+      { category, tf, limit, rateLimited: false, ...body },
+      { cacheControl: body.stale ? 'public, max-age=15' : 'public, max-age=45' },
     );
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'fetch failed';
-    const rateLimited = msg.includes('429');
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         category,
         tf,
         items: [],
         effectiveTf: tf,
         tfLabel: tf,
-        rateLimited,
+        rateLimited: false,
         stale: false,
-        error: msg,
+        error: e instanceof Error ? e.message : 'fetch failed',
+        limitation: 'This data is unavailable right now.',
         fetchedAt: new Date().toISOString(),
-        limitation: rateLimited
-          ? 'Upstream rate-limited (HTTP 429); no cached data. Keep prior bubble data in UI.'
-          : 'Upstream failed; keep prior bubble data in UI.',
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=10',
-          'Access-Control-Allow-Origin': '*',
-        },
       },
+      { cacheControl: 'public, max-age=10' },
     );
   }
 }

@@ -1,131 +1,79 @@
 /**
- * Cloudflare Pages Function — Yahoo Finance chart series for sparklines / lookbacks.
  * GET /api/chart?symbol=BTC-USD&range=1y&interval=1d
- * Returns { symbol, closes, timestamps?, fetchedAt }. No API keys.
+ * A price series for one symbol from Yahoo Finance, plus the quote details
+ * Yahoo returns with it (previous close, day range, 52-week range, volume).
  */
 
-const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart';
+import { cacheGet, cachePut, jsonResponse, type WaitUntil } from '../_shared/edgeCache';
+import { fetchChart, type Series } from '../_shared/yahoo';
 
-const ALLOWED_RANGES = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'ytd', 'max']);
-const ALLOWED_INTERVALS = new Set(['1m', '2m', '5m', '15m', '30m', '60m', '1h', '1d', '1wk', '1mo']);
+const RANGES = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'ytd', 'max']);
+const INTERVALS = new Set(['1m', '2m', '5m', '15m', '30m', '60m', '1h', '1d', '1wk', '1mo']);
 
-const UA = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  Accept: 'application/json',
-};
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+/** How long a series stays fresh, by bar size. */
+function freshMs(interval: string): number {
+  if (interval === '1d' || interval === '1wk' || interval === '1mo') return 10 * 60_000;
+  return 60_000;
 }
 
-async function fetchYahooChart(
-  symbol: string,
-  range: string,
-  interval: string,
-): Promise<{ closes: number[]; timestamps: number[]; error?: string }> {
-  const yahooUrl = `${YAHOO_CHART}/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
-  let lastErr = 'fetch failed';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await fetch(yahooUrl, { headers: UA });
-      if (!res.ok) {
-        lastErr = `HTTP ${res.status}`;
-        if (
-          (res.status === 404 || res.status === 429 || res.status === 502 || res.status === 503) &&
-          attempt < 2
-        ) {
-          await sleep(140 + attempt * 200);
-          continue;
-        }
-        return { closes: [], timestamps: [], error: lastErr };
-      }
-      const json = (await res.json()) as {
-        chart?: {
-          result?: Array<{
-            timestamp?: number[];
-            indicators?: { quote?: Array<{ close?: Array<number | null> }> };
-          }>;
-          error?: unknown;
-        };
-      };
-      const result = json.chart?.result?.[0];
-      if (!result) {
-        lastErr = 'No chart result';
-        if (attempt < 2) {
-          await sleep(140 + attempt * 200);
-          continue;
-        }
-        return { closes: [], timestamps: [], error: lastErr };
-      }
-      const timestampsRaw = result.timestamp ?? [];
-      const raw = result.indicators?.quote?.[0]?.close ?? [];
-      const closes: number[] = [];
-      const timestamps: number[] = [];
-      for (let i = 0; i < raw.length; i++) {
-        const c = raw[i];
-        if (c != null && Number.isFinite(c)) {
-          closes.push(c);
-          if (timestampsRaw[i] != null) timestamps.push(timestampsRaw[i]!);
-        }
-      }
-      if (closes.length <= 1 && attempt < 2) {
-        lastErr = 'Sparse series';
-        await sleep(140 + attempt * 200);
-        continue;
-      }
-      return { closes, timestamps };
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : 'fetch failed';
-      if (attempt < 2) await sleep(140 + attempt * 200);
-    }
-  }
-  return { closes: [], timestamps: [], error: lastErr };
-}
-
-export async function onRequestGet(context: { request: Request }): Promise<Response> {
+export async function onRequestGet(context: { request: Request; waitUntil?: WaitUntil }): Promise<Response> {
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') ?? '').trim();
   const range = (url.searchParams.get('range') ?? '1y').trim();
   const interval = (url.searchParams.get('interval') ?? '1d').trim();
-
-  if (!symbol) {
-    return new Response(JSON.stringify({ error: 'symbol query param required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  if (!symbol || symbol.length > 24) {
+    return jsonResponse({ error: 'symbol query param required' }, { status: 400 });
   }
-  if (!ALLOWED_RANGES.has(range) || !ALLOWED_INTERVALS.has(interval)) {
-    return new Response(JSON.stringify({ error: 'invalid range or interval' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  if (!RANGES.has(range) || !INTERVALS.has(interval)) {
+    return jsonResponse({ error: 'invalid range or interval' }, { status: 400 });
   }
 
-  const { closes, timestamps, error } = await fetchYahooChart(symbol, range, interval);
-  const ok = closes.length > 1;
+  const key = `chart:${symbol}:${range}:${interval}`;
+  const hit = await cacheGet<Series>(key);
+  let series: Series | null = hit && Date.now() - hit.at < freshMs(interval) ? hit.data : null;
+  let stale = false;
+  if (!series) {
+    series = await fetchChart(symbol, range, interval);
+    if (series && series.c.length > 1) {
+      cachePut(key, series, { keepSec: 86_400, waitUntil: context.waitUntil });
+    } else if (hit) {
+      series = hit.data;
+      stale = true;
+    }
+  }
 
-  return new Response(
-    JSON.stringify({
+  const ok = !!series && series.c.length > 1;
+  return jsonResponse(
+    {
       symbol,
       range,
       interval,
-      closes,
-      timestamps,
+      closes: series?.c ?? [],
+      timestamps: series?.t ?? [],
+      volumes: series?.v ?? [],
+      meta: series
+        ? {
+            symbol: series.symbol,
+            name: series.name ?? null,
+            currency: series.currency ?? null,
+            exchange: series.exchange ?? null,
+            type: series.type ?? null,
+            price: series.price,
+            prevClose: series.prevClose,
+            changePercent: series.changePercent,
+            time: series.time,
+            dayHigh: series.dayHigh ?? null,
+            dayLow: series.dayLow ?? null,
+            volume: series.volume ?? null,
+            high52: series.high52 ?? null,
+            low52: series.low52 ?? null,
+          }
+        : null,
       ok,
-      ...(error && !ok ? { error } : {}),
+      stale,
+      ...(ok ? {} : { error: 'No chart data for this symbol' }),
       fetchedAt: new Date().toISOString(),
-    }),
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        // Avoid CDN caching empty/error sparkline payloads for long.
-        'Cache-Control': ok
-          ? 'public, max-age=60, s-maxage=120'
-          : 'public, max-age=10, s-maxage=15',
-        'Access-Control-Allow-Origin': '*',
-      },
     },
+    { cacheControl: ok && !stale ? 'public, max-age=60' : 'public, max-age=10' },
   );
 }

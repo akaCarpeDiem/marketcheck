@@ -1,118 +1,66 @@
-# Deploy — Market Check
+# Deploy
 
-Preferred: **Cloudflare Pages** (static `dist/` + Pages Functions in `functions/`). Free tier is enough. No paid plans or custom domains required.
+Market Check runs on **Cloudflare Pages**: the static site in `dist/` plus the Pages Functions in `functions/`. The Pages project is `market-check` and the site is served at **marketcheck.money**.
 
-## Prerequisites
+## Requirements
 
-- Node 20+
-- Cloudflare account (free)
-- Optional: `gh` authenticated to push to akaCarpeDiem/marketcheck
+- Node 20 or newer
+- `wrangler` logged in to the Cloudflare account that owns the `market-check` project (`npx wrangler login`)
 
-## A. CLI deploy (fastest once logged in)
-
-```bash
-cd /workspace/market-check   # or your clone
-npm install
-npm run build
-
-# One-time authentication (opens browser / device flow)
-npx wrangler login
-
-# First time only — create the Pages project
-npx wrangler pages project create market-check
-
-# Deploy static assets; Functions from ./functions are bundled by Pages
-npx wrangler pages deploy dist --project-name=market-check
-```
-
-Or use the npm script after login:
+## Production deploy
 
 ```bash
-npm run deploy
+npm ci
+npm run check                # optional: type-check and tests
+npm run build                # writes dist/
+npx wrangler pages deploy dist --project-name=market-check --branch=main
 ```
 
-Wrangler will print a `*.pages.dev` URL. No env vars needed for production.
+`npm run deploy` does the build and the deploy in one step.
 
-### If `wrangler login` is required
+No build settings are needed. The AdSense publisher id is built in (`scripts/build.mjs`, and `public/ads.txt`); set `VITE_ADSENSE_CLIENT` only to override it.
 
-Stop here and complete login in the browser, then re-run:
+## Preview deploy
 
-```bash
-npx wrangler pages deploy dist --project-name=market-check
-```
-
-## B. Git-connected deploy (dashboard)
-
-1. Push this repo to GitHub (`akaCarpeDiem/marketcheck`).
-2. Cloudflare Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-3. Select the repo.
-4. Build settings:
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-   - **Root directory:** `/` (default)
-5. Deploy. Pages auto-detects `functions/` as Functions.
-
-## C. Local Pages simulation
+To look at a change with real data before it goes live, deploy it to a branch alias:
 
 ```bash
 npm run build
-npx wrangler pages dev dist
+npx wrangler pages deploy dist --project-name=market-check --branch=preview-redesign
 ```
 
-This serves `dist` and Pages Functions together (`/api/markets`, `/api/chart`, `/api/trenches`, `/api/bubbles`).
+This is served at `https://preview-redesign.market-check.pages.dev`. Normally every `*.pages.dev` address redirects to marketcheck.money; `functions/_middleware.ts` makes an exception for branch names that start with `preview` or `redesign`, and marks those responses `noindex`.
 
-## Vercel (optional)
+Sign-in is not expected to work on a preview address: the Google and Microsoft sign-in settings only allow marketcheck.money, and Pages keeps separate secrets for previews. Everything else works, including saving a watchlist and portfolio in the browser.
 
-Cloudflare is preferred. To use Vercel instead you must add a serverless route that mirrors `functions/api/markets.ts` (Yahoo proxy). The included `vercel.json` only documents headers/rewrites — implement `api/markets.ts` before relying on Vercel.
+## Settings and secrets
 
-## Pushing to GitHub
+`wrangler.toml` binds the KV namespace `LAYOUTS`. Secrets are set in the Cloudflare dashboard (Workers & Pages → market-check → Settings → Variables and secrets) or with `wrangler pages secret put`. They never go in the repo. `.env.example` lists the names.
 
-```bash
-cd /workspace/market-check
-git remote add origin https://github.com/akaCarpeDiem/marketcheck.git   # if missing
-git push -u origin main
-```
+| Name | Used for |
+|------|----------|
+| `SESSION_SECRET` | Signing the sign-in cookie |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Sign in with Microsoft |
+| `RESEND_API_KEY`, `MAGIC_FROM_EMAIL` | Emailing sign-in codes |
+| `PUBLIC_ORIGIN` | `https://marketcheck.money` |
 
-If `gh` / git credentials are missing, authenticate first:
+## What the hosting files do
 
-```bash
-gh auth login
-```
+- `public/_routes.json` keeps requests for scripts, styles, fonts and images away from Functions, so they do not count against the daily Functions allowance. Pages and `/api/*` still go through `functions/_middleware.ts`.
+- `public/_headers` sets caching. Files under `/assets/` have a hash in their name and are cached for a year.
+- `dist/404.html` is written by the build. Its presence tells Pages to answer unknown addresses with a real 404 instead of the home page.
+- `dist/sitemap.xml` is written by the build from the page list in `src/site/pages.ts`.
 
-Do **not** force-push. Do **not** commit `.env` or secrets.
+## After a deploy
 
+1. Open https://marketcheck.money/ and check that prices load and the time in the footer is recent.
+2. Open `/markets/`, `/heatmap/`, `/portfolio/`, `/news/` and one text page.
+3. `https://marketcheck.money/ads.txt` and `/robots.txt` still answer.
+4. Sign in and check that your tiles and lists are there.
 
-## Auth secrets (market-check Pages)
+`npm run smoke` runs these checks from the command line (`node scripts/smoke-live.mjs <address>` for another address).
 
-Required production secrets / bindings:
+## Rolling back
 
-| Name | Notes |
-|------|--------|
-| `LAYOUTS` (KV) | Bound in `wrangler.toml` — magic challenges + hero layouts |
-| `SESSION_SECRET` | HMAC session cookie |
-| `PUBLIC_ORIGIN` | `https://marketcheck.money` (OAuth redirect URIs: `/api/auth/callback`, `/api/auth/microsoft/callback` on this origin) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth |
-| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth |
-| `RESEND_API_KEY` | Magic email — from the Resend dashboard (do not invent) |
-| `MAGIC_FROM_EMAIL` | `Market Check <noreply@marketcheck.money>` (domain must be verified in Resend) |
-
-```bash
-# Example (pipe value; never commit secrets)
-printf '%s' 'Market Check <noreply@marketcheck.money>' | npx wrangler pages secret put MAGIC_FROM_EMAIL --project-name=market-check
-# Set remaining secrets in the Cloudflare dashboard
-# (Pages → market-check → Settings → Environment variables).
-```
-
-## Resend DNS for `marketcheck.money`
-
-
-Verify the domain in [Resend → Domains](https://resend.com/domains), then add the **exact** records Resend shows (values are account-specific):
-
-| Type | Name | Content (example — use Resend’s values) |
-|------|------|-----------------------------------------|
-| `TXT` | `resend._domainkey` | DKIM public key from Resend |
-| `TXT` | `@` (root) | SPF, typically `v=spf1 include:amazonses.com ~all` (or Resend’s SPF) |
-| `TXT` | `_dmarc` | e.g. `v=DMARC1; p=none;` |
-| `MX` (if shown) | send / bounce subdomain | As listed in Resend UI |
-
-Add the Resend records in Cloudflare Dashboard → the zone → **DNS** (the deploy-box token can edit DNS on marketcheck.money but cannot manage Email Routing or redirect rules).
+Every deploy stays available in the Cloudflare dashboard (Workers & Pages → market-check → Deployments). To go back, open an earlier deployment and choose **Rollback to this deployment**. Per the house rules, fix forward with a new commit instead of reverting history.

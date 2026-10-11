@@ -44,7 +44,7 @@ async function check(path, { expectStatus = 200, expectJson, expectIncludes, exp
 }
 
 const results = [];
-results.push(await check('/', { expectIncludes: ['Market Check', 'id="app"', 'Not financial advice', '/assets/index-'] }));
+results.push(await check('/', { expectIncludes: ['Market Check', 'id="app"', 'Not financial advice', '/assets/app'] }));
 {
   const res = await fetch(BASE + '/', { redirect: 'manual' });
   const html = await res.text();
@@ -54,6 +54,9 @@ results.push(await check('/', { expectIncludes: ['Market Check', 'id="app"', 'No
     row.notes.push('deployed Vite source index.html (/src/main.ts) — rebuild and deploy dist/');
   }
   results.push(row);
+}
+for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'], ['/portfolio/', 'Portfolio'], ['/news/', 'Headlines'], ['/sources/', 'Sources']]) {
+  results.push(await check(path, { expectStatus: 200, expectIncludes: [word, 'id="app"'] }));
 }
 results.push(await check('/privacy/', { expectStatus: 200, expectIncludes: ['Privacy'] }));
 results.push(await check('/terms/', { expectStatus: 200, expectIncludes: ['Terms'] }));
@@ -101,14 +104,29 @@ results.push(
     },
   }),
 );
+results.push(
+  await check('/api/equities', {
+    expectJson: (j, row) => {
+      const ok = (j.items ?? []).filter((e) => e.ok).length;
+      if (ok < 100) {
+        row.ok = false;
+        row.notes.push(`only ${ok} stocks and funds priced`);
+      }
+    },
+  }),
+);
 
-const redir = await fetch('https://market-check.pages.dev/', { redirect: 'manual' });
-results.push({
-  path: 'pages.dev→canonical',
-  status: redir.status,
-  ok: redir.status >= 300 && redir.status < 400 && (redir.headers.get('location') || '').includes('marketcheck.money'),
-  notes: [`location=${redir.headers.get('location')}`],
-});
+try {
+  const redir = await fetch('https://market-check.pages.dev/', { redirect: 'manual' });
+  results.push({
+    path: 'pages.dev→canonical',
+    status: redir.status,
+    ok: redir.status >= 300 && redir.status < 400 && (redir.headers.get('location') || '').includes('marketcheck.money'),
+    notes: [`location=${redir.headers.get('location')}`],
+  });
+} catch (e) {
+  results.push({ path: 'pages.dev→canonical', status: 0, ok: false, notes: [`could not reach market-check.pages.dev: ${e?.cause?.code || e?.message}`] });
+}
 
 let failed = 0;
 for (const r of results) {

@@ -4,14 +4,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "pages:dev": "wrangler pages dev dist --compatibility-date=2024-09-01",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=market-check"
+    "dev": "node scripts/dev.mjs",
+    "dev:mock": "node scripts/dev.mjs --mock",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node scripts/test/run.mjs",
+    "check": "npm run typecheck && npm test",
+    "pages:dev": "wrangler pages dev dist --compatibility-date=2024-09-23",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=market-check",
+    "smoke": "node scripts/smoke-live.mjs"
   },
   "devDependencies": {
     "@types/d3-hierarchy": "^3.1.7",
+    "esbuild": "^0.25.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",
     "wrangler": "^3.112.0"

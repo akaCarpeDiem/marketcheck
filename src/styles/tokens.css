@@ -1,0 +1,145 @@
+/* Design tokens. Dark is the default; [data-theme="light"] switches. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter Display Logo';
+  font-style: italic;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/inter-display-800i.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: dark;
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Surfaces */
+  --bg: #080a0f;
+  --bg-2: #0c0f15;
+  --card: #10141b;
+  --card-2: #151a23;
+  --card-3: #1b212c;
+  --overlay: rgba(4, 6, 10, 0.72);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.12);
+  --line-3: rgba(255, 255, 255, 0.2);
+
+  /* Text */
+  --text: #eef1f6;
+  --text-2: #a7b0c0;
+  --text-3: #6f7a8d;
+  --text-inv: #06080c;
+
+  /* Brand: the cyan of the logo's magnifier */
+  --brand: #22c7e8;
+  --brand-2: #2ec4b6;
+  --brand-soft: rgba(34, 199, 232, 0.12);
+  --brand-line: rgba(34, 199, 232, 0.4);
+
+  /* Market direction */
+  --up: #2fd480;
+  --up-soft: rgba(47, 212, 128, 0.13);
+  --up-line: rgba(47, 212, 128, 0.45);
+  --down: #ff5d6c;
+  --down-soft: rgba(255, 93, 108, 0.13);
+  --down-line: rgba(255, 93, 108, 0.45);
+  --flat: #8b95a7;
+  --flat-soft: rgba(139, 149, 167, 0.14);
+  --warn: #f5b942;
+  --warn-soft: rgba(245, 185, 66, 0.14);
+
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 18px 50px -12px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --glow: radial-gradient(1200px 500px at 12% -10%, rgba(34, 199, 232, 0.09), transparent 60%),
+    radial-gradient(900px 480px at 96% -6%, rgba(46, 196, 182, 0.07), transparent 60%);
+
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  --page: 1480px;
+  --gap: 16px;
+  --pad: 18px;
+  --topbar-h: 58px;
+  --tabbar-h: 0px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f3f5f9;
+  --bg-2: #ebeef4;
+  --card: #ffffff;
+  --card-2: #f6f8fb;
+  --card-3: #eceff5;
+  --overlay: rgba(15, 23, 42, 0.42);
+  --line: rgba(15, 23, 42, 0.09);
+  --line-2: rgba(15, 23, 42, 0.14);
+  --line-3: rgba(15, 23, 42, 0.26);
+
+  --text: #0d1420;
+  --text-2: #4a5568;
+  --text-3: #7b8799;
+  --text-inv: #ffffff;
+
+  --brand: #0891b2;
+  --brand-2: #0f9488;
+  --brand-soft: rgba(8, 145, 178, 0.1);
+  --brand-line: rgba(8, 145, 178, 0.38);
+
+  --up: #0b9150;
+  --up-soft: rgba(11, 145, 80, 0.1);
+  --up-line: rgba(11, 145, 80, 0.4);
+  --down: #d92d3d;
+  --down-soft: rgba(217, 45, 61, 0.09);
+  --down-line: rgba(217, 45, 61, 0.4);
+  --flat: #6b7689;
+  --flat-soft: rgba(107, 118, 137, 0.12);
+  --warn: #b7791f;
+  --warn-soft: rgba(183, 121, 31, 0.12);
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-2: 0 24px 60px -16px rgba(15, 23, 42, 0.28), 0 2px 10px rgba(15, 23, 42, 0.08);
+  --glow: radial-gradient(1200px 500px at 12% -10%, rgba(8, 145, 178, 0.08), transparent 60%),
+    radial-gradient(900px 480px at 96% -6%, rgba(15, 148, 136, 0.06), transparent 60%);
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gap: 12px;
+    --pad: 14px;
+    --topbar-h: 54px;
+    --tabbar-h: 60px;
+  }
+}

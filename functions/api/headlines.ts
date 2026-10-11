@@ -1,9 +1,12 @@
 /**
  * Cloudflare Pages Function — Recent Headlines from public RSS.
  * GET /api/headlines?category=tradfi|crypto|politics|housing|web3nfts|health|longevity|technology|ai|robotics|genart|podcasts
- * No API keys. Server-side fetch + ~7 min cache.
+ * No API keys. Server-side fetch, shared for about six minutes through the edge
+ * cache so that a busy minute does not turn into hundreds of feed requests.
+ * If the feeds fail, the last good set is served and marked stale.
  */
 
+import { cached, type WaitUntil } from '../_shared/edgeCache';
 import {
   getHeadlines,
   ALL_HEADLINE_CATEGORIES,
@@ -13,7 +16,7 @@ import {
 const VALID = new Set<HeadlineCategory>(ALL_HEADLINE_CATEGORIES);
 const VALID_HELP = 'tradfi|crypto|politics|housing|web3nfts|health|longevity|technology|ai|robotics|genart|podcasts';
 
-export async function onRequestGet(context: { request: Request }): Promise<Response> {
+export async function onRequestGet(context: { request: Request; waitUntil?: WaitUntil }): Promise<Response> {
   try {
     const url = new URL(context.request.url);
     const category = (url.searchParams.get('category') ?? 'tradfi') as HeadlineCategory;
@@ -26,7 +29,21 @@ export async function onRequestGet(context: { request: Request }): Promise<Respo
         },
       );
     }
-    const data = await getHeadlines(category);
+    let data: Awaited<ReturnType<typeof getHeadlines>>;
+    try {
+      const hit = await cached(`headlines:v1:${category}`, {
+        freshMs: 6 * 60_000,
+        keepSec: 12 * 3600,
+        retryMs: 60_000,
+        load: () => getHeadlines(category),
+        // An empty set is never kept; a quiet category is answered directly below.
+        valid: (d) => d.items.length > 0,
+        waitUntil: context.waitUntil,
+      });
+      data = hit.stale ? { ...hit.data, stale: true } : hit.data;
+    } catch {
+      data = await getHeadlines(category);
+    }
     return new Response(
       JSON.stringify({
         category: data.category,

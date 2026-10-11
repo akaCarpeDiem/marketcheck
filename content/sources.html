@@ -1,0 +1,74 @@
+<h1>Sources and methods</h1>
+<p class="meta">Official site: <strong>marketcheck.money</strong>. Where each number comes from, how often it refreshes and how it is worked out.</p>
+
+<p>Market Check shows public market data. It does not place trades, hold money or publish price predictions. Nothing here is investment advice.</p>
+
+<h2>Where prices come from</h2>
+<div class="table-scroll">
+<table>
+  <thead><tr><th>What</th><th>Source</th><th>Refreshes about every</th></tr></thead>
+  <tbody>
+    <tr><td>Crypto prices, market caps and changes (250 largest coins)</td><td><a href="https://www.coingecko.com/" target="_blank" rel="noopener">CoinGecko</a></td><td>2 minutes</td></tr>
+    <tr><td>Top tiles, index tiles and your watchlist and portfolio prices</td><td>Yahoo Finance</td><td>30 seconds while the US market is open, 1 minute otherwise</td></tr>
+    <tr><td>Stock and fund tables, heat map and stock movers</td><td>Yahoo Finance</td><td>1 minute while the market is open, 5 to 10 minutes otherwise</td></tr>
+    <tr><td>Indexes, gold, silver, oil</td><td>Yahoo Finance</td><td>30 seconds to 1 minute</td></tr>
+    <tr><td>Solana tokens</td><td><a href="https://jup.ag/" target="_blank" rel="noopener">Jupiter</a></td><td>2 to 3 minutes</td></tr>
+    <tr><td>Company share counts and fund sizes</td><td>Yahoo Finance, Nasdaq</td><td>week (values move with the price in between)</td></tr>
+    <tr><td>Crypto Fear &amp; Greed reading</td><td><a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">alternative.me</a></td><td>30 minutes (the index itself changes once a day)</td></tr>
+    <tr><td>Small price charts in tables</td><td>CoinGecko, Yahoo Finance</td><td>15 minutes</td></tr>
+    <tr><td>Headlines</td><td>Publishers' public RSS feeds</td><td>6 to 7 minutes</td></tr>
+  </tbody>
+</table>
+</div>
+<p>These services set their own terms, limits and delays. Stock prices in particular can run behind the exchange. A figure here can differ from your broker's screen, and your broker's is the one to trust.</p>
+
+<h2>How each change is measured</h2>
+<h3>Crypto</h3>
+<ul>
+  <li><strong>1h, 24h, 7d, 30d, 1y</strong> are rolling windows that end now, as reported by CoinGecko. Crypto trades around the clock, so "24h" always means the last 24 hours.</li>
+</ul>
+<h3>Stocks, funds, indexes and commodities</h3>
+<ul>
+  <li><strong>1D</strong> is the latest price against the previous session's official close. Before the open and at weekends this is the last session's change.</li>
+  <li><strong>1W</strong> and <strong>1M</strong> compare the latest price with the close 7 and 30 calendar days earlier, using the nearest trading day on or before that date.</li>
+  <li><strong>YTD</strong> compares with the last close of the previous year.</li>
+  <li><strong>1Y</strong> compares with the close one year ago.</li>
+</ul>
+<p>Changes are price changes only. They do not include dividends.</p>
+
+<h2>Market cap</h2>
+<ul>
+  <li><strong>Crypto:</strong> price multiplied by circulating supply, from CoinGecko.</li>
+  <li><strong>Stocks:</strong> the latest price multiplied by the company's share count. Share counts are taken from Yahoo Finance and rechecked about once a week, so a market cap moves with the price during the day.</li>
+  <li><strong>Funds:</strong> assets under management as published by Nasdaq, which is the usual measure of a fund's size. It is rechecked about once a week and moves with the fund's price in between.</li>
+</ul>
+
+<h2>Movers, bubbles and the heat map</h2>
+<p>A list of "biggest movers" is only useful if the moves are real. Thinly traded coins can show enormous percentage changes on almost no money, so they are left out:</p>
+<ul>
+  <li><strong>Crypto</strong> movers are picked from the 250 largest coins only, and a coin must have traded at least $2 million in the last 24 hours. Stablecoins and wrapped copies of other coins are excluded.</li>
+  <li><strong>Solana</strong> tokens must have a market cap of at least $2 million and a minimum trading volume for the window shown.</li>
+  <li><strong>Stocks and funds</strong> are picked from the fixed lists on the <a href="/markets/">markets</a> page: more than 100 large US-listed companies and 50 major funds.</li>
+</ul>
+<p>On the <a href="/heatmap/">heat map</a>, colour shows direction and strength (green up, red down), and size shows either market value or the size of the move, whichever you choose. Bubble areas are proportional, with a minimum size so the smallest stay readable.</p>
+
+<h2>Market hours and dates</h2>
+<p>The open or closed label follows the New York Stock Exchange and Nasdaq schedule: regular trading 9:30 AM to 4:00 PM Eastern, Monday to Friday, with pre-market from 4:00 AM and after-hours until 8:00 PM. Holidays and 1:00 PM early closes are worked out from the exchanges' published holiday rules, so the calendar does not run out at the end of a year. An unscheduled closure, such as a national day of mourning, would not be shown until the site is updated.</p>
+<p>Federal Reserve decision days are taken from the Federal Reserve's published meeting calendar. Monthly options expiration is the third Friday of each month.</p>
+
+<h2>Headlines</h2>
+<p>Headlines are gathered on our server from the public RSS and Atom feeds of news publishers, including some video channels. Each one links to the original story on the publisher's site. Market Check is not affiliated with these publishers, does not write or rewrite articles, and a headline appearing here is not an endorsement.</p>
+
+<h2>When data is late or missing</h2>
+<p>If a source fails, the page keeps showing the last good figures and says so, with the time they were last updated. If there is nothing to show, you see a plain message that the data is unavailable instead of an empty box or a made-up number. The time of the latest update is shown at the top of every page.</p>
+
+<h2>The daily call</h2>
+<p>The daily call is a free game: before each US session, guess whether the S&amp;P 500 will finish higher or lower than its previous close. Calls are accepted from one close until the next open at 9:30 AM Eastern. The result is read from the index's closing level; an exact tie counts as neither a win nor a loss. There are no prizes and nothing is staked.</p>
+
+<h2>Your lists</h2>
+<p>Your watchlist and portfolio are kept in your browser. If you sign in, they are saved to your account so they follow you between devices. Details are in the <a href="/privacy/">privacy policy</a>.</p>
+
+<h2>Links to a symbol</h2>
+<p>Opening a coin, stock or fund puts it in the address bar, for example <code>marketcheck.money/?q=AAPL</code>, so you can bookmark or share it. Addresses like <code>/quote/AAPL</code> lead to the same place.</p>
+
+<p>Questions about a number? <a href="/contact/">Contact us</a>.</p>
