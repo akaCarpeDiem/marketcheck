@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 200" fill="none">
+  <!-- Magnifying glass with check-shaped candle trend -->
+  <g stroke="#2ec4b6" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M 118 42 A 58 58 0 1 0 168 55" />
+    <line x1="168" y1="148" x2="205" y2="185" />
+  </g>
+  <!-- Candles: descending red then ascending green = check / V shape -->
+  <g stroke-linecap="round">
+    <line x1="78" y1="78" x2="78" y2="118" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="71" y="88" width="14" height="24" rx="1.5" fill="#e74c3c"/>
+    <line x1="96" y1="92" x2="96" y2="128" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="89" y="100" width="14" height="22" rx="1.5" fill="#e74c3c"/>
+    <line x1="114" y1="108" x2="114" y2="142" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="107" y="116" width="14" height="20" rx="1.5" fill="#e74c3c"/>
+    <line x1="132" y1="100" x2="132" y2="136" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="125" y="108" width="14" height="22" rx="1.5" fill="#2ecc71"/>
+    <line x1="150" y1="78" x2="150" y2="120" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="143" y="86" width="14" height="28" rx="1.5" fill="#2ecc71"/>
+    <line x1="168" y1="52" x2="168" y2="100" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="161" y="60" width="14" height="34" rx="1.5" fill="#2ecc71"/>
+    <line x1="186" y1="28" x2="186" y2="82" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="179" y="36" width="14" height="40" rx="1.5" fill="#2ecc71"/>
+  </g>
+  <!-- Wordmark: space preserved via &#160; between colored spans -->
+  <text x="240" y="118" font-family="Arial Black, Helvetica Neue, Arial, sans-serif" font-size="52" font-weight="800" xml:space="preserve">
+    <tspan fill="#2ec4b6">Market</tspan><tspan fill="#ffffff">&#160;Check</tspan>
+  </text>
+</svg>

@@ -1,0 +1,604 @@
+<svg class="bubble-svg" viewBox="0 0 900 420" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bubble map of top movers with 24h change">
+    <defs>
+      <clipPath id="bclip-0"><circle cx="321.5" cy="178.2" r="15.5"/></clipPath><clipPath id="bclip-1"><circle cx="593.5" cy="189.6" r="15.0"/></clipPath><clipPath id="bclip-2"><circle cx="454.8" cy="248.5" r="13.4"/></clipPath><clipPath id="bclip-3"><circle cx="470.0" cy="117.6" r="13.3"/></clipPath><clipPath id="bclip-4"><circle cx="219.1" cy="88.8" r="12.3"/></clipPath><clipPath id="bclip-5"><circle cx="223.0" cy="282.7" r="12.0"/></clipPath><clipPath id="bclip-6"><circle cx="676.3" cy="92.9" r="11.6"/></clipPath><clipPath id="bclip-7"><circle cx="702.4" cy="285.6" r="10.4"/></clipPath><clipPath id="bclip-8"><circle cx="103.4" cy="258.5" r="10.1"/></clipPath><clipPath id="bclip-9"><circle cx="175.6" cy="192.7" r="9.3"/></clipPath><clipPath id="bclip-10"><circle cx="798.7" cy="246.7" r="9.2"/></clipPath><clipPath id="bclip-11"><circle cx="762.6" cy="160.7" r="9.1"/></clipPath><clipPath id="bclip-12"><circle cx="555.6" cy="316.8" r="8.9"/></clipPath><clipPath id="bclip-13"><circle cx="371.0" cy="74.8" r="8.5"/></clipPath><clipPath id="bclip-14"><circle cx="341.0" cy="314.1" r="8.2"/></clipPath><clipPath id="bclip-15"><circle cx="567.7" cy="75.1" r="8.0"/></clipPath><clipPath id="bclip-16"><circle cx="796.1" cy="335.8" r="7.9"/></clipPath><clipPath id="bclip-17"><circle cx="449.5" cy="364.9" r="7.7"/></clipPath><clipPath id="bclip-18"><circle cx="450.3" cy="26.1" r="7.6"/></clipPath><clipPath id="bclip-19"><circle cx="132.5" cy="347.1" r="7.4"/></clipPath><clipPath id="bclip-20"><circle cx="772.2" cy="80.7" r="7.0"/></clipPath><clipPath id="bclip-21"><circle cx="115.9" cy="84.0" r="6.9"/></clipPath><clipPath id="bclip-22"><circle cx="655.1" cy="368.8" r="6.9"/></clipPath><clipPath id="bclip-23"><circle cx="626.4" cy="26.8" r="6.5"/></clipPath><clipPath id="bclip-24"><circle cx="276.5" cy="369.0" r="6.3"/></clipPath><clipPath id="bclip-25"><circle cx="841.4" cy="183.3" r="6.2"/></clipPath><clipPath id="bclip-26"><circle cx="275.2" cy="24.5" r="6.2"/></clipPath><clipPath id="bclip-27"><circle cx="71.9" cy="190.0" r="6.1"/></clipPath><clipPath id="bclip-28"><circle cx="729.9" cy="373.3" r="6.1"/></clipPath><clipPath id="bclip-29"><circle cx="860.6" cy="301.8" r="6.0"/></clipPath><clipPath id="bclip-30"><circle cx="193.1" cy="382.4" r="6.0"/></clipPath><clipPath id="bclip-31"><circle cx="722.1" cy="34.3" r="6.0"/></clipPath><clipPath id="bclip-32"><circle cx="153.5" cy="40.4" r="6.0"/></clipPath><clipPath id="bclip-33"><circle cx="31.1" cy="310.8" r="6.0"/></clipPath><clipPath id="bclip-34"><circle cx="202.8" cy="21.3" r="6.0"/></clipPath><clipPath id="bclip-35"><circle cx="869.3" cy="241.9" r="6.0"/></clipPath><clipPath id="bclip-36"><circle cx="822.2" cy="132.1" r="6.0"/></clipPath><clipPath id="bclip-37"><circle cx="380.6" cy="383.8" r="6.0"/></clipPath><clipPath id="bclip-38"><circle cx="521.7" cy="26.0" r="6.0"/></clipPath><clipPath id="bclip-39"><circle cx="516.4" cy="386.3" r="6.0"/></clipPath><clipPath id="bclip-40"><circle cx="76.4" cy="139.4" r="6.0"/></clipPath><clipPath id="bclip-41"><circle cx="592.8" cy="387.4" r="6.0"/></clipPath><clipPath id="bclip-42"><circle cx="389.2" cy="21.6" r="6.0"/></clipPath><clipPath id="bclip-43"><circle cx="874.0" cy="144.1" r="6.0"/></clipPath><clipPath id="bclip-44"><circle cx="571.7" cy="19.0" r="6.0"/></clipPath><clipPath id="bclip-45"><circle cx="37.3" cy="237.5" r="6.0"/></clipPath><clipPath id="bclip-46"><circle cx="330.7" cy="388.1" r="6.0"/></clipPath><clipPath id="bclip-47"><circle cx="300.7" cy="78.9" r="6.0"/></clipPath><clipPath id="bclip-48"><circle cx="34.0" cy="157.8" r="6.0"/></clipPath><clipPath id="bclip-49"><circle cx="343.4" cy="26.7" r="6.0"/></clipPath>
+    </defs><g class="bubble-node has-tip" data-tip="FDX — FDX Inc
+11.899999999999999 (24h)
+Price 147
+Vol 58000000
+Mkt 2900000000" data-id="s-47">
+        <circle class="bubble-disk" cx="321.5" cy="207.2" r="74.0" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="321.5" cy="207.2" r="70.8" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="321.5" cy="207.2" r="60.0" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="321.4896206396288" cy="178.1812517581251" r="15.53484520735825" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="321.4896206396288" y="178.1812517581251" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">F</text>
+        <text class="bubble-label bubble-label-sym" x="321.5" y="211.8" text-anchor="middle" dominant-baseline="central" font-size="28.0" font-weight="800">FDX</text>
+        <text class="bubble-label bubble-label-pct up" x="321.5" y="240.8" text-anchor="middle" dominant-baseline="central" font-size="22.0" font-weight="700">+11.9%</text>
+      </g><g class="bubble-node has-tip" data-tip="VZ — VZ Inc
+11.5 (24h)
+Price 135
+Vol 86000000
+Mkt 4300000000" data-id="s-35">
+        <circle class="bubble-disk" cx="593.5" cy="218.1" r="71.6" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="593.5" cy="218.1" r="68.4" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="593.5" cy="218.1" r="57.6" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="593.456783069707" cy="189.5761657187465" r="15.028658327533734" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="593.456783069707" y="189.5761657187465" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">V</text>
+        <text class="bubble-label bubble-label-sym" x="593.5" y="222.1" text-anchor="middle" dominant-baseline="central" font-size="27.1" font-weight="800">VZ</text>
+        <text class="bubble-label bubble-label-pct up" x="593.5" y="250.6" text-anchor="middle" dominant-baseline="central" font-size="22.0" font-weight="700">+11.5%</text>
+      </g><g class="bubble-node has-tip" data-tip="CRM — CRM Inc
+11.100000000000001 (24h)
+Price 123
+Vol 14000000
+Mkt 700000000" data-id="s-23">
+        <circle class="bubble-disk" cx="454.8" cy="273.9" r="63.7" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="454.8" cy="273.9" r="60.5" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="454.8" cy="273.9" r="49.7" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="454.772086724576" cy="248.50306312189986" r="13.379588419004714" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="454.772086724576" y="248.50306312189986" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="454.8" y="277.4" text-anchor="middle" dominant-baseline="central" font-size="24.1" font-weight="800">CRM</text>
+        <text class="bubble-label bubble-label-pct up" x="454.8" y="302.9" text-anchor="middle" dominant-baseline="central" font-size="19.7" font-weight="700">+11.1%</text>
+      </g><g class="bubble-node has-tip" data-tip="XOM — XOM Inc
+10.7 (24h)
+Price 111
+Vol 42000000
+Mkt 2100000000" data-id="s-11">
+        <circle class="bubble-disk" cx="470.0" cy="142.8" r="63.3" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="470.0" cy="142.8" r="60.1" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="470.0" cy="142.8" r="49.3" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="470.04083406347877" cy="117.60643988561745" r="13.283258839313893" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="470.04083406347877" y="117.60643988561745" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">X</text>
+        <text class="bubble-label bubble-label-sym" x="470.0" y="146.3" text-anchor="middle" dominant-baseline="central" font-size="23.9" font-weight="800">XOM</text>
+        <text class="bubble-label bubble-label-pct up" x="470.0" y="171.6" text-anchor="middle" dominant-baseline="central" font-size="19.6" font-weight="700">+10.7%</text>
+      </g><g class="bubble-node has-tip" data-tip="UPS — UPS Inc
+10.2 (24h)
+Price 146
+Vol 27000000
+Mkt 1350000000" data-id="s-46">
+        <circle class="bubble-disk" cx="219.1" cy="112.1" r="58.4" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="219.1" cy="112.1" r="55.2" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="219.1" cy="112.1" r="44.4" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="219.1414302732828" cy="88.79370339861512" r="12.257941079058494" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="219.1414302732828" y="88.79370339861512" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">U</text>
+        <text class="bubble-label bubble-label-sym" x="219.1" y="115.3" text-anchor="middle" dominant-baseline="central" font-size="22.1" font-weight="800">UPS</text>
+        <text class="bubble-label bubble-label-pct up" x="219.1" y="138.6" text-anchor="middle" dominant-baseline="central" font-size="18.1" font-weight="700">+10.2%</text>
+      </g><g class="bubble-node has-tip" data-tip="T — T Inc
+9.8 (24h)
+Price 134
+Vol 55000000
+Mkt 2750000000" data-id="s-34">
+        <circle class="bubble-disk" cx="223.0" cy="305.5" r="57.2" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="223.0" cy="305.5" r="54.0" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="223.0" cy="305.5" r="43.2" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="222.97322507658222" cy="282.6599161222733" r="12.006475267442415" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="222.97322507658222" y="282.6599161222733" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">T</text>
+        <text class="bubble-label bubble-label-sym" x="223.0" y="308.6" text-anchor="middle" dominant-baseline="central" font-size="21.6" font-weight="800">T</text>
+        <text class="bubble-label bubble-label-pct up" x="223.0" y="331.4" text-anchor="middle" dominant-baseline="central" font-size="17.7" font-weight="700">+9.80%</text>
+      </g><g class="bubble-node has-tip" data-tip="ORCL — ORCL Inc
+9.399999999999999 (24h)
+Price 122
+Vol 83000000
+Mkt 4150000000" data-id="s-22">
+        <circle class="bubble-disk" cx="676.3" cy="114.9" r="55.3" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="676.3" cy="114.9" r="52.1" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="676.3" cy="114.9" r="41.3" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="676.3260888227836" cy="92.85085132440219" r="11.623081958607708" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="676.3260888227836" y="92.85085132440219" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">O</text>
+        <text class="bubble-label bubble-label-sym" x="676.3" y="118.0" text-anchor="middle" dominant-baseline="central" font-size="20.9" font-weight="800">ORCL</text>
+        <text class="bubble-label bubble-label-pct up" x="676.3" y="140.1" text-anchor="middle" dominant-baseline="central" font-size="17.1" font-weight="700">+9.40%</text>
+      </g><g class="bubble-node has-tip" data-tip="HON — HON Inc
+8.5 (24h)
+Price 145
+Vol 96000000
+Mkt 4800000000" data-id="s-45">
+        <circle class="bubble-disk" cx="702.4" cy="305.4" r="49.7" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="702.4" cy="305.4" r="46.5" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="702.4" cy="305.4" r="35.8" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="702.3819728760641" cy="285.5569850979807" r="10.44491449689897" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="702.3819728760641" y="285.5569850979807" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">H</text>
+        <text class="bubble-label bubble-label-sym" x="702.4" y="308.1" text-anchor="middle" dominant-baseline="central" font-size="18.8" font-weight="800">HON</text>
+        <text class="bubble-label bubble-label-pct up" x="702.4" y="328.0" text-anchor="middle" dominant-baseline="central" font-size="15.4" font-weight="700">+8.50%</text>
+      </g><g class="bubble-node has-tip" data-tip="JPM — JPM Inc
+9 (24h)
+Price 110
+Vol 11000000
+Mkt 550000000" data-id="s-10">
+        <circle class="bubble-disk" cx="103.4" cy="277.6" r="47.9" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="103.4" cy="277.6" r="44.7" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="103.4" cy="277.6" r="34.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="103.37919442978504" cy="258.4857197158051" r="10.066951466536443" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="103.37919442978504" y="258.4857197158051" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">J</text>
+        <text class="bubble-label bubble-label-sym" x="103.4" y="280.3" text-anchor="middle" dominant-baseline="central" font-size="18.1" font-weight="800">JPM</text>
+        <text class="bubble-label bubble-label-pct up" x="103.4" y="299.4" text-anchor="middle" dominant-baseline="central" font-size="14.8" font-weight="700">+9.00%</text>
+      </g><g class="bubble-node has-tip" data-tip="WFC — WFC Inc
+8.100000000000001 (24h)
+Price 133
+Vol 24000000
+Mkt 1200000000" data-id="s-33">
+        <circle class="bubble-disk" cx="175.6" cy="210.3" r="44.1" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="175.6" cy="210.3" r="40.9" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="175.6" cy="210.3" r="31.8" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="175.57802652392695" cy="192.7380023960456" r="9.262075088972262" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="175.57802652392695" y="192.7380023960456" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">W</text>
+        <text class="bubble-label bubble-label-sym" x="175.6" y="212.8" text-anchor="middle" dominant-baseline="central" font-size="16.7" font-weight="800">WFC</text>
+        <text class="bubble-label bubble-label-pct up" x="175.6" y="230.4" text-anchor="middle" dominant-baseline="central" font-size="13.7" font-weight="700">+8.10%</text>
+      </g><g class="bubble-node has-tip" data-tip="CVX — CVX Inc
+-7.6 (24h)
+Price 112
+Vol 73000000
+Mkt 3650000000" data-id="s-12">
+        <circle class="bubble-disk" cx="798.7" cy="264.1" r="43.7" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="798.7" cy="264.1" r="40.5" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="798.7" cy="264.1" r="31.5" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="798.7200597217147" cy="246.6543362177664" r="9.179231549571943" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="798.7200597217147" y="246.6543362177664" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="798.7" y="266.5" text-anchor="middle" dominant-baseline="central" font-size="16.5" font-weight="800">CVX</text>
+        <text class="bubble-label bubble-label-pct down" x="798.7" y="283.9" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="700">-7.60%</text>
+      </g><g class="bubble-node has-tip" data-tip="AVGO — AVGO Inc
+7.699999999999999 (24h)
+Price 121
+Vol 52000000
+Mkt 2600000000" data-id="s-21">
+        <circle class="bubble-disk" cx="762.6" cy="178.1" r="43.5" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="762.6" cy="178.1" r="40.3" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="762.6" cy="178.1" r="31.3" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="762.5503133305106" cy="160.7033773229864" r="9.13771734721544" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="762.5503133305106" y="160.7033773229864" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">A</text>
+        <text class="bubble-label bubble-label-sym" x="762.6" y="180.5" text-anchor="middle" dominant-baseline="central" font-size="16.5" font-weight="800">AVGO</text>
+        <text class="bubble-label bubble-label-pct up" x="762.6" y="197.8" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="700">+7.70%</text>
+      </g><g class="bubble-node has-tip" data-tip="BAC — BAC Inc
+7.300000000000001 (24h)
+Price 109
+Vol 80000000
+Mkt 4000000000" data-id="s-9">
+        <circle class="bubble-disk" cx="555.6" cy="333.6" r="42.2" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="555.6" cy="333.6" r="39.0" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="555.6" cy="333.6" r="30.4" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="555.5500558875107" cy="316.7583583176077" r="8.87125921716058" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="555.5500558875107" y="316.7583583176077" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">B</text>
+        <text class="bubble-label bubble-label-sym" x="555.6" y="335.9" text-anchor="middle" dominant-baseline="central" font-size="15.9" font-weight="800">BAC</text>
+        <text class="bubble-label bubble-label-pct up" x="555.6" y="352.7" text-anchor="middle" dominant-baseline="central" font-size="13.0" font-weight="700">+7.30%</text>
+      </g><g class="bubble-node has-tip" data-tip="ADBE — ADBE Inc
+-7.2 (24h)
+Price 124
+Vol 45000000
+Mkt 2250000000" data-id="s-24">
+        <circle class="bubble-disk" cx="371.0" cy="90.8" r="40.4" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="371.0" cy="90.8" r="37.2" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="371.0" cy="90.8" r="29.1" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="370.98743374460867" cy="74.82139068974672" r="8.487875024367515" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="370.98743374460867" y="74.82139068974672" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">A</text>
+        <text class="bubble-label bubble-label-sym" x="371.0" y="93.1" text-anchor="middle" dominant-baseline="central" font-size="15.1" font-weight="800">ADBE</text>
+        <text class="bubble-label bubble-label-pct down" x="371.0" y="109.1" text-anchor="middle" dominant-baseline="central" font-size="12.4" font-weight="700">-7.20%</text>
+      </g><g class="bubble-node has-tip" data-tip="MMM — MMM Inc
+6.800000000000001 (24h)
+Price 144
+Vol 65000000
+Mkt 3250000000" data-id="s-44">
+        <circle class="bubble-disk" cx="341.0" cy="329.5" r="39.1" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="341.0" cy="329.5" r="35.9" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="341.0" cy="329.5" r="28.2" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="340.9823999519887" cy="314.1237167096471" r="8.217102391334443" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="340.9823999519887" y="314.1237167096471" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="341.0" y="331.8" text-anchor="middle" dominant-baseline="central" font-size="14.6" font-weight="800">MMM</text>
+        <text class="bubble-label bubble-label-pct up" x="341.0" y="347.2" text-anchor="middle" dominant-baseline="central" font-size="11.9" font-weight="700">+6.80%</text>
+      </g><g class="bubble-node has-tip" data-tip="C — C Inc
+6.4 (24h)
+Price 132
+Vol 93000000
+Mkt 4650000000" data-id="s-32">
+        <circle class="bubble-disk" cx="567.7" cy="90.0" r="37.9" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="567.7" cy="90.0" r="34.7" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="567.7" cy="90.0" r="27.3" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="567.6528516051022" cy="75.10807232209625" r="7.961446273589539" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="567.6528516051022" y="75.10807232209625" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="567.7" y="92.2" text-anchor="middle" dominant-baseline="central" font-size="14.0" font-weight="800">C</text>
+        <text class="bubble-label bubble-label-pct up" x="567.7" y="107.0" text-anchor="middle" dominant-baseline="central" font-size="11.5" font-weight="700">+6.40%</text>
+      </g><g class="bubble-node has-tip" data-tip="PYPL — PYPL Inc
+-6.4 (24h)
+Price 148
+Vol 89000000
+Mkt 4450000000" data-id="s-48">
+        <circle class="bubble-disk" cx="796.1" cy="350.6" r="37.8" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="796.1" cy="350.6" r="34.6" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="796.1" cy="350.6" r="27.2" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="796.0522733505802" cy="335.8053558791855" r="7.941203556410419" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="796.0522733505802" y="335.8053558791855" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">P</text>
+        <text class="bubble-label bubble-label-sym" x="796.1" y="352.8" text-anchor="middle" dominant-baseline="central" font-size="14.0" font-weight="800">PYPL</text>
+        <text class="bubble-label bubble-label-pct down" x="796.1" y="367.6" text-anchor="middle" dominant-baseline="central" font-size="11.5" font-weight="700">-6.40%</text>
+      </g><g class="bubble-node has-tip" data-tip="AAPL — AAPL Inc
+-8 (24h)
+Price 100
+Vol 1000000
+Mkt 50000000" data-id="s-0">
+        <circle class="bubble-disk" cx="449.5" cy="379.3" r="36.7" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="449.5" cy="379.3" r="33.5" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="449.5" cy="379.3" r="26.5" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="449.53022972952715" cy="364.9332990014019" r="7.716843443096637" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="449.53022972952715" y="364.9332990014019" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">A</text>
+        <text class="bubble-label bubble-label-sym" x="449.5" y="381.4" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="800">AAPL</text>
+        <text class="bubble-label bubble-label-pct down" x="449.5" y="395.8" text-anchor="middle" dominant-baseline="central" font-size="11.1" font-weight="700">-8.00%</text>
+      </g><g class="bubble-node has-tip" data-tip="DIS — DIS Inc
+-6.8 (24h)
+Price 136
+Vol 17000000
+Mkt 850000000" data-id="s-36">
+        <circle class="bubble-disk" cx="450.3" cy="40.2" r="36.2" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="450.3" cy="40.2" r="33.0" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="450.3" cy="40.2" r="26.1" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="450.32875200711663" cy="26.140177690455765" r="7.6090621916595165" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="450.32875200711663" y="26.140177690455765" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">D</text>
+        <text class="bubble-label bubble-label-sym" x="450.3" y="42.4" text-anchor="middle" dominant-baseline="central" font-size="13.3" font-weight="800">DIS</text>
+        <text class="bubble-label bubble-label-pct down" x="450.3" y="56.5" text-anchor="middle" dominant-baseline="central" font-size="10.9" font-weight="700">-6.80%</text>
+      </g><g class="bubble-node has-tip" data-tip="MSFT — MSFT Inc
+-6.3 (24h)
+Price 101
+Vol 32000000
+Mkt 1600000000" data-id="s-1">
+        <circle class="bubble-disk" cx="132.5" cy="360.7" r="35.1" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="132.5" cy="360.7" r="31.9" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="132.5" cy="360.7" r="25.3" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="132.54241305076394" cy="347.0665418633037" r="7.377051304515731" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="132.54241305076394" y="347.0665418633037" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="132.5" y="362.9" text-anchor="middle" dominant-baseline="central" font-size="12.8" font-weight="800">MSFT</text>
+        <text class="bubble-label bubble-label-pct down" x="132.5" y="376.5" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="700">-6.30%</text>
+      </g><g class="bubble-node has-tip" data-tip="PEP — PEP Inc
+-5.5 (24h)
+Price 125
+Vol 76000000
+Mkt 3800000000" data-id="s-25">
+        <circle class="bubble-disk" cx="772.2" cy="93.6" r="33.3" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="772.2" cy="93.6" r="30.1" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="772.2" cy="93.6" r="24.0" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="772.2446214345999" cy="80.66414874142623" r="7.002685306846748" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="772.2446214345999" y="80.66414874142623" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">P</text>
+        <text class="bubble-label bubble-label-sym" x="772.2" y="95.7" text-anchor="middle" dominant-baseline="central" font-size="12.0" font-weight="800">PEP</text>
+        <text class="bubble-label bubble-label-pct down" x="772.2" y="108.6" text-anchor="middle" dominant-baseline="central" font-size="9.8" font-weight="700">-5.50%</text>
+      </g><g class="bubble-node has-tip" data-tip="COST — COST Inc
+6 (24h)
+Price 120
+Vol 21000000
+Mkt 1050000000" data-id="s-20">
+        <circle class="bubble-disk" cx="115.9" cy="96.7" r="32.9" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="115.9" cy="96.7" r="29.7" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="115.9" cy="96.7" r="23.7" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="115.94372161894546" cy="83.96591918261886" r="6.899846201565557" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="115.94372161894546" y="83.96591918261886" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="115.9" y="98.8" text-anchor="middle" dominant-baseline="central" font-size="11.8" font-weight="800">COST</text>
+        <text class="bubble-label bubble-label-pct up" x="115.9" y="111.5" text-anchor="middle" dominant-baseline="central" font-size="9.7" font-weight="700">+6.00%</text>
+      </g><g class="bubble-node has-tip" data-tip="AMD — AMD Inc
+5.6 (24h)
+Price 108
+Vol 49000000
+Mkt 2450000000" data-id="s-8">
+        <circle class="bubble-disk" cx="655.1" cy="381.6" r="32.9" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="655.1" cy="381.6" r="29.7" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="655.1" cy="381.6" r="23.7" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="655.1185256962127" cy="368.81937789762713" r="6.898997736657441" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="655.1185256962127" y="368.81937789762713" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">A</text>
+        <text class="bubble-label bubble-label-sym" x="655.1" y="383.6" text-anchor="middle" dominant-baseline="central" font-size="11.8" font-weight="800">AMD</text>
+        <text class="bubble-label bubble-label-pct up" x="655.1" y="396.4" text-anchor="middle" dominant-baseline="central" font-size="9.7" font-weight="700">+5.60%</text>
+      </g><g class="bubble-node has-tip" data-tip="CMCSA — CMCSA Inc
+-5.1 (24h)
+Price 137
+Vol 48000000
+Mkt 2400000000" data-id="s-37">
+        <circle class="bubble-disk" cx="626.4" cy="38.7" r="30.7" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="626.4" cy="38.7" r="27.5" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="626.4" cy="38.7" r="22.1" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="626.397840417264" cy="26.840402235927943" r="6.45325637139675" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="626.397840417264" y="26.840402235927943" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="626.4" y="40.7" text-anchor="middle" dominant-baseline="central" font-size="10.9" font-weight="800">CMCSA</text>
+        <text class="bubble-label bubble-label-pct down" x="626.4" y="52.6" text-anchor="middle" dominant-baseline="central" font-size="8.9" font-weight="700">-5.10%</text>
+      </g><g class="bubble-node has-tip" data-tip="GE — GE Inc
+5.1 (24h)
+Price 143
+Vol 34000000
+Mkt 1700000000" data-id="s-43">
+        <circle class="bubble-disk" cx="276.5" cy="380.6" r="30.0" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="276.5" cy="380.6" r="26.8" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="276.5" cy="380.6" r="21.6" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="276.50378435656467" cy="368.9916276939179" r="6.3049810403438125" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="276.50378435656467" y="368.9916276939179" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">G</text>
+        <text class="bubble-label bubble-label-sym" x="276.5" y="382.6" text-anchor="middle" dominant-baseline="central" font-size="10.6" font-weight="800">GE</text>
+        <text class="bubble-label bubble-label-pct up" x="276.5" y="394.2" text-anchor="middle" dominant-baseline="central" font-size="8.6" font-weight="700">+5.10%</text>
+      </g><g class="bubble-node has-tip" data-tip="MS — MS Inc
+4.699999999999999 (24h)
+Price 131
+Vol 62000000
+Mkt 3100000000" data-id="s-31">
+        <circle class="bubble-disk" cx="841.4" cy="194.8" r="29.7" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="841.4" cy="194.8" r="26.5" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="841.4" cy="194.8" r="21.4" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="841.4062752136664" cy="183.29489158180414" r="6.2379124020905765" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="841.4062752136664" y="183.29489158180414" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="841.4" y="196.7" text-anchor="middle" dominant-baseline="central" font-size="10.4" font-weight="800">MS</text>
+        <text class="bubble-label bubble-label-pct up" x="841.4" y="208.2" text-anchor="middle" dominant-baseline="central" font-size="8.5" font-weight="700">+4.70%</text>
+      </g><g class="bubble-node has-tip" data-tip="NVDA — NVDA Inc
+-4.6 (24h)
+Price 102
+Vol 63000000
+Mkt 3150000000" data-id="s-2">
+        <circle class="bubble-disk" cx="275.2" cy="35.9" r="29.4" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="275.2" cy="35.9" r="26.2" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="275.2" cy="35.9" r="21.1" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="275.2405313009476" cy="24.513374598824065" r="6.166541756217738" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="275.2405313009476" y="24.513374598824065" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">N</text>
+        <text class="bubble-label bubble-label-sym" x="275.2" y="37.8" text-anchor="middle" dominant-baseline="central" font-size="10.3" font-weight="800">NVDA</text>
+        <text class="bubble-label bubble-label-pct down" x="275.2" y="49.2" text-anchor="middle" dominant-baseline="central" font-size="8.4" font-weight="700">-4.60%</text>
+      </g><g class="bubble-node has-tip" data-tip="UNH — UNH Inc
+-5.9 (24h)
+Price 113
+Vol 4000000
+Mkt 200000000" data-id="s-13">
+        <circle class="bubble-disk" cx="71.9" cy="201.3" r="29.1" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="71.9" cy="201.3" r="25.9" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="71.9" cy="201.3" r="20.9" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="71.89284934691457" cy="190.04499767966462" r="6.106189027829882" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="71.89284934691457" y="190.04499767966462" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">U</text>
+        <text class="bubble-label bubble-label-sym" x="71.9" y="203.2" text-anchor="middle" dominant-baseline="central" font-size="10.2" font-weight="800">UNH</text>
+        <text class="bubble-label bubble-label-pct down" x="71.9" y="214.5" text-anchor="middle" dominant-baseline="central" font-size="8.3" font-weight="700">-5.90%</text>
+      </g><g class="bubble-node has-tip" data-tip="HD — HD Inc
+4.300000000000001 (24h)
+Price 119
+Vol 90000000
+Mkt 4500000000" data-id="s-19">
+        <circle class="bubble-disk" cx="729.9" cy="384.5" r="29.0" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="729.9" cy="384.5" r="25.8" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="729.9" cy="384.5" r="20.9" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="729.8706136823487" cy="373.3106116412184" r="6.092249202855254" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="729.8706136823487" y="373.3106116412184" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">H</text>
+        <text class="bubble-label bubble-label-sym" x="729.9" y="386.5" text-anchor="middle" dominant-baseline="central" font-size="10.1" font-weight="800">HD</text>
+        <text class="bubble-label bubble-label-pct up" x="729.9" y="397.7" text-anchor="middle" dominant-baseline="central" font-size="8.3" font-weight="700">+4.30%</text>
+      </g><g class="bubble-node has-tip" data-tip="SQ — SQ Inc
+-4.7 (24h)
+Price 149
+Vol 20000000
+Mkt 1000000000" data-id="s-49">
+        <circle class="bubble-disk" cx="860.6" cy="308.8" r="27.4" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="860.6" cy="308.8" r="24.2" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="860.6" cy="308.8" r="19.7" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="860.5981721386559" cy="301.840850090895" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="860.5981721386559" y="301.840850090895" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">S</text>
+        <text class="bubble-label bubble-label-sym" x="860.6" y="315.8" text-anchor="middle" dominant-baseline="central" font-size="12.0" font-weight="800">SQ</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="JNJ — JNJ Inc
+-4.2 (24h)
+Price 114
+Vol 35000000
+Mkt 1750000000" data-id="s-14">
+        <circle class="bubble-disk" cx="193.1" cy="389.2" r="26.8" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="193.1" cy="389.2" r="23.6" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="193.1" cy="389.2" r="19.3" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="193.06747376554574" cy="382.4215000552798" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="193.06747376554574" y="382.4215000552798" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">J</text>
+        <text class="bubble-label bubble-label-sym" x="193.1" y="396.2" text-anchor="middle" dominant-baseline="central" font-size="11.6" font-weight="800">JNJ</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="NKE — NKE Inc
+-3.4000000000000004 (24h)
+Price 138
+Vol 79000000
+Mkt 3950000000" data-id="s-38">
+        <circle class="bubble-disk" cx="722.1" cy="40.9" r="25.8" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="722.1" cy="40.9" r="22.6" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="722.1" cy="40.9" r="18.6" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="722.059142711633" cy="34.29559359248108" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="722.059142711633" y="34.29559359248108" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">N</text>
+        <text class="bubble-label bubble-label-sym" x="722.1" y="47.9" text-anchor="middle" dominant-baseline="central" font-size="11.1" font-weight="800">NKE</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="GOOGL — GOOGL Inc
+-2.9000000000000004 (24h)
+Price 103
+Vol 94000000
+Mkt 4700000000" data-id="s-3">
+        <circle class="bubble-disk" cx="153.5" cy="46.6" r="24.8" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="153.5" cy="46.6" r="21.6" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="153.5" cy="46.6" r="17.9" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="153.54461065064197" cy="40.36490950664416" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="153.54461065064197" y="40.36490950664416" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">G</text>
+        <text class="bubble-label bubble-label-sym" x="153.5" y="53.6" text-anchor="middle" dominant-baseline="central" font-size="10.4" font-weight="800">GOOGL</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="NFLX — NFLX Inc
+3.9000000000000004 (24h)
+Price 107
+Vol 18000000
+Mkt 900000000" data-id="s-7">
+        <circle class="bubble-disk" cx="31.1" cy="317.0" r="24.5" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="31.1" cy="317.0" r="21.3" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="31.1" cy="317.0" r="17.6" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="31.083658288892934" cy="310.7793268344417" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="31.083658288892934" y="310.7793268344417" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">N</text>
+        <text class="bubble-label bubble-label-sym" x="31.1" y="324.0" text-anchor="middle" dominant-baseline="central" font-size="10.4" font-weight="800">NFLX</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="PG — PG Inc
+2.5999999999999996 (24h)
+Price 118
+Vol 59000000
+Mkt 2950000000" data-id="s-18">
+        <circle class="bubble-disk" cx="202.8" cy="27.1" r="23.1" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="202.8" cy="27.1" r="19.9" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="202.8" cy="27.1" r="16.7" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="202.77471947304173" cy="21.33899049962374" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="202.77471947304173" y="21.33899049962374" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">P</text>
+        <text class="bubble-label bubble-label-sym" x="202.8" y="34.1" text-anchor="middle" dominant-baseline="central" font-size="9.6" font-weight="800">PG</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="V — V Inc
+-2.5 (24h)
+Price 115
+Vol 66000000
+Mkt 3300000000" data-id="s-15">
+        <circle class="bubble-disk" cx="869.3" cy="247.7" r="23.1" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="869.3" cy="247.7" r="19.9" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="869.3" cy="247.7" r="16.6" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="869.2550122036268" cy="241.93283413403833" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="869.2550122036268" y="241.93283413403833" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">V</text>
+        <text class="bubble-label bubble-label-sym" x="869.3" y="254.7" text-anchor="middle" dominant-baseline="central" font-size="9.6" font-weight="800">V</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="TSLA — TSLA Inc
+2.1999999999999993 (24h)
+Price 106
+Vol 87000000
+Mkt 4350000000" data-id="s-6">
+        <circle class="bubble-disk" cx="822.2" cy="137.8" r="23.0" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="822.2" cy="137.8" r="19.8" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="822.2" cy="137.8" r="16.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="822.2081911351769" cy="132.09663166713418" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="822.2081911351769" y="132.09663166713418" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">T</text>
+        <text class="bubble-label bubble-label-sym" x="822.2" y="144.8" text-anchor="middle" dominant-baseline="central" font-size="9.5" font-weight="800">TSLA</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="GS — GS Inc
+3 (24h)
+Price 130
+Vol 31000000
+Mkt 1550000000" data-id="s-30">
+        <circle class="bubble-disk" cx="380.6" cy="389.5" r="22.9" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="380.6" cy="389.5" r="19.7" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="380.6" cy="389.5" r="16.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="380.6046512903455" cy="383.78891618859984" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="380.6046512903455" y="383.78891618859984" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">G</text>
+        <text class="bubble-label bubble-label-sym" x="380.6" y="396.5" text-anchor="middle" dominant-baseline="central" font-size="9.5" font-weight="800">GS</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="INTC — INTC Inc
+-3.8 (24h)
+Price 126
+Vol 7000000
+Mkt 350000000" data-id="s-26">
+        <circle class="bubble-disk" cx="521.7" cy="31.6" r="22.4" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="521.7" cy="31.6" r="19.2" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="521.7" cy="31.6" r="16.1" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="521.7397936346283" cy="26.040008660026164" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="521.7397936346283" y="26.040008660026164" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">I</text>
+        <text class="bubble-label bubble-label-sym" x="521.7" y="38.6" text-anchor="middle" dominant-baseline="central" font-size="9.2" font-weight="800">INTC</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="BA — BA Inc
+1.6999999999999993 (24h)
+Price 141
+Vol 72000000
+Mkt 3600000000" data-id="s-41">
+        <circle class="bubble-disk" cx="516.4" cy="391.8" r="21.6" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="516.4" cy="391.8" r="18.4" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="516.4" cy="391.8" r="15.6" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="516.3612641869389" cy="386.32066655380845" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="516.3612641869389" y="386.32066655380845" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">B</text>
+        <text class="bubble-label bubble-label-sym" x="516.4" y="398.8" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">BA</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="IBM — IBM Inc
+1.3000000000000007 (24h)
+Price 129
+Vol 100000000
+Mkt 5000000000" data-id="s-29">
+        <circle class="bubble-disk" cx="76.4" cy="144.9" r="21.6" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="76.4" cy="144.9" r="18.4" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="76.4" cy="144.9" r="15.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="76.37942517958083" cy="139.43565084732253" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="76.37942517958083" y="139.43565084732253" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">I</text>
+        <text class="bubble-label bubble-label-sym" x="76.4" y="151.9" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">IBM</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="QCOM — QCOM Inc
+-2.0999999999999996 (24h)
+Price 127
+Vol 38000000
+Mkt 1900000000" data-id="s-27">
+        <circle class="bubble-disk" cx="592.8" cy="392.9" r="21.2" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="592.8" cy="392.9" r="18.0" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="592.8" cy="392.9" r="15.3" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="592.815057807271" cy="387.43130394725375" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="592.815057807271" y="387.43130394725375" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">Q</text>
+        <text class="bubble-label bubble-label-sym" x="592.8" y="399.9" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">QCOM</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="MA — MA Inc
+-0.7999999999999998 (24h)
+Price 116
+Vol 97000000
+Mkt 4850000000" data-id="s-16">
+        <circle class="bubble-disk" cx="389.2" cy="27.1" r="20.9" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="389.2" cy="27.1" r="17.7" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="389.2" cy="27.1" r="15.0" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="389.22417206446386" cy="21.55086338490634" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="389.22417206446386" y="21.55086338490634" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="389.2" y="34.1" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">MA</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="TXN — TXN Inc
+-0.40000000000000036 (24h)
+Price 128
+Vol 69000000
+Mkt 3450000000" data-id="s-28">
+        <circle class="bubble-disk" cx="874.0" cy="149.6" r="19.9" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="874.0" cy="149.6" r="16.7" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="874.0" cy="149.6" r="14.3" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="873.9887289425478" cy="144.1205947368096" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="873.9887289425478" y="144.1205947368096" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">T</text>
+        <text class="bubble-label bubble-label-sym" x="874.0" y="156.6" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">TXN</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="CAT — CAT Inc
+3.4000000000000004 (24h)
+Price 142
+Vol 3000000
+Mkt 150000000" data-id="s-42">
+        <circle class="bubble-disk" cx="571.7" cy="24.5" r="19.7" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="571.7" cy="24.5" r="16.5" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="571.7" cy="24.5" r="14.2" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="571.7274699794905" cy="19.024089727429644" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="571.7274699794905" y="19.024089727429644" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">C</text>
+        <text class="bubble-label bubble-label-sym" x="571.7" y="31.5" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">CAT</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="META — META Inc
+0.5 (24h)
+Price 105
+Vol 56000000
+Mkt 2800000000" data-id="s-5">
+        <circle class="bubble-disk" cx="37.3" cy="243.0" r="19.6" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="37.3" cy="243.0" r="16.4" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="37.3" cy="243.0" r="14.1" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="37.27640562175985" cy="237.50889030903951" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="37.27640562175985" y="237.50889030903951" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="37.3" y="250.0" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">META</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="AMZN — AMZN Inc
+-1.2000000000000002 (24h)
+Price 104
+Vol 25000000
+Mkt 1250000000" data-id="s-4">
+        <circle class="bubble-disk" cx="330.7" cy="393.5" r="18.9" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="330.7" cy="393.5" r="15.7" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="330.7" cy="393.5" r="13.6" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="330.6518581043212" cy="388.0712929290995" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="330.6518581043212" y="388.0712929290995" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">A</text>
+        <text class="bubble-label bubble-label-sym" x="330.7" y="400.5" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">AMZN</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="SBUX — SBUX Inc
+0 (24h)
+Price 140
+Vol 41000000
+Mkt 2050000000" data-id="s-40">
+        <circle class="bubble-disk" cx="300.7" cy="84.3" r="18.8" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="300.7" cy="84.3" r="15.6" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="300.7" cy="84.3" r="13.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="300.68162864330196" cy="78.91172756822469" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="300.68162864330196" y="78.91172756822469" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">S</text>
+        <text class="bubble-label bubble-label-sym" x="300.7" y="91.3" text-anchor="middle" dominant-baseline="central" font-size="8.9" font-weight="800">SBUX</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="WMT — WMT Inc
+0.9000000000000004 (24h)
+Price 117
+Vol 28000000
+Mkt 1400000000" data-id="s-17">
+        <circle class="bubble-disk" cx="34.0" cy="163.3" r="18.7" fill="rgba(12, 48, 32, 0.92)" stroke="#3dce7a" stroke-width="3.25"/>
+        <circle cx="34.0" cy="163.3" r="15.5" fill="none" stroke="rgba(61, 206, 122, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="34.0" cy="163.3" r="13.5" fill="rgba(61, 206, 122, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="33.95792885405753" cy="157.76762126905308" r="6" fill="rgba(61, 206, 122, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="33.95792885405753" y="157.76762126905308" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">W</text>
+        <text class="bubble-label bubble-label-sym" x="34.0" y="170.3" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">WMT</text>
+        
+      </g><g class="bubble-node has-tip" data-tip="MCD — MCD Inc
+-1.7000000000000002 (24h)
+Price 139
+Vol 10000000
+Mkt 500000000" data-id="s-39">
+        <circle class="bubble-disk" cx="343.4" cy="32.2" r="18.0" fill="rgba(52, 16, 20, 0.92)" stroke="#f05555" stroke-width="3.25"/>
+        <circle cx="343.4" cy="32.2" r="14.8" fill="none" stroke="rgba(240, 85, 85, 0.55)" stroke-width="5" opacity="0.35" pointer-events="none"/>
+        <circle cx="343.4" cy="32.2" r="13.0" fill="rgba(240, 85, 85, 0.55)" opacity="0.12" pointer-events="none"/>
+        <circle cx="343.4015163729886" cy="26.721609635795602" r="6" fill="rgba(240, 85, 85, 0.35)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="343.4015163729886" y="26.721609635795602" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="#e8edf5" font-family="IBM Plex Mono, monospace">M</text>
+        <text class="bubble-label bubble-label-sym" x="343.4" y="39.2" text-anchor="middle" dominant-baseline="central" font-size="9.0" font-weight="800">MCD</text>
+        
+      </g></svg>

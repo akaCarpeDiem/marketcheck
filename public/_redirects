@@ -1,0 +1,4 @@
+# Prefer hard 404 for missing hashed assets (static files still win when present).
+/assets/*  /404-asset.txt  404
+
+# /quote/:sym is handled in functions/_middleware.ts → 302 /?q=:sym

@@ -1,0 +1,22 @@
+{
+  "name": "market-check",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "pages:dev": "wrangler pages dev dist --compatibility-date=2024-09-01",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=market-check"
+  },
+  "devDependencies": {
+    "@types/d3-hierarchy": "^3.1.7",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0",
+    "wrangler": "^3.112.0"
+  },
+  "dependencies": {
+    "d3-hierarchy": "^3.1.2"
+  }
+}

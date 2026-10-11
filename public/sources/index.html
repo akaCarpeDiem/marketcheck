@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EN7YS4P0XE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-EN7YS4P0XE');
+</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sources and methodology for Market Check (marketcheck.money): CoinGecko, Yahoo Finance, public RSS, refresh intervals, and delay warnings." />
+  <meta name="robots" content="index,follow" />
+  <title>Sources &amp; methodology · Market Check</title>
+  <link rel="canonical" href="https://marketcheck.money/sources/" />
+  <link rel="icon" type="image/png" href="/favicon.png?v=6" />
+  <link rel="stylesheet" href="/legal.css" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Market Check" />
+  <meta property="og:url" content="https://marketcheck.money/sources/" />
+  <meta property="og:title" content="Sources &amp; methodology · Market Check" />
+  <meta property="og:description" content="Where Market Check gets quotes and headlines, how often it refreshes, and why figures may be delayed." />
+  <meta property="og:image" content="https://marketcheck.money/og-share.png?v=6" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4059575347806121"
+     crossorigin="anonymous"></script>
+  </head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/">Market Check</a>
+      <nav>
+        <a href="/about/">About</a>
+        <a href="/sources/">Sources</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/terms/">Terms</a>
+        <a href="/contact/">Contact</a>
+      </nav>
+    </header>
+
+    <h1>Sources &amp; methodology</h1>
+    <p class="meta">Official site: <strong>marketcheck.money</strong> · checker dashboard · not a brokerage. A <code>*.pages.dev</code> hostname may appear as a Cloudflare Pages hosting alias only.</p>
+
+    <h2>What this page is</h2>
+    <p>
+      Market Check is a <strong>checker</strong>: a free public board of live market prices and headlines.
+      It does not execute trades, hold funds, open accounts for trading, or publish price predictions as fact.
+      Nothing here is investment advice.
+    </p>
+
+    <h2>Quote sources</h2>
+    <ul>
+      <li><strong>Crypto (top list, many bubbles / trending)</strong> — <a href="https://www.coingecko.com/en/api" target="_blank" rel="noopener">CoinGecko</a> public markets API (and related public crypto endpoints where noted in-module).</li>
+      <li><strong>US equities, ETFs, indexes, commodities, metals, oil</strong> — Yahoo Finance quote / chart endpoints, proxied through Market Check’s <code>/api/markets</code> and <code>/api/chart</code> Cloudflare Functions (no Yahoo API key).</li>
+      <li><strong>Search / single-symbol check</strong> — same Yahoo proxy for typed tickers (e.g. <code>AAPL</code>, <code>BTC-USD</code>); catalog search via <code>/api/assets</code>.</li>
+    </ul>
+    <p>
+      Upstream providers have their own terms, rate limits, and delays. Figures can be incomplete, stale, or wrong relative to any broker or exchange.
+    </p>
+
+    <h2>Headlines</h2>
+    <p>
+      Aggregated <strong>server-side</strong> from public RSS / Atom feeds (no publisher affiliation).
+      Categories include traditional finance, crypto, politics, housing, technology, AI, and others shown as tabs on the dashboard.
+      Typical outlet families: major wire / newspaper business &amp; tech feeds, selected crypto outlets, and some YouTube channel Atom feeds for video mix.
+      We never invent articles; the UI notes when a category is thin.
+    </p>
+
+    <h2>Refresh intervals (typical)</h2>
+    <ul>
+      <li>Main quotes (hero, crypto table, stocks/ETFs, indexes): about <strong>45 seconds</strong> (configurable at build via <code>VITE_REFRESH_MS</code>).</li>
+      <li>Sparklines: about <strong>15 minutes</strong>.</li>
+      <li>Bubble map: about <strong>90 seconds</strong>.</li>
+      <li>Trending pumps/dumps: about <strong>2 minutes</strong>.</li>
+      <li>Headlines: about <strong>6 minutes</strong> (server cache often 5–10 minutes).</li>
+    </ul>
+
+    <h2>Stale data &amp; errors</h2>
+    <p>
+      If a feed fails, the UI keeps the last good value <strong>only when it is also marked stale</strong> (badge or module note).
+      Otherwise you should see an explicit error / unavailable state — not a blank card pretending to be live.
+      Module footers show <strong>source name</strong> and <strong>as-of time</strong> where applicable.
+    </p>
+
+    <h2>Market hours strip</h2>
+    <p>
+      The NYSE / Nasdaq open–closed strip is an <strong>estimate</strong> from <code>America/New_York</code> wall time
+      (regular session Mon–Fri 09:30–16:00 ET) plus a thin holiday list. It is <strong>not</strong> an official exchange calendar.
+      Early closes and unlisted holidays will be wrong — treat the label as a hint only.
+    </p>
+
+    <h2>Watchlist</h2>
+    <p>
+      The watchlist is stored in your browser’s <strong>localStorage only</strong>. There is no cloud sync for watchlists on the public checker.
+      Clearing site data clears the list.
+    </p>
+
+    <h2>Shareable symbol links</h2>
+    <p>
+      Searching a symbol updates a shareable query URL such as <code>https://marketcheck.money/?q=AAPL</code>.
+      Paths like <code>/quote/AAPL</code> redirect to the same query form. These load one symbol from the existing Yahoo (and catalog) APIs — we do not prerender thousands of static quote pages.
+    </p>
+
+    <h2>Privacy &amp; policies</h2>
+    <p>
+      Watchlist and UI prefs stay in browser localStorage. No account required for the public checker.
+      Full details:
+      <a href="/privacy/">Privacy Policy</a>
+      ·
+      <a href="/terms/">Terms of Use</a>
+      ·
+      <a href="/contact/">Contact</a>
+      ·
+      <a href="/about/">About</a>.
+    </p>
+
+    <footer class="bottom">
+      <span>Not financial advice. Third-party data may be delayed or incorrect.</span>
+      <span><a href="/">← Back to dashboard</a></span>
+    </footer>
+  </div>
+</body>
+</html>
