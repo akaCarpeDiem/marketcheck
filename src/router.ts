@@ -16,6 +16,7 @@ const ROUTES: Record<string, ViewId> = {
   '/heatmap/': 'heatmap',
   '/portfolio/': 'portfolio',
   '/news/': 'news',
+  '/podcasts/': 'podcasts',
 };
 
 const TITLES: Record<ViewId, string> = {
@@ -23,7 +24,8 @@ const TITLES: Record<ViewId, string> = {
   markets: 'Markets: crypto, stocks and ETFs by market cap · Market Check',
   heatmap: 'Heat map and bubble map: what is moving · Market Check',
   portfolio: 'Portfolio and watchlist · Market Check',
-  news: 'Market headlines: finance, crypto, technology and AI · Market Check',
+  news: 'Money news by topic: markets, investing, crypto and more · Market Check',
+  podcasts: 'Finance and business podcasts to browse · Market Check',
 };
 
 export const currentView = signal<ViewId | null>(null);

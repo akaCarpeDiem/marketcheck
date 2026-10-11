@@ -8,6 +8,8 @@ export type HeatItem = {
   change: number | null;
   weight: number;
   group: string;
+  /** Brand icon, shown on tiles with room for it. */
+  image?: string | null;
 };
 
 export type HeatMap = {
@@ -81,7 +83,15 @@ export function createHeatMap(
       }
       const showText = size >= 8;
       size = Math.max(8, size);
-      markup += `<button type="button" class="heat-tile ${tone}" data-key="${esc(t.item.key)}" style="left:${(r.x + 1).toFixed(1)}px;top:${(r.y + 1).toFixed(1)}px;width:${Math.max(0, r.w - 2).toFixed(1)}px;height:${Math.max(0, r.h - 2).toFixed(1)}px;--s:${s};font-size:${size.toFixed(1)}px" aria-label="${esc(t.item.label)} ${esc(pctText)}">${showText ? `<b>${esc(t.item.label)}</b>${showPct ? `<span>${pctText}</span>` : ''}` : ''}</button>`;
+      // A brand icon above the ticker where the tile has the height for it. Not lazy-loaded:
+      // it stays hidden until it has loaded, and a hidden lazy image would never load.
+      const iconSize = Math.round(Math.min(34, Math.max(16, size * 1.25)));
+      const textHeight = size * (showPct ? 2.1 : 1.2);
+      const icon =
+        showText && t.item.image && r.w >= 46 && r.h - textHeight >= iconSize + 12
+          ? `<img class="heat-ico" src="${esc(t.item.image)}" alt="" width="${iconSize}" height="${iconSize}" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('ok')" onerror="this.remove()" />`
+          : '';
+      markup += `<button type="button" class="heat-tile ${tone}" data-key="${esc(t.item.key)}" style="left:${(r.x + 1).toFixed(1)}px;top:${(r.y + 1).toFixed(1)}px;width:${Math.max(0, r.w - 2).toFixed(1)}px;height:${Math.max(0, r.h - 2).toFixed(1)}px;--s:${s};font-size:${size.toFixed(1)}px" aria-label="${esc(t.item.label)} ${esc(pctText)}">${icon}${showText ? `<b>${esc(t.item.label)}</b>${showPct ? `<span>${pctText}</span>` : ''}` : ''}</button>`;
     }
     layer.innerHTML = markup;
   }

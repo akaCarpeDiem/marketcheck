@@ -1581,3 +1581,205 @@ td .cell-asset .cell-stack {
 .board-table td svg {
   display: inline-block;
 }
+
+/* Brand icon on a heat map tile. Hidden until it has loaded, so a missing one leaves no gap. */
+.heat-ico {
+  border-radius: 50%;
+  background: #fff;
+  object-fit: contain;
+  margin-bottom: 0.25em;
+  flex: none;
+  display: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.heat-ico.ok {
+  display: block;
+}
+
+/* ── News: topic line and type filter ── */
+.news-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: -2px 0 14px;
+}
+.news-about {
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+.news-types .seg-btn em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.topic-list a {
+  color: var(--brand);
+  white-space: nowrap;
+}
+.topic-list a:hover {
+  text-decoration: underline;
+}
+
+/* ── Podcast hub ── */
+.pod-tabs {
+  margin-bottom: 18px;
+}
+.shows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+  margin-bottom: calc(var(--gap) + 10px);
+}
+.show {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  align-items: start;
+}
+.show-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--card-3);
+}
+.show-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s;
+}
+.show-art:hover img {
+  transform: scale(1.04);
+}
+.show-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.show-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.show-head h3 {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.show-head .tag {
+  flex: none;
+}
+.show-head .tag:hover {
+  color: var(--brand);
+}
+.show-about {
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.show-latest {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.show-latest:hover {
+  background: var(--card-3);
+}
+.show-latest em {
+  grid-row: span 2;
+  align-self: start;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand);
+  padding-top: 2px;
+}
+.show-latest strong {
+  font-weight: 550;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.show-latest span,
+.show-more span {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+.show-more {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.show-more li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+}
+.show-more a {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.show-more a:hover,
+.show-all:hover {
+  color: var(--brand);
+}
+.show-all {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-3);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.show.is-loading .show-art {
+  background: var(--card-2);
+}
+@media (max-width: 1240px) {
+  .shows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .shows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .show {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .call-side {
+    flex-wrap: wrap;
+  }
+  .call-board {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .call-board em {
+    max-width: none;
+  }
+}

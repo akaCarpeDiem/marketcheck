@@ -5,17 +5,20 @@
  */
 import { icon, logoMark } from '../lib/icons';
 
-export type NavId = 'overview' | 'markets' | 'heatmap' | 'portfolio' | 'news';
+export type NavId = 'overview' | 'markets' | 'heatmap' | 'portfolio' | 'news' | 'podcasts';
 
-export const NAV: { id: NavId; href: string; label: string; short: string; icon: (s?: number) => string }[] = [
+/** `tab: false` keeps an entry out of the phone tab bar, which has room for five. */
+export const NAV: { id: NavId; href: string; label: string; short: string; icon: (s?: number) => string; tab?: boolean }[] = [
   { id: 'overview', href: '/', label: 'Overview', short: 'Overview', icon: icon.home },
   { id: 'markets', href: '/markets/', label: 'Markets', short: 'Markets', icon: icon.chart },
   { id: 'heatmap', href: '/heatmap/', label: 'Heat map', short: 'Heat map', icon: icon.bubbles },
   { id: 'portfolio', href: '/portfolio/', label: 'Portfolio', short: 'Portfolio', icon: icon.wallet },
   { id: 'news', href: '/news/', label: 'News', short: 'News', icon: icon.news },
+  { id: 'podcasts', href: '/podcasts/', label: 'Podcasts', short: 'Podcasts', icon: icon.mic, tab: false },
 ];
 
 export const FOOT_LINKS: { href: string; label: string }[] = [
+  { href: '/podcasts/', label: 'Podcasts' },
   { href: '/about/', label: 'About' },
   { href: '/sources/', label: 'Sources & methods' },
   { href: '/privacy/', label: 'Privacy' },
@@ -52,9 +55,11 @@ export function topbarHtml(active: NavId | null): string {
 }
 
 export function tabbarHtml(active: NavId | null): string {
-  return NAV.map(
+  // On a phone, Podcasts is reached from News; while there, the News tab stays lit.
+  const lit = active === 'podcasts' ? 'news' : active;
+  return NAV.filter((n) => n.tab !== false).map(
     (n) =>
-      `<a class="tab${n.id === active ? ' is-active' : ''}" href="${n.href}" data-nav="${n.id}"${n.id === active ? ' aria-current="page"' : ''}>${n.icon(20)}<span>${n.short}</span></a>`,
+      `<a class="tab${n.id === lit ? ' is-active' : ''}" href="${n.href}" data-nav="${n.id}"${n.id === lit ? ' aria-current="page"' : ''}>${n.icon(20)}<span>${n.short}</span></a>`,
   ).join('');
 }
 

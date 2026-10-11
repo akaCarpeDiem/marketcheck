@@ -270,6 +270,36 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     return list;
   }
 
+  /** The podcast hub in the shape /api/podcasts returns. `shows` is the real directory. */
+  function podcasts(shows, topics) {
+    const now = Date.now();
+    const titles = ['What the Fed does next', 'A listener asks: pay off the mortgage or invest?', 'The deal that changed an industry', 'Bull case, bear case', 'Inside a record quarter', 'Three charts everyone is arguing about'];
+    const list = shows.map((show, i) => ({
+      ...show,
+      url: `https://www.youtube.com/channel/${show.channel}`,
+      episodes: [0, 1, 2].map((n) => {
+        const at = now - ((i * 5 + n * 31 + 2) % 140) * 3_600_000;
+        return {
+          id: `${show.id}-${n}`,
+          title: `${titles[(i + n) % titles.length]} | ${show.name}`,
+          link: `https://example.com/podcasts/${show.id}/${n}`,
+          summary: '',
+          image: `/__dev/img?i=${(i + n) % 9}`,
+          source: show.name,
+          publishedAt: new Date(at).toISOString(),
+          publishedMs: at,
+          mediaType: 'video',
+          topic: show.topic,
+          type: 'podcast',
+          show: show.id,
+        };
+      }),
+    }));
+    const latest = list.flatMap((s) => s.episodes).sort((a, b) => b.publishedMs - a.publishedMs).slice(0, 36);
+    const used = new Set(list.map((s) => s.topic));
+    return { ok: true, shows: list, latest, topics: topics.filter((t) => used.has(t.id)).map((t) => ({ id: t.id, label: t.label, short: t.short })), failed: [], stale: false, fetchedAt: new Date(now).toISOString() };
+  }
+
   function jupiter() {
     const out = [];
     for (let i = 0; i < 260; i++) {
@@ -394,12 +424,20 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
   /** Headlines in the shape /api/headlines returns (the real one reads dozens of RSS feeds). */
   function headlines(category) {
     const POOL = {
-      tradfi: ['Fed minutes show officials saw more work to do to quell inflation', 'Why markets are buoyant, and under pressure', 'Savings rates: 5% deals may not last, say experts', 'Treasury yields climb as traders reprice rate path', 'Oil slips as supply worries ease', 'Big banks kick off earnings season with a beat', 'Dollar steadies ahead of inflation report', 'Chip stocks lead Nasdaq to a record close'],
+      markets: ['Fed minutes show officials saw more work to do to quell inflation', 'Why markets are buoyant, and under pressure', 'Treasury yields climb as traders reprice rate path', 'Jobless claims fall to a six-month low', 'Dollar steadies ahead of inflation report', 'Chip stocks lead Nasdaq to a record close', 'What a steeper yield curve means for banks', 'Consumer sentiment slips for a second month'],
+      investing: ['Five funds that beat the index this year, and why', 'Earnings season: what analysts expect from big tech', 'Dividend growers are back in favour', 'Small caps have lagged for a decade. Is that changing?', 'How to read a company buyback', 'Bond ladders, explained with numbers'],
+      'personal-finance': ['Savings rates: 5% deals may not last, say experts', 'What to do with an old 401(k)', 'The real cost of carrying a card balance', 'Tax brackets for next year are out', 'Is renters insurance worth it? A worked example', 'How much emergency fund is enough'],
       crypto: ['Bitcoin holds $82,000 as ETF inflows return', 'Ethereum developers set date for next upgrade', 'Stablecoin supply reaches a new high', 'Solana activity jumps as fees stay low', 'Exchange volumes rebound in October', 'What the latest halving cycle chart is telling traders'],
-      technology: ['Chipmakers race to add capacity', 'The laptop refresh nobody expected', 'Cloud spending keeps growing', 'A new standard for satellite phones', 'Inside the fight over app store fees'],
-      ai: ['New model release resets the benchmark tables', 'Data centers strain local power grids', 'Start-ups pivot to on-device AI', 'Regulators weigh rules for AI agents'],
+      'real-estate': ['Mortgage rates dip to the lowest since spring', 'New listings rise as sellers return', 'Office vacancies are still climbing downtown', 'Builders cut prices to move inventory', 'Rents are flat in most big cities'],
+      technology: ['Chipmakers race to add capacity', 'New model release resets the benchmark tables', 'Data centers strain local power grids', 'Cloud spending keeps growing', 'Humanoid robots move from demo to factory floor', 'Inside the fight over app store fees'],
+      policy: ['Senate panel advances market structure bill', 'SEC proposes changes to fund disclosure rules', 'Tariff review could reshape supply chains', 'Fed governors split on the pace of cuts', 'Treasury outlines new stablecoin guidance'],
+      business: ['Big banks kick off earnings season with a beat', 'Retail giant to buy rival in $9 billion deal', 'Automaker recalls 200,000 vehicles', 'Airline orders 100 new jets', 'A founder steps down after 20 years', 'Why layoffs are rising in consulting'],
+      commodities: ['Oil slips as supply worries ease', 'Gold steadies near a record', 'Copper rallies on grid spending', 'OPEC+ keeps output plan unchanged', 'Natural gas jumps on a cold forecast', 'Wheat falls as harvest beats estimates'],
+      healthcare: ['Drugmaker wins approval for obesity pill', 'Hospitals brace for a hard flu season', 'A longevity trial reports its first results', 'Insurers raise premiums for next year', 'What a new blood test can and cannot detect'],
     };
-    const titles = POOL[category] ?? POOL.tradfi.map((t) => `${t} (${category})`);
+    const LEGACY = { tradfi: 'markets', web3nfts: 'crypto', politics: 'policy', housing: 'real-estate', ai: 'technology', robotics: 'technology', genart: 'technology', health: 'healthcare', longevity: 'healthcare' };
+    category = LEGACY[category] ?? category;
+    const titles = POOL[category] ?? POOL.markets;
     const sources = ['BBC Business', 'CNBC Markets', 'WSJ Markets', 'NYT Business', 'Guardian Business', 'CoinDesk'];
     const now = Date.now();
     const items = titles.map((title, i) => ({
@@ -411,10 +449,13 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       source: sources[(i + hash(category)) % sources.length],
       publishedAt: new Date(now - (i * 47 + 12) * 60_000).toISOString(),
       publishedMs: now - (i * 47 + 12) * 60_000,
-      mediaType: i % 4 === 3 ? 'video' : 'article',
+      mediaType: i % 4 === 3 || i % 5 === 2 ? 'video' : 'article',
+      topic: category,
+      type: i % 5 === 2 ? 'podcast' : i % 4 === 3 ? 'video' : 'article',
     }));
     return {
       category,
+      topic: category,
       items,
       feedsUsed: sources.slice(0, 4),
       feedsFailed: [],
@@ -426,7 +467,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     };
   }
 
-  return { handle, headlines, livePrice };
+  return { handle, headlines, podcasts, livePrice };
 }
 
 /** A round icon with the ticker's first letters, standing in for coin and company logos. */

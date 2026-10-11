@@ -35,6 +35,7 @@ export const icon = {
   bubbles: (s = 16) => svg('<circle cx="5.6" cy="6" r="3.6"/><circle cx="11.6" cy="10.6" r="2.6"/><circle cx="11.8" cy="4" r="1.5"/>', s),
   treemap: (s = 16) => svg('<rect x="2" y="2.5" width="12" height="11" rx="1.4"/><path d="M8.6 2.5v11M8.6 8h5.4M2 9.4h6.6"/>', s),
   wallet: (s = 16) => svg('<path d="M2.5 5.2a1.7 1.7 0 0 1 1.7-1.7h7.1v2.2"/><rect x="2.5" y="5.2" width="11" height="8" rx="1.6"/><path d="M11 9.2h.1"/>', s),
+  mic: (s = 16) => svg('<rect x="6" y="2" width="4" height="7.2" rx="2"/><path d="M3.8 7.6a4.2 4.2 0 0 0 8.4 0M8 11.8v2.2M5.8 14h4.4"/>', s),
   news: (s = 16) => svg('<rect x="2.3" y="3" width="11.4" height="10" rx="1.4"/><path d="M5 6h6M5 8.4h6M5 10.8h3.4"/>', s),
   home: (s = 16) => svg('<path d="M2.5 7.4 8 2.8l5.5 4.6v5.3a.9.9 0 0 1-.9.9H9.9V9.8H6.1v3.8H3.4a.9.9 0 0 1-.9-.9z"/>', s),
   chart: (s = 16) => svg('<path d="M2.5 13.5h11M4.5 11V8M8 11V4.5M11.5 11V6.5"/>', s),

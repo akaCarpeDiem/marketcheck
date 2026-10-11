@@ -255,6 +255,25 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
     Date.now = realNow;
   }
 
+  // The hourly price record is off unless switched on, and costs one write an hour when it is.
+  coinGeckoRefuses = false;
+  assert.ok(![...kv.store.keys()].some((k) => k.startsWith('snap:')), 'no price record without the switch');
+  Date.now = () => realNow() + 40 * 60_000;
+  try {
+    const res = await cryptos({
+      request: new Request('https://marketcheck.money/api/cryptos'),
+      env: { LAYOUTS: kv, PRICE_HISTORY: '1' },
+      waitUntil: (p) => pending.push(p),
+    });
+    const body = await res.json();
+    await Promise.allSettled(pending.splice(0));
+    assert.equal([...kv.store.keys()].filter((k) => k.startsWith('snap:')).length, 1, 'switched on: one record for the hour');
+    assert.ok(body.items.every((c) => c.ch['4h'] === null), 'and no 4h figure until the record goes back four hours');
+  } finally {
+    Date.now = realNow;
+  }
+  coinGeckoRefuses = true;
+
   // From cold (a new location with no copy anywhere) the answer is an honest "nothing", not a crash.
   // The universe module keeps its own memory, so load a second copy of it the way a fresh isolate would.
   edge.clear();

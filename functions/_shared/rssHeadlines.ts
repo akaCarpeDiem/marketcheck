@@ -6,20 +6,10 @@
  */
 
 import { makeCache, mapPool } from './cache';
+import { PODCAST_SHOWS, TOPIC_IDS, type ContentType, type PodcastShow, type TopicId } from './newsTopics';
 
-export type HeadlineCategory =
-  | 'tradfi'
-  | 'crypto'
-  | 'politics'
-  | 'housing'
-  | 'web3nfts'
-  | 'health'
-  | 'longevity'
-  | 'technology'
-  | 'ai'
-  | 'robotics'
-  | 'genart'
-  | 'podcasts';
+/** News is organised by the ten topics in newsTopics.ts. (The name "category" is kept from the older code.) */
+export type HeadlineCategory = TopicId;
 
 export type HeadlineMediaType = 'article' | 'video';
 
@@ -35,6 +25,12 @@ export type HeadlineItem = {
   mediaType: HeadlineMediaType;
   /** YouTube media:statistics views when present */
   views?: number | null;
+  /** Topic this item is filed under. */
+  topic?: TopicId | null;
+  /** Article, video or podcast episode. Independent of the topic. */
+  type?: ContentType;
+  /** For a podcast episode: the id of the show in the podcast directory. */
+  show?: string;
 };
 
 export type HeadlinesResult = {
@@ -386,104 +382,7 @@ const AI_FEEDS: FeedDef[] = [
   },
 ];
 
-/** Must be about generative / AI-created art & media — not generic “generative AI” news. */
-const GENART_KEYWORDS =
-  /\b(generative\s+arts?|gen[\s-]?arts?|AI[\s-]?arts?|neural\s+arts?|procedural\s+arts?|AI[\s-]?generated\s+(art|arts|image|images|film|films|movie|movies|video|videos|animation|animations|music|ad|ads|advert|commercial|spot)|text[\s-]?to[\s-]?(image|video|film)|image[\s-]?generat(or|ion|ive)|video[\s-]?generat(or|ion|ive)|AI\s+(filmmaking|animation|illustrat\w*|design\s+tool)|Midjourney|Stable\s+Diffusion|DALL-?E|DALL·E|Runway(\s*(ML|Gen-?\d))?\b|Pika(\s+Labs)?\b|Luma(\s+(AI|Dream|Dream\s*Machine))?\b|Kling(\s+AI)?\b|\bSora\b|Flux\.(1|Dev|Schnell|Pro)|Ideogram|Leonardo[\s-]?AI|Firefly\b|Adobe\s+Firefly|Gen-?[123]\s+Alpha|AI[\s-]?generated\s+content\s+in\s+(film|movies?|ads?|advertising|fashion|music)|((film|movie|advertising|commercial|ad\s+campaign|fashion\s+campaign|exhibition|museum|gallery|music\s+video|TV\s+show|trailer).{0,48}(generative|AI[\s-]?generated|Midjourney|Runway|Sora|Stable\s+Diffusion|DALL-?E))|((generative|AI[\s-]?generated|Midjourney|Runway|Sora|Stable\s+Diffusion|DALL-?E).{0,48}(film|movie|advertising|commercial|exhibition|museum|gallery|music\s+video|fashion|trailer)))\b/i;
-
-/** Drop generic LLM / chip / chatbot stories that only mention “AI”. */
-const GENART_EXCLUDE =
-  /\b(semiconductor|data\s+center|cybersecurity|ransomware|interest\s+rate|coding (assistant|agent)|\bLLM\s+benchmark)\b/i;
-
-const GENART_FEEDS: FeedDef[] = [
-  {
-    name: 'MIT Technology Review',
-    url: 'https://www.technologyreview.com/feed/',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'The Verge',
-    url: 'https://www.theverge.com/rss/index.xml',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'Ars Technica',
-    url: 'https://feeds.arstechnica.com/arstechnica/index',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'Guardian Technology',
-    url: 'https://www.theguardian.com/technology/rss',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'BBC Technology',
-    url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'Creative Bloq',
-    url: 'https://www.creativebloq.com/feed',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'Dezeen',
-    url: 'https://www.dezeen.com/feed/',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'Designboom',
-    url: 'https://www.designboom.com/feed/',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'OpenAI News',
-    url: 'https://openai.com/blog/rss.xml',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  // Dedicated gen-media channels — channel IS the topic
-  { name: 'YT Runway', url: yt('UCUBqu_z5uP0AZhYtuyFZB3g'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT Midjourney', url: yt('UCldFPBqAVrok5DPUQeSMEqQ'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT Stability AI', url: yt('UCpi_ULPErwrxGTDWZey5azQ'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT Pika Labs', url: yt('UC0SclYU4iiQRihtmDnak-gQ'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT Luma AI', url: yt('UC2U1evSGm5bAiKbVDTX36bw'), mediaType: 'video', trustedTopic: true },
-  {
-    name: 'YT Corridor Crew',
-    url: yt('UCSpFnDQr88xCZ80N-X7t0nQ'),
-    mediaType: 'video',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'YT OpenAI',
-    url: yt('UCXZCJLdBC09xxGZ6gcdrc6A'),
-    mediaType: 'video',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'YT Matt Wolfe',
-    url: yt('UChpleBmo18P08aKCIgti38g'),
-    mediaType: 'video',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-  {
-    name: 'YT TED',
-    url: yt('UCAuUUnT6oDeKwE6v1NGQxug'),
-    mediaType: 'video',
-    keywordFilter: GENART_KEYWORDS,
-    excludeFilter: GENART_EXCLUDE,
-  },
-];
+/* The old "Generative art" list is retired: it has no place in a finance news structure. */
 
 
 /** Real robots / humanoids / cobots / named robotics cos — not phones, cars, or “automation”. */
@@ -585,29 +484,146 @@ const ROBOTICS_FEEDS: FeedDef[] = [
 ];
 
 
-/** Podcasts — recent YouTube episodes only (no article RSS). */
-const PODCASTS_FEEDS: FeedDef[] = [
-  { name: 'YT Joe Rogan Experience', ...ytMeta('UCzQUP1qoWDoEbmsQxvdjxgQ', 'PowerfulJRE'), trustedTopic: true },
-  { name: 'YT The Diary Of A CEO', ...ytMeta('UCGq-a57w-aPwyi3pW7XLiHw', 'The Diary Of A CEO'), trustedTopic: true },
-  { name: 'YT Theo Von', ...ytMeta('UC5AQEUAwCh1sGDvkQtkDWUQ', 'Theo Von'), trustedTopic: true },
-  { name: 'YT Caleb Hammer', ...ytMeta('UCLe_q9axMaeTbjN0hy1Z9xA', 'Caleb Hammer'), trustedTopic: true },
-  { name: 'YT a16z', ...ytMeta('UC9cn0TuPq4dnbTY-CBsm8XA', 'a16z'), trustedTopic: true },
+
+/* ── Topics added with the ten-topic structure ─────────────────────────── */
+
+const INVESTING_KEYWORDS =
+  /\b(invest(?:or|ors|ing|ment|ments)?|stocks?|shares|equit(?:y|ies)|ETFs?|index funds?|mutual funds?|portfolio|dividends?|earnings|analysts?|price target|upgrades?|downgrades?|valuation|bull(?:ish)?|bear(?:ish)?|rally|sell-?off|IPO|buybacks?|bonds?|yields?|hedge funds?|Buffett|Berkshire|S&P 500|Nasdaq|Dow)\b/i;
+
+const INVESTING_FEEDS: FeedDef[] = [
+  { name: 'CNBC Investing', url: 'https://www.cnbc.com/id/15839069/device/rss/rss.html', trustedTopic: true },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: INVESTING_KEYWORDS },
+  { name: 'MarketWatch Market Pulse', url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse', trustedTopic: true },
+  { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', trustedTopic: true },
+  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', keywordFilter: INVESTING_KEYWORDS },
+  { name: 'Seeking Alpha', url: 'https://seekingalpha.com/market_currents.xml', trustedTopic: true },
+  { name: 'Motley Fool', url: 'https://www.fool.com/feeds/index.aspx', trustedTopic: true },
+  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: INVESTING_KEYWORDS },
+  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: INVESTING_KEYWORDS },
+  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: INVESTING_KEYWORDS },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: INVESTING_KEYWORDS },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: INVESTING_KEYWORDS },
+  { name: 'YT The Compound', ...ytMeta('UCBRpqrzuuqE8TZcWw75JSdw', 'The Compound'), trustedTopic: true },
+  { name: 'YT Real Vision', ...ytMeta('UCGXWKlq1Oxr3ddEtmKhAkPg', 'Real Vision'), trustedTopic: true },
 ];
 
+const PERSONAL_FINANCE_KEYWORDS =
+  /\b(sav(?:e|ing|ings)|budget(?:s|ing)?|retire(?:ment|es?)?|401\(?k\)?|IRAs?|Roth|pensions?|credit (?:cards?|scores?)|debts?|loans?|student loans?|mortgages?|refinanc\w*|tax(?:es)?|IRS|insurance|Social Security|Medicare|paychecks?|salar(?:y|ies)|wages?|cost of living|household|scams?|fraud|bank accounts?|interest rates?|emergency fund|inheritance|estate plan\w*|financial advis\w*|money)\b/i;
+
+const PERSONAL_FINANCE_FEEDS: FeedDef[] = [
+  { name: 'CNBC Personal Finance', url: 'https://www.cnbc.com/id/21324812/device/rss/rss.html', trustedTopic: true },
+  { name: 'NYT Your Money', url: 'https://rss.nytimes.com/services/xml/rss/nyt/YourMoney.xml', trustedTopic: true },
+  { name: 'Guardian Money', url: 'https://www.theguardian.com/uk/money/rss', trustedTopic: true },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'MarketWatch Personal Finance', url: 'https://feeds.content.dowjones.io/public/rss/RSSPersonalFinance', trustedTopic: true },
+  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'YT Caleb Hammer', ...ytMeta('UCLe_q9axMaeTbjN0hy1Z9xA', 'Caleb Hammer'), trustedTopic: true },
+  { name: 'YT The Ramsey Show', ...ytMeta('UC7eBNeDW1GQf2NJQ6G6gAxw', 'The Ramsey Show Highlights'), trustedTopic: true },
+  { name: 'YT The Money Guy Show', ...ytMeta('UC9vUu4vlIlMC0dHQCTvQPbg', 'The Money Guy Show'), trustedTopic: true },
+  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+];
+
+const BUSINESS_KEYWORDS =
+  /\b(compan(?:y|ies)|corporat\w*|CEOs?|CFOs?|chief executive|executives?|boards?|earnings|profits?|revenue|sales|mergers?|acquisitions?|acquire[sd]?|takeovers?|buyouts?|deals?|IPO|layoffs?|job cuts|hiring|strikes?|unions?|antitrust|bankrupt\w*|restructur\w*|startups?|founders?|retailers?|airlines?|automakers?|supply chains?|franchis\w*|shareholders?|activist investors?)\b/i;
+
+const BUSINESS_FEEDS: FeedDef[] = [
+  { name: 'CNBC Business', url: 'https://www.cnbc.com/id/10001147/device/rss/rss.html', trustedTopic: true },
+  { name: 'CNBC Earnings', url: 'https://www.cnbc.com/id/15839135/device/rss/rss.html', trustedTopic: true },
+  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'NYT DealBook', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Dealbook.xml', trustedTopic: true },
+  { name: 'WSJ Business', url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', trustedTopic: true },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'Fortune', url: 'https://fortune.com/feed/', keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', keywordFilter: /\b(raises?|funding|valuation|acqui\w+|IPO|layoffs?|revenue|startup)\b/i },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'YT WSJ', ...ytMeta('UCK7tptUDHh-RYDsdxO1-5QQ', 'Wall Street Journal'), keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'YT All-In', ...ytMeta('UCESLZhusAkFfsNsApnjF_Cg', 'All-In Podcast'), trustedTopic: true },
+  { name: 'YT Acquired', ...ytMeta('UCyFqFYfTW2VoIQKylJ04Rtw', 'Acquired'), trustedTopic: true },
+  { name: 'YT The Diary Of A CEO', ...ytMeta('UCGq-a57w-aPwyi3pW7XLiHw', 'The Diary Of A CEO'), trustedTopic: true },
+];
+
+const COMMODITIES_KEYWORDS =
+  /\b(oil|crude|Brent|WTI|OPEC\+?|barrels?|gasoline|diesel|refiner\w*|pipelines?|natural gas|LNG|energy|power grid|electricity|utilities|solar|wind (?:power|farms?|energy)|nuclear|uranium|coal|gold|silver|platinum|palladium|copper|aluminium|aluminum|nickel|lithium|cobalt|rare earths?|iron ore|steel|metals?|mining|miners?|commodit\w*|wheat|corn|soy\w*|coffee|cocoa|sugar|cotton|cattle|grain|fertili[sz]er)\b/i;
+
+const COMMODITIES_FEEDS: FeedDef[] = [
+  { name: 'CNBC Energy', url: 'https://www.cnbc.com/id/19836768/device/rss/rss.html', trustedTopic: true },
+  { name: 'OilPrice.com', url: 'https://oilprice.com/rss/main', trustedTopic: true },
+  { name: 'EIA Today in Energy', url: 'https://www.eia.gov/rss/todayinenergy.xml', trustedTopic: true },
+  { name: 'Mining.com', url: 'https://www.mining.com/feed/', trustedTopic: true },
+  { name: 'Guardian Energy', url: 'https://www.theguardian.com/environment/energy/rss', trustedTopic: true },
+  { name: 'Guardian Commodities', url: 'https://www.theguardian.com/business/commodities/rss', trustedTopic: true },
+  { name: 'NYT Energy & Environment', url: 'https://rss.nytimes.com/services/xml/rss/nyt/EnergyEnvironment.xml', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'CNBC Markets', url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'YT Kitco News', ...ytMeta('UC9ijza42jVR3T6b8bColgvg', 'Kitco NEWS'), trustedTopic: true },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: COMMODITIES_KEYWORDS },
+];
+
+/** Extra property sources for Real Estate, on top of the old housing list. */
+const REAL_ESTATE_EXTRA: FeedDef[] = [
+  { name: 'HousingWire', url: 'https://www.housingwire.com/feed/', trustedTopic: true },
+  { name: 'Realtor.com News', url: 'https://www.realtor.com/news/feed/', trustedTopic: true },
+  { name: 'Redfin News', url: 'https://www.redfin.com/news/feed/', trustedTopic: true },
+  { name: 'YT BiggerPockets', ...ytMeta('UCVWDbXqQ8cupuVpotWNt2eg', 'BiggerPockets'), trustedTopic: true },
+];
+
+/**
+ * Several old lists become one topic. The same outlet is often in more than
+ * one of them with a different keyword filter; the first one listed wins.
+ * Video channels are capped, because every feed is one request and a Worker
+ * may only make so many while answering.
+ */
+function merged(lists: FeedDef[][], opts: { maxVideo: number; maxTotal: number; drop?: RegExp }): FeedDef[] {
+  const seen = new Set<string>();
+  const articles: FeedDef[] = [];
+  const videos: FeedDef[] = [];
+  for (const list of lists) {
+    for (const f of list) {
+      if (seen.has(f.name) || (opts.drop && opts.drop.test(f.name))) continue;
+      seen.add(f.name);
+      (f.mediaType === 'video' ? videos : articles).push(f);
+    }
+  }
+  const v = videos.slice(0, opts.maxVideo);
+  return [...articles.slice(0, Math.max(0, opts.maxTotal - v.length)), ...v];
+}
+
 const FEEDS_BY_CAT: Record<HeadlineCategory, FeedDef[]> = {
-  tradfi: TRADFI_FEEDS,
-  crypto: CRYPTO_FEEDS,
-  politics: POLITICS_FEEDS,
-  housing: HOUSING_FEEDS,
-  web3nfts: WEB3_NFT_FEEDS,
-  health: HEALTH_FEEDS,
-  longevity: LONGEVITY_FEEDS,
-  technology: TECHNOLOGY_FEEDS,
-  ai: AI_FEEDS,
-  robotics: ROBOTICS_FEEDS,
-  genart: GENART_FEEDS,
-  podcasts: PODCASTS_FEEDS,
+  markets: TRADFI_FEEDS,
+  investing: INVESTING_FEEDS,
+  'personal-finance': PERSONAL_FINANCE_FEEDS,
+  // Crypto and the old "Web3 & NFTs" list. Single-brand NFT channels are left out of a finance feed.
+  crypto: merged([CRYPTO_FEEDS, WEB3_NFT_FEEDS], { maxVideo: 8, maxTotal: 22, drop: /Claynosaurz|Pudgy Penguins|VeeFriends/ }),
+  'real-estate': merged([HOUSING_FEEDS, REAL_ESTATE_EXTRA], { maxVideo: 6, maxTotal: 16 }),
+  // Technology, AI and robotics.
+  technology: merged([TECHNOLOGY_FEEDS, AI_FEEDS, ROBOTICS_FEEDS], { maxVideo: 8, maxTotal: 24, drop: /PBS Space Time|Linus Tech Tips|TechLinked|Unitree|Agility|^YT TED$|^YT Veritasium$/ }),
+  policy: POLITICS_FEEDS,
+  business: BUSINESS_FEEDS,
+  commodities: COMMODITIES_FEEDS,
+  // Health and longevity.
+  healthcare: merged([HEALTH_FEEDS, LONGEVITY_FEEDS], { maxVideo: 7, maxTotal: 22, drop: /^YT TED$|^YT Veritasium$|^YT Kurzgesagt$|SciShow|AsapSCIENCE/ }),
 };
+
+
+/** Feeds in the topic lists that are podcast shows, so their episodes are tagged as podcasts too. */
+const SHOW_BY_FEED = new Map<string, PodcastShow>();
+{
+  const byChannel = new Map(PODCAST_SHOWS.map((show) => [show.channel, show]));
+  for (const list of Object.values(FEEDS_BY_CAT)) {
+    for (const f of list) {
+      const id = f.ytChannelId ?? f.url.match(/channel_id=([\w-]+)/)?.[1];
+      const show = id ? byChannel.get(id) : undefined;
+      if (show) SHOW_BY_FEED.set(f.name, show);
+    }
+  }
+}
 
 /** Post-fetch topic gates — applied after parse for non-trusted feeds. */
 const TRADFI_TOPIC =
@@ -631,20 +647,23 @@ const HEALTH_TOPIC =
 const TECHNOLOGY_TOPIC =
   /\b(tech|software|hardware|chips?|semiconductor|startup|Apple|Google|Microsoft|NVIDIA|gadget|cyber|AI\b|robot|cloud|app\b|smartphone|GPU|CPU|quantum)\b/i;
 
+const HEALTHCARE_TOPIC = new RegExp(`${HEALTH_TOPIC.source}|${LONGEVITY_KEYWORDS.source}`, 'i');
+const TECH_ALL_TOPIC = new RegExp(`${TECHNOLOGY_TOPIC.source}|${AI_KEYWORDS.source}|${ROBOTICS_KEYWORDS.source}`, 'i');
+const CRYPTO_ALL_TOPIC = new RegExp(`${CRYPTO_TOPIC.source}|${WEB3_NFT_TOPIC.source}`, 'i');
+
 const CATEGORY_TOPIC: Record<HeadlineCategory, RegExp | null> = {
-  tradfi: TRADFI_TOPIC,
-  crypto: CRYPTO_TOPIC,
-  politics: POLITICS_TOPIC,
-  housing: HOUSING_TOPIC,
-  web3nfts: WEB3_NFT_TOPIC,
-  health: HEALTH_TOPIC,
-  longevity: LONGEVITY_KEYWORDS,
-  technology: TECHNOLOGY_TOPIC,
-  ai: AI_KEYWORDS,
-  robotics: ROBOTICS_KEYWORDS,
-  genart: GENART_KEYWORDS,
-  podcasts: null, // all feeds trustedTopic — videos only
+  markets: TRADFI_TOPIC,
+  investing: INVESTING_KEYWORDS,
+  'personal-finance': PERSONAL_FINANCE_KEYWORDS,
+  crypto: CRYPTO_ALL_TOPIC,
+  'real-estate': HOUSING_TOPIC,
+  technology: TECH_ALL_TOPIC,
+  policy: POLITICS_TOPIC,
+  business: BUSINESS_KEYWORDS,
+  commodities: COMMODITIES_KEYWORDS,
+  healthcare: HEALTHCARE_TOPIC,
 };
+
 
 function matchesCategory(category: HeadlineCategory, item: HeadlineItem, feed: FeedDef): boolean {
   if (feed.trustedTopic) return true;
@@ -656,6 +675,39 @@ function matchesCategory(category: HeadlineCategory, item: HeadlineItem, feed: F
 
 /** Source reach tiers — prefer household-name outlets for “big story” ranking. */
 const SOURCE_TIER: Record<string, number> = {
+  'CNBC Investing': 3,
+  'CNBC Personal Finance': 3,
+  'CNBC Business': 3,
+  'CNBC Earnings': 3,
+  'CNBC Energy': 3,
+  'MarketWatch': 3,
+  'MarketWatch Market Pulse': 2,
+  'MarketWatch Personal Finance': 2,
+  'Yahoo Finance': 2,
+  'Seeking Alpha': 2,
+  'Motley Fool': 2,
+  'NYT Your Money': 3,
+  'NYT DealBook': 3,
+  'NYT Energy & Environment': 3,
+  'WSJ Business': 3,
+  'Fortune': 3,
+  'OilPrice.com': 2,
+  'EIA Today in Energy': 2,
+  'Mining.com': 2,
+  'Guardian Energy': 2,
+  'Guardian Commodities': 2,
+  'HousingWire': 2,
+  'Realtor.com News': 2,
+  'Redfin News': 2,
+  'Decrypt': 2,
+  'YT The Compound': 2,
+  'YT Real Vision': 2,
+  'YT The Ramsey Show': 2,
+  'YT The Money Guy Show': 2,
+  'YT All-In': 3,
+  'YT Acquired': 2,
+  'YT Kitco News': 2,
+  'YT BiggerPockets': 2,
   'BBC Business': 3,
   'BBC Technology': 3,
   'BBC Health': 3,
@@ -805,14 +857,20 @@ const LOW_REACH = new Set([
 const MIN_YT_VIEWS = 25_000;
 /** Podcasts / niche web3 often land under the global floor; keep Shorts blocked. */
 const MIN_YT_VIEWS_BY_CAT: Partial<Record<HeadlineCategory, number>> = {
-  podcasts: 8_000,
-  web3nfts: 5_000,
+  // Specialist channels with smaller audiences than the news networks.
+  'personal-finance': 8_000,
+  'real-estate': 5_000,
+  commodities: 5_000,
+  investing: 8_000,
+  business: 10_000,
 };
 /** ~4 weeks so thinner categories (esp. web3/NFTs) still fill TARGET_COUNT. */
 const MAX_STORY_AGE_MS = 28 * 24 * 60 * 60 * 1000; // 28 days
 const MAX_STORY_AGE_BY_CAT: Partial<Record<HeadlineCategory, number>> = {
-  // NFT / web3 IP news is sparse — keep ~3 months so category stays filled
-  web3nfts: 90 * 24 * 60 * 60 * 1000,
+  // Markets move on: two weeks is old news there.
+  markets: 14 * 24 * 60 * 60 * 1000,
+  investing: 14 * 24 * 60 * 60 * 1000,
+  business: 14 * 24 * 60 * 60 * 1000,
 };
 
 function maxStoryAgeMs(category: HeadlineCategory): number {
@@ -849,36 +907,26 @@ function parseYtViews(block: string): number | null {
 }
 
 function isBigEnough(item: HeadlineItem, category?: HeadlineCategory): boolean {
-  // web3nfts: keep niche NFT outlets (was filtering the whole category empty)
-  if (category !== 'web3nfts' && LOW_REACH.has(item.source)) return false;
+  if (LOW_REACH.has(item.source)) return false;
   // Skip YouTube Shorts — rarely “big story” framing
   if (/\/shorts\//i.test(item.link)) return false;
   if (item.mediaType === 'video') {
     const v = item.views;
-    if (v == null) {
-      // web3: allow trusted / mid-tier channels without stats
-      if (category === 'web3nfts') return sourceTier(item.source) >= 1;
-      return sourceTier(item.source) >= 3; // major YT channels without stats: allow
-    }
-    const floor =
-      (category != null ? MIN_YT_VIEWS_BY_CAT[category] : undefined) ?? MIN_YT_VIEWS;
+    // Channels without view counts: allow the major ones.
+    if (v == null) return sourceTier(item.source) >= 2;
+    const floor = (category != null ? MIN_YT_VIEWS_BY_CAT[category] : undefined) ?? MIN_YT_VIEWS;
     return v >= floor;
   }
-  // Articles: mid/high tier; web3nfts allows any known outlet (tier >= 1)
-  if (category === 'web3nfts') return sourceTier(item.source) >= 1;
   return sourceTier(item.source) >= 2;
 }
 
 
-/** Soft priority boosts — Optimus (robotics) / Claynosaurz (web3nfts) float to top. */
-const OPTIMUS_RE =
-  /\b(Optimus|Tesla\s+Optimus|Tesla\s+(?:robot|humanoid|bot)|Optimus\s+(?:robot|humanoid|Gen\s*[0-9]))\b/i;
-const CLAYNO_RE = /\b(Claynosaurz|Claynos?)\b/i;
-
-function categoryPriorityBoost(category: HeadlineCategory, item: HeadlineItem): number {
-  const text = `${item.title} ${item.summary}`;
-  if (category === 'robotics' && OPTIMUS_RE.test(text)) return 1_000_000;
-  if (category === 'web3nfts' && CLAYNO_RE.test(text)) return 1_000_000;
+/**
+ * Room for pinning a kind of story to the top of a topic. The old site pinned
+ * two (Tesla Optimus under Robotics, Claynosaurz under Web3 & NFTs); with those
+ * folded into broader finance topics nothing is pinned now.
+ */
+function categoryPriorityBoost(_category: HeadlineCategory, _item: HeadlineItem): number {
   return 0;
 }
 
@@ -888,19 +936,21 @@ function storyScore(item: HeadlineItem, consensus: number): number {
   const freshness = Math.max(0, 1 - ageMs / MAX_STORY_AGE_MS);
   const viewBoost =
     item.views != null && item.views > 0 ? Math.min(3, Math.log10(item.views) - 3) : 0;
-  return consensus * 40 + tier * 12 + freshness * 20 + viewBoost * 8;
+  return consensus * 40 + tier * 12 + freshness * 20 + viewBoost * 8 + (item.image ? 5 : 0);
 }
 
 const CACHE_TTL_MS = 7 * 60_000; // ~7 min
 const FETCH_TIMEOUT_MS = 10_000;
-const TARGET_COUNT = 12;
+const TARGET_COUNT = 18;
 const THIN_THRESHOLD = 4;
 const VIDEO_CAP = 7; // default max YouTube videos mixed into each category
 const VIDEO_CAP_BY_CAT: Partial<Record<HeadlineCategory, number>> = {
-  robotics: 9,
-  genart: 8,
-  web3nfts: 9,
-  podcasts: TARGET_COUNT, // videos-only category — fill all slots
+  // Written news leads on money topics; video is the side dish.
+  markets: 5,
+  investing: 5,
+  business: 5,
+  policy: 5,
+  commodities: 5,
 };
 
 const cache = makeCache<HeadlinesResult>(CACHE_TTL_MS);
@@ -1400,9 +1450,8 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
   });
   for (const { feed, items, ok } of results) {
     if (ok && items.length) {
-      const kept = items.filter(
-        (it) => !!it.image && matchesCategory(category, it, feed),
-      );
+      // A video needs its thumbnail; a written story is welcome without a picture.
+      const kept = items.filter((it) => (it.mediaType !== 'video' || !!it.image) && matchesCategory(category, it, feed));
       feedsUsed.push(feed.name);
       collected.push(...kept);
     } else {
@@ -1412,7 +1461,7 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
 
   const now = Date.now();
   const ageLimit = maxStoryAgeMs(category);
-  const withImages = dedupeSort(collected).filter((it) => !!it.image);
+  const withImages = dedupeSort(collected);
   // Drop stale + low-reach / low-view items (RSS rarely has article view counts —
   // we approximate “big stories” via outlet tier, YT views, and cross-feed consensus.)
   let big = withImages.filter((it) => {
@@ -1421,10 +1470,9 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
     return true;
   });
 
-  // Soft fill when thin (especially web3nfts): relax popularity gates, keep age + shorts rules
+  // Soft fill when thin: relax popularity gates, keep age + shorts rules
   if (big.length < 5) {
-    const softAge =
-      category === 'web3nfts' ? Math.max(ageLimit, 120 * 24 * 60 * 60 * 1000) : ageLimit;
+    const softAge = ageLimit;
     const seen = new Set(big.map((it) => it.link));
     const extras = withImages.filter((it) => {
       if (seen.has(it.link)) return false;
@@ -1481,7 +1529,13 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
       mixed.push(videos[vi++]!);
     }
   }
-  const items = mixed.slice(0, TARGET_COUNT);
+  // Two independent tags on every item: its topic, and whether it is an article, a video or a podcast episode.
+  const items = mixed.slice(0, TARGET_COUNT).map((it) => {
+    const show = SHOW_BY_FEED.get(it.source);
+    const tagged: HeadlineItem = { ...it, topic: category, type: show ? 'podcast' : it.mediaType };
+    if (show) tagged.show = show.id;
+    return tagged;
+  });
 
   const thin = items.length < THIN_THRESHOLD;
   let note: string | null = null;
@@ -1523,17 +1577,56 @@ export function listFeeds(category: HeadlineCategory): FeedDef[] {
   return FEEDS_BY_CAT[category];
 }
 
-export const ALL_HEADLINE_CATEGORIES: HeadlineCategory[] = [
-  'tradfi',
-  'crypto',
-  'politics',
-  'housing',
-  'web3nfts',
-  'health',
-  'longevity',
-  'technology',
-  'ai',
-  'robotics',
-  'genart',
-  'podcasts',
-];
+export const ALL_HEADLINE_CATEGORIES: HeadlineCategory[] = TOPIC_IDS;
+
+/* ── Podcast directory ─────────────────────────────────────────────────── */
+
+export type PodcastEpisode = HeadlineItem & { show: string };
+
+export type PodcastsResult = {
+  /** Shows that answered, in directory order, each with its latest episodes. */
+  shows: Array<PodcastShow & { url: string; episodes: PodcastEpisode[] }>;
+  /** The newest episodes across all shows. */
+  latest: PodcastEpisode[];
+  /** Shows whose feed could not be read this time. */
+  failed: string[];
+  fetchedAt: string;
+};
+
+/**
+ * The podcast hub: every show in PODCAST_SHOWS with its recent episodes, read
+ * from the show's YouTube channel feed (small and keyless). One request per
+ * show and no fallback requests, so the whole directory fits in one invocation.
+ */
+export async function getPodcasts(): Promise<PodcastsResult> {
+  const results = await mapPool(PODCAST_SHOWS, 6, async (show) => {
+    const feed: FeedDef = { name: show.name, ...ytMeta(show.channel, show.name), trustedTopic: true };
+    const { items, ok } = await fetchAtomFeed(feed);
+    return { show, items, ok };
+  });
+  const shows: PodcastsResult['shows'] = [];
+  const failed: string[] = [];
+  const all: PodcastEpisode[] = [];
+  for (const { show, items, ok } of results) {
+    const episodes: PodcastEpisode[] = (ok ? items : [])
+      .filter((it) => !!it.image && !/\/shorts\//i.test(it.link))
+      .sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0))
+      .slice(0, 6)
+      .map((it) => ({ ...it, source: show.name, topic: show.topic, type: 'podcast' as const, show: show.id }));
+    if (!episodes.length) {
+      failed.push(show.name);
+      continue;
+    }
+    shows.push({ ...show, url: `https://www.youtube.com/channel/${show.channel}`, episodes: episodes.slice(0, 4) });
+    all.push(...episodes);
+  }
+  // Newest first, but no more than two in a row from one show at the top of the list.
+  all.sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0));
+  const perShow = new Map<string, number>();
+  const latest = all.filter((e) => {
+    const n = (perShow.get(e.show) ?? 0) + 1;
+    perShow.set(e.show, n);
+    return n <= 3;
+  });
+  return { shows, latest: latest.slice(0, 36), failed, fetchedAt: new Date().toISOString() };
+}

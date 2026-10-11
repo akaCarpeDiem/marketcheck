@@ -24,14 +24,19 @@ export const MOVER_CATS: { id: MoverCat; label: string }[] = [
 
 export type TfOption = { id: string; label: string };
 
-export const CRYPTO_TFS: TfOption[] = [
-  { id: '1h', label: '1h' },
-  { id: '4h', label: '4h' },
-  { id: '8h', label: '8h' },
-  { id: '24h', label: '24h' },
-  { id: '7d', label: '7d' },
-  { id: '30d', label: '30d' },
-];
+const tfOpt = (id: string): TfOption => ({ id, label: id });
+
+/**
+ * Crypto timeframes. CoinGecko publishes 1h, 24h, 7d, 30d and 1y. 4h and 8h
+ * come from the site's own price record and are offered only while the list in
+ * hand actually carries them; with them the bar is full, so 1y steps aside.
+ */
+function cryptoTfs(coins: { ch: { '4h'?: number | null; '8h'?: number | null } }[]): TfOption[] {
+  const has4 = coins.some((c) => c.ch['4h'] != null);
+  const has8 = coins.some((c) => c.ch['8h'] != null);
+  const ids = ['1h', ...(has4 ? ['4h'] : []), ...(has8 ? ['8h'] : []), '24h', '7d', '30d', ...(has4 || has8 ? [] : ['1y'])];
+  return ids.map(tfOpt);
+}
 const EQUITY_TFS: TfOption[] = [
   { id: '24h', label: '1D' },
   { id: '7d', label: '1W' },
@@ -46,14 +51,16 @@ const SOLANA_TFS: TfOption[] = [
 ];
 
 export function tfOptions(cat: MoverCat): TfOption[] {
-  return cat === 'cryptos' || cat === 'ethereum' ? CRYPTO_TFS : cat === 'solana' ? SOLANA_TFS : EQUITY_TFS;
+  if (cat === 'cryptos') return cryptoTfs(crypto.get().coins);
+  if (cat === 'ethereum') return cryptoTfs(eth.get().coins);
+  return cat === 'solana' ? SOLANA_TFS : EQUITY_TFS;
 }
 
 /** The timeframe actually used for a category when asked for `tf`. */
 export function effectiveTf(cat: MoverCat, tf: string): string {
   if (cat === 'cryptos' || cat === 'ethereum') {
     const eff = cryptoTf(tf);
-    return eff === '1y' ? '30d' : eff;
+    return tfOptions(cat).some((o) => o.id === eff) ? eff : '24h';
   }
   if (cat === 'solana') return tf === '1h' ? '1h' : tf === '6h' || tf === '4h' || tf === '8h' || tf === '12h' ? '6h' : '24h';
   return equityTf(tf);
@@ -135,13 +142,7 @@ export function loadSolana(tf: string): Promise<void> {
   return job;
 }
 
-export type Pool = {
-  items: Mover[];
-  status: Status;
-  at: number;
-  /** True when the list is loaded but this window (4h, 8h) has no price history yet. */
-  noHistory?: boolean;
-};
+export type Pool = { items: Mover[]; status: Status; at: number };
 
 /** Everything in a category that can be ranked, with its change over `tf`. */
 export function moverPool(cat: MoverCat, tf: string): Pool {
@@ -149,16 +150,12 @@ export function moverPool(cat: MoverCat, tf: string): Pool {
     const eff = effectiveTf(cat, tf) as CryptoTf;
     const s = cat === 'ethereum' ? eth.get() : crypto.get();
     const items: Mover[] = [];
-    let liquid = 0;
     for (const c of s.coins) {
-      if (!isMoverCandidate(c)) continue;
-      liquid += 1;
       const change = c.ch[eff];
-      if (change == null) continue;
+      if (!isMoverCandidate(c) || change == null) continue;
       items.push({ key: `c:${c.id}`, ref: refFromCoin(c), sym: c.symbol, name: c.name, image: c.image, price: c.price, change, marketCap: c.marketCap, volume: c.volume });
     }
-    const intraday = eff === '4h' || eff === '8h';
-    return { items, status: s.status, at: s.at, noHistory: intraday && liquid > 0 && items.length === 0 };
+    return { items, status: s.status, at: s.at };
   }
   if (cat === 'solana') {
     const s = solana.get().get(effectiveTf('solana', tf));
@@ -193,6 +190,3 @@ export function moverTip(m: Mover, label: string): string {
   return `<div class="tip-head"><strong>${esc(m.sym)}</strong><span>${esc(m.name)}</span></div>${rows.join('')}`;
 }
 
-/** What to say when a 4h or 8h view has nothing because the price record is too short. */
-export const noHistoryText = (tf: string): string =>
-  `${tf} changes are worked out from the site's own hourly price record, and it does not go back ${tf === '8h' ? 'eight' : 'four'} hours yet. Try 1h or 24h for now.`;

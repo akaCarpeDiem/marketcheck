@@ -55,7 +55,7 @@ results.push(await check('/', { expectIncludes: ['Market Check', 'id="app"', 'No
   }
   results.push(row);
 }
-for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'], ['/portfolio/', 'Portfolio'], ['/news/', 'Headlines'], ['/sources/', 'Sources']]) {
+for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'], ['/portfolio/', 'Portfolio'], ['/news/', 'Headlines'], ['/podcasts/', 'Podcasts'], ['/sources/', 'Sources']]) {
   results.push(await check(path, { expectStatus: 200, expectIncludes: [word, 'id="app"'] }));
 }
 results.push(await check('/privacy/', { expectStatus: 200, expectIncludes: ['Privacy'] }));
@@ -97,10 +97,10 @@ results.push(
 results.push(
   await check('/api/cryptos', {
     expectJson: (j, row) => {
-      if (!j.items?.length) {
-        row.ok = false;
-        row.notes.push('no crypto items');
-      }
+      // CoinGecko sometimes refuses Cloudflare's shared addresses. The site copes (browsers ask CoinGecko
+      // directly), so an empty answer here is worth knowing about but is not a failed deploy.
+      if (!j.items?.length) row.notes.push(`no coin list from the server just now (${j.error ?? 'empty'}); browsers fall back to CoinGecko directly`);
+      else row.notes.push(`${j.items.length} coins${j.stale ? ', older copy' : ''}`);
     },
   }),
 );
@@ -112,6 +112,33 @@ results.push(
         row.ok = false;
         row.notes.push(`only ${ok} stocks and funds priced`);
       }
+    },
+  }),
+);
+for (const topic of ['markets', 'investing', 'personal-finance', 'crypto', 'real-estate', 'technology', 'policy', 'business', 'commodities', 'healthcare']) {
+  results.push(
+    await check(`/api/headlines?topic=${topic}`, {
+      expectJson: (j, row) => {
+        const n = j.items?.length ?? 0;
+        row.notes.push(`${n} stories; feeds ok ${j.feedsUsed?.length ?? 0}, failed ${j.feedsFailed?.length ?? 0}${j.feedsFailed?.length ? ` (${j.feedsFailed.join(', ')})` : ''}`);
+        if (n < 4) row.ok = false;
+      },
+    }),
+  );
+}
+results.push(
+  await check('/api/podcasts', {
+    expectJson: (j, row) => {
+      row.notes.push(`${j.shows?.length ?? 0} shows${j.failed?.length ? `; not answering: ${j.failed.join(', ')}` : ''}`);
+      if ((j.shows?.length ?? 0) < 10) row.ok = false;
+    },
+  }),
+);
+results.push(await check('/api/game/board', { expectJson: (j, row) => { if (!j.ok) { row.ok = false; row.notes.push('board not ok'); } } }));
+results.push(
+  await check('/api/cryptos?universe=eth', {
+    expectJson: (j, row) => {
+      row.notes.push(`${j.items?.length ?? 0} tokens${j.error ? `; ${j.error}` : ''}`);
     },
   }),
 );

@@ -8,7 +8,6 @@ import {
   loadSolana,
   moverPool,
   moverTip,
-  noHistoryText,
   solana,
   tfLabel,
   tfOptions,
@@ -135,7 +134,7 @@ export const heatmapView: View = {
           lastKey = key;
           bubbles!.set(toBubbles(res.items, sizeBy), {
             exponent: sizeBy === 'cap' ? 0.3 : 0.5,
-            emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : res.noHistory ? noHistoryText(label) : 'Nothing moved enough to show here.',
+            emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : 'Nothing moved enough to show here.',
           });
         }
         status = res.status;
@@ -154,6 +153,7 @@ export const heatmapView: View = {
           const items: HeatItem[] = list.map((m) => ({
             key: m.key,
             label: m.sym,
+            image: m.image,
             change: m.change,
             // "Balanced" flattens the scale so a few giants do not crowd out everything else.
             weight: sizeBy === 'move' ? Math.pow(m.marketCap ?? 0, 0.45) : (m.marketCap ?? 0),
@@ -161,7 +161,7 @@ export const heatmapView: View = {
           }));
           tiles!.set(items, {
             full: fullScale(cat, tf),
-            emptyText: pool.status === 'loading' ? 'Loading…' : pool.noHistory ? noHistoryText(label) : 'This data is not available right now.',
+            emptyText: pool.status === 'loading' ? 'Loading…' : 'This data is not available right now.',
           });
         }
         status = pool.status;

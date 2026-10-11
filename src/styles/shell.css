@@ -634,6 +634,32 @@ kbd {
     max-width: 260px;
   }
 }
+/* Six sections and a full search box do not fit side by side here: the search becomes a button. */
+@media (min-width: 981px) and (max-width: 1360px) {
+  .search-open {
+    flex: none;
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    margin-left: auto;
+  }
+  .search-open-text,
+  .search-open kbd {
+    display: none;
+  }
+}
+@media (min-width: 981px) and (max-width: 1100px) {
+  .topbar-in {
+    gap: 10px;
+  }
+  .nav-link {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  .logo-word {
+    font-size: 18px;
+  }
+}
 @media (max-width: 980px) {
   .nav {
     display: none;
@@ -758,5 +784,16 @@ kbd {
 @media (max-width: 350px) {
   .logo-word {
     display: none;
+  }
+}
+@media (max-width: 380px) {
+  .logo-mark {
+    height: 28px;
+  }
+  .logo-word {
+    font-size: 17px;
+  }
+  .logo {
+    gap: 6px;
   }
 }

@@ -8,6 +8,13 @@
  * 8 hours is today's price against the recorded price that long ago. Both
  * ends come from the same source, so these figures agree with the others.
  *
+ * This is switched off unless the Pages variable PRICE_HISTORY is "1" (see
+ * getCryptoUniverse). The record is only written when someone loads the site,
+ * so on a quiet site it has holes, and a figure next to a hole is left out.
+ * Turn it on once the site is visited every hour of the day, or once something
+ * (an uptime monitor, say) requests /api/cryptos every 15 minutes or so. The
+ * 4h and 8h buttons appear on the site by themselves whenever figures exist.
+ *
  * Consequences worth knowing:
  * - After the record starts (first deploy, or after a gap), 4h figures appear
  *   once four hours of history exist, and 8h figures after eight.

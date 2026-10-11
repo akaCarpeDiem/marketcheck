@@ -148,7 +148,7 @@ function paintUpdated(): void {
 
 /* ── Headline ticker ───────────────────────────────────────────────────── */
 
-const TICKER_CATS = ['tradfi', 'crypto', 'technology'] as const;
+const TICKER_CATS = ['markets', 'crypto', 'business'] as const;
 let tickerKey = '';
 
 function shorten(title: string, max = 96): string {
@@ -266,9 +266,9 @@ export function startShell(): void {
   onScroll();
 
   // Headlines for the ticker: one category now, the others a little later.
-  void loadNews('tradfi');
+  void loadNews('markets');
   setTimeout(() => void loadNews('crypto'), 2500);
-  setTimeout(() => void loadNews('technology'), 6000);
+  setTimeout(() => void loadNews('business'), 6000);
   setInterval(() => {
     if (document.hidden) return;
     for (const c of TICKER_CATS) void loadNews(c);

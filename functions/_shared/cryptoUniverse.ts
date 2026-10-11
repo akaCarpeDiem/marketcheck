@@ -42,8 +42,8 @@ export type Coin = {
   volume: number | null;
   /**
    * Percent change per timeframe; null when there is none (new listings have no 1y).
-   * 4h and 8h come from the site's own hourly price record (cryptoHistory.ts) and
-   * are null until enough history exists.
+   * 4h and 8h come from the site's own hourly price record (cryptoHistory.ts): absent
+   * unless that record is switched on, and null until it reaches back far enough.
    */
   ch: { '1h': number | null; '24h': number | null; '7d': number | null; '30d': number | null; '1y': number | null; '4h'?: number | null; '8h'?: number | null };
   high24: number | null;
@@ -213,7 +213,18 @@ export type CryptoUniverse = {
   source: 'coingecko';
 };
 
-export type DataEnv = { LAYOUTS?: KvLike; COINGECKO_API_KEY?: string };
+export type DataEnv = {
+  LAYOUTS?: KvLike;
+  COINGECKO_API_KEY?: string;
+  /**
+   * "1" turns on the hourly price record that 4h and 8h changes are worked out
+   * from (cryptoHistory.ts). Off unless set: the record is only complete if
+   * something loads the site at least once an hour, day and night.
+   */
+  PRICE_HISTORY?: string;
+};
+
+const historyOn = (env: DataEnv | undefined): boolean => /^(1|on|true|yes)$/i.test((env?.PRICE_HISTORY ?? '').trim());
 
 /** Refresh from CoinGecko at most every 2 minutes; keep the last good copy for a day. */
 const FRESH_MS = 120_000;
@@ -227,9 +238,9 @@ export async function getCryptoUniverse(
     keepSec: 86_400,
     load: async () => {
       const coins = await loadFromCoinGecko(CG_MARKETS, env?.COINGECKO_API_KEY);
-      const kv = env?.LAYOUTS;
+      const kv = historyOn(env) ? env?.LAYOUTS : undefined;
       const now = Date.now();
-      await attachIntraday(coins, kv, now, waitUntil).catch(() => undefined);
+      if (kv) await attachIntraday(coins, kv, now, waitUntil).catch(() => undefined);
       if (kv && coins.length >= 50) {
         const job = recordSnapshot(kv, coins, now);
         if (waitUntil) waitUntil(job);

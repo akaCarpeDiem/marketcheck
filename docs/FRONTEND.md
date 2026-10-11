@@ -56,6 +56,14 @@ Refresh times follow the market: faster while New York is open, slower when it i
 - **Tiles, index tiles, movers panels:** signed-in only, through `/api/layout/*`.
 - **Display choices** (theme, which table tab is open): browser only, never sent.
 
+## News and podcasts
+
+`data/news.ts` loads headlines per topic and the podcast directory. Topics, content types and shows are defined once, in `functions/_shared/newsTopics.ts`, and imported by both sides. Every item carries a topic and a type (article, video or podcast), and the news page filters by either. Podcasts are a page of their own (`views/podcasts.ts`), not a topic.
+
+## Daily call
+
+`data/game.ts` places calls and reads results; the rules are in `functions/_shared/game.ts`, shared with the server. For signed-in players the server's copy of the game wins after every save, because it decides which calls count for the leaderboard (`ui/board.ts`, `data/board.ts`).
+
 ## Bubble maps
 
 `lib/pack.ts` places circles so they fill a rectangle of any shape. It grows every circle from a small start, pushes overlapping ones apart, shakes the layout loose when it jams, and repeats from several starting arrangements for up to 70 ms, keeping the fullest. The maths is separate from drawing (`ui/bubbles.ts`) so it can be tested: `scripts/test/pack.test.mjs` fails if circles overlap, leave the box, or fill less of it than expected.

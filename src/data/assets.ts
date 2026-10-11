@@ -210,14 +210,44 @@ function hue(text: string): number {
   return h;
 }
 
-const KIND_GLYPH: Partial<Record<AssetKind, string>> = { index: '∑', future: 'ƒ', fx: '¤' };
+/**
+ * Commodities, indexes and currencies have no brand icon, so the common ones
+ * get a deliberate badge instead of a bare initial: a short label on a colour
+ * that fits (gold, silver, copper, oil) or a neutral plate for an index.
+ */
+const BADGES: Record<string, { t: string; bg: string; fg?: string }> = {
+  'GC=F': { t: 'Au', bg: 'linear-gradient(135deg,#f7d774,#c8931a)', fg: '#3b2a00' },
+  'SI=F': { t: 'Ag', bg: 'linear-gradient(135deg,#eef1f5,#9aa5b4)', fg: '#1f2733' },
+  'PL=F': { t: 'Pt', bg: 'linear-gradient(135deg,#e3e8ee,#8793a3)', fg: '#1f2733' },
+  'PA=F': { t: 'Pd', bg: 'linear-gradient(135deg,#dfe3e8,#7f8a99)', fg: '#1f2733' },
+  'HG=F': { t: 'Cu', bg: 'linear-gradient(135deg,#f0a36b,#a8521f)', fg: '#2c1200' },
+  'CL=F': { t: 'WTI', bg: 'linear-gradient(135deg,#3b4252,#12151c)' },
+  'BZ=F': { t: 'BRT', bg: 'linear-gradient(135deg,#3b4252,#12151c)' },
+  'NG=F': { t: 'Gas', bg: 'linear-gradient(135deg,#4fa3ff,#1d4fbf)' },
+  '^GSPC': { t: '500', bg: 'linear-gradient(135deg,#d9404f,#8f1d2b)' },
+  '^IXIC': { t: 'NAS', bg: 'linear-gradient(135deg,#19a7c9,#0a5d86)' },
+  '^NDX': { t: '100', bg: 'linear-gradient(135deg,#19a7c9,#0a5d86)' },
+  '^DJI': { t: 'DOW', bg: 'linear-gradient(135deg,#3a6fd8,#1c3a8a)' },
+  '^RUT': { t: '2K', bg: 'linear-gradient(135deg,#7a5cd6,#40288f)' },
+  '^VIX': { t: 'VIX', bg: 'linear-gradient(135deg,#f08a3c,#a84a0e)' },
+  '^TNX': { t: '10Y', bg: 'linear-gradient(135deg,#4c9a6a,#22593a)' },
+  'DX-Y.NYB': { t: '$', bg: 'linear-gradient(135deg,#4c9a6a,#22593a)' },
+  'EURUSD=X': { t: '€', bg: 'linear-gradient(135deg,#3a6fd8,#1c3a8a)' },
+  'GBPUSD=X': { t: '£', bg: 'linear-gradient(135deg,#7a5cd6,#40288f)' },
+  'JPY=X': { t: '¥', bg: 'linear-gradient(135deg,#d9404f,#8f1d2b)' },
+};
 
 /**
  * A round logo: the image when there is one, with the ticker's initials
  * underneath so a missing or blocked image leaves a tidy placeholder.
  */
 export function avatar(ref: AssetRef, image: string | null | undefined, size = 22): string {
-  const text = KIND_GLYPH[ref.kind] && !image ? ref.sym.slice(0, 1) : ref.sym.replace(/[^A-Za-z0-9]/g, '').slice(0, size >= 28 ? 3 : 2) || '?';
+  const badge = !image && ref.yahoo ? BADGES[ref.yahoo.toUpperCase()] : undefined;
+  if (badge) {
+    return `<span class="avatar avatar-badge" style="--s:${size}px;--bg:${badge.bg};--fg:${badge.fg ?? '#fff'};--n:${badge.t.length}" aria-hidden="true"><b>${esc(badge.t)}</b></span>`;
+  }
+  const letters = ref.sym.replace(/[^A-Za-z0-9]/g, '');
+  const text = (ref.kind === 'index' || ref.kind === 'future' || ref.kind === 'fx') && !image ? letters.slice(0, 1) || '?' : letters.slice(0, size >= 28 ? 3 : 2) || '?';
   const img = image
     ? `<img src="${esc(image)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('ok')" onerror="this.remove()" />`
     : '';

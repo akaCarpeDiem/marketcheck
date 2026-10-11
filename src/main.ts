@@ -9,6 +9,7 @@ import { startShell } from './ui/shell';
 import { heatmapView } from './views/heatmap';
 import { marketsView } from './views/markets';
 import { newsView } from './views/news';
+import { podcastsView } from './views/podcasts';
 import { overviewView } from './views/overview';
 import { portfolioView } from './views/portfolio';
 import { crypto, equities } from './data/market';
@@ -19,6 +20,7 @@ const views: Record<ViewId, () => View> = {
   heatmap: () => heatmapView,
   portfolio: () => portfolioView,
   news: () => newsView,
+  podcasts: () => podcastsView,
 };
 
 function boot(): void {

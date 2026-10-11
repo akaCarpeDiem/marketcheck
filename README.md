@@ -23,7 +23,7 @@ House rules for contributors and agents are in [AGENTS.md](./AGENTS.md).
 
 ## Pages
 
-`/` overview · `/markets/` tables · `/heatmap/` bubble map and heat map · `/portfolio/` portfolio and watchlist · `/news/` headlines · `/about/` `/sources/` `/privacy/` `/terms/` `/contact/` text pages. Each is a real HTML file, so each can be indexed and shared. `/?q=AAPL` opens one symbol; `/quote/AAPL` redirects there.
+`/` overview · `/markets/` tables · `/heatmap/` bubble map and heat map · `/portfolio/` portfolio and watchlist · `/news/` headlines in ten topics · `/podcasts/` podcast directory · `/about/` `/sources/` `/privacy/` `/terms/` `/contact/` text pages. Each is a real HTML file, so each can be indexed and shared. `/?q=AAPL` opens one symbol; `/quote/AAPL` redirects there.
 
 ## Local development
 
@@ -52,6 +52,9 @@ Copy `.env.example` to `.env` for optional build-time settings. `.env` is gitign
 | `pack` | Bubble maps fill their box and never overlap |
 | `treemap` | Heat map tiles cover their box exactly |
 | `game` | Rules of the daily call |
+| `board` | The leaderboard: a record cannot be faked from the browser, results and ranking |
+| `history` | The hourly price record behind 4h and 8h crypto changes |
+| `news` | The ten news topics, where each old category went, feed limits, the podcast directory |
 
 ## Deploy
 
@@ -68,6 +71,18 @@ CoinGecko (crypto), Yahoo Finance (stocks, ETFs, indexes, commodities), Nasdaq (
 CoinGecko limits its free API by address, and Cloudflare's outgoing addresses are shared, so the server is sometimes refused (HTTP 429) through no fault of its own. When that happens the server answers from its last good copy, and a browser that gets nothing asks CoinGecko directly (`refreshCrypto` in `src/data/market.ts`). Setting a free CoinGecko demo key as the secret `COINGECKO_API_KEY` is optional: it is used only to retry a refused request.
 
 Data is cached in the Cloudflare Cache API, not in KV. KV (`LAYOUTS`) holds only what belongs to a signed-in visitor, sign-in codes, and a rare last-good snapshot of the two big lists. The free plan allows 1,000 KV writes a day, so keep it that way.
+
+## News topics and podcasts
+
+`functions/_shared/newsTopics.ts` is the one place that defines the ten topics, the content types (article, video, podcast) and the podcast directory. Which feeds belong to which topic is in `functions/_shared/rssHeadlines.ts` (`FEEDS_BY_CAT`). To add a show to the podcast hub, add a line to `PODCAST_SHOWS` with its YouTube channel id. The ids of the old categories (`tradfi`, `housing`, `ai` and so on) are still accepted and mapped to the topic that replaced them.
+
+## Daily call leaderboard
+
+Calls are refereed on the server (`functions/_shared/game.ts`, `reconcileGame`): only a call that arrives while its session is still open is marked verified, and the server settles it from the index's closes. A player's line lives in the metadata of a KV key `board:<account>`, written about once per trading day per player; the board itself is one `list` call, cached five minutes.
+
+## 4h and 8h crypto changes (off by default)
+
+CoinGecko has no 4h or 8h figures. `functions/_shared/cryptoHistory.ts` can work them out from an hourly record of prices kept in KV, but the record is only complete if the site is loaded at least once an hour around the clock. It is off unless the Pages variable `PRICE_HISTORY` is `1`. The 4h and 8h buttons appear on the site by themselves when figures exist.
 
 ## `/api/markets` chunking
 

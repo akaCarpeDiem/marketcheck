@@ -11,7 +11,7 @@ import {
 } from '../../../functions/_shared/panelConfig';
 import { avatar, heroFromRef, lookup, priceText, refFromCoin, refFromEquity, refFromHero, stockLogo, type AssetRef } from '../../data/assets';
 import { crypto, equities, eth, loadEth, quotes, wantQuotes } from '../../data/market';
-import { CRYPTO_TFS, MOVER_CATS, biggestMoves, effectiveTf, loadSolana, moverTip, noHistoryText, solana, tfLabel, tfOptions, type Mover, type MoverCat } from '../../data/movers';
+import { MOVER_CATS, biggestMoves, effectiveTf, loadSolana, moverTip, solana, tfLabel, tfOptions, type Mover, type MoverCat } from '../../data/movers';
 import { data, panels, pref, savePanels, savePanelsSoon, setPref, user } from '../../data/user';
 import { esc, frame, html, on, raw, render } from '../../lib/dom';
 import { compact, dir, pct } from '../../lib/format';
@@ -42,7 +42,6 @@ const MODE_LABEL: Record<PanelMode, string> = {
   filter_metals: 'Metals',
 };
 
-const CRYPTO_PANEL_TFS = CRYPTO_TFS.map((o) => o.id);
 const STOCK_PANEL_TFS: [string, string][] = [['24h', '1D'], ['7d', '1W'], ['30d', '1M'], ['1y', '1Y']];
 
 /** The crypto timeframe a panel shows: saved layouts may hold one the bar no longer offers. */
@@ -75,12 +74,11 @@ function panelRows(cfg: PanelConfig): { rows: Row[]; changeLabel: string; source
       const coins = crypto.get().coins;
       const { gainers, losers } = gainersAndLosers(coins, tf, n);
       const list = cfg.mode === 'movers_up' ? gainers : losers;
-      const noHistory = (tf === '4h' || tf === '8h') && coins.length > 0 && !coins.some((c) => c.ch[tf] != null);
       return {
         rows: list.map((c) => ({ ref: refFromCoin(c), image: c.image, price: c.price, change: c.ch[tf] ?? null, marketCap: c.marketCap, volume: c.volume })),
         changeLabel: tf,
         source: 'CoinGecko',
-        empty: noHistory ? noHistoryText(tf) : cfg.mode === 'movers_up' ? `No liquid coin is up over ${tf}.` : `No liquid coin is down over ${tf}.`,
+        empty: cfg.mode === 'movers_up' ? `No liquid coin is up over ${tf}.` : `No liquid coin is down over ${tf}.`,
       };
     }
     case 'stocks_up':
@@ -150,7 +148,7 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
     !rows.length &&
     ((cfg.mode.startsWith('movers') || cfg.mode === 'filter_crypto') ? crypto.get().status === 'loading' : equities.get().status === 'loading' && cfg.mode !== 'watchlist');
   const tfBar = hasTfBar(cfg.mode)
-    ? `<div class="seg" role="group" aria-label="Timeframe">${(cfg.mode.startsWith('stocks') ? STOCK_PANEL_TFS : CRYPTO_PANEL_TFS.map((t) => [t, t] as [string, string]))
+    ? `<div class="seg" role="group" aria-label="Timeframe">${(cfg.mode.startsWith('stocks') ? STOCK_PANEL_TFS : tfOptions('cryptos').map((o) => [o.id, o.label] as [string, string]))
         .map(([id, label]) => {
           const on = (cfg.mode.startsWith('stocks') ? equityTf(cfg.tf) : panelCryptoTf(cfg.tf)) === id;
           return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-tf="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
@@ -453,7 +451,7 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
       lastKey = key;
       map.set(toBubbles(res.items, sizeBy), {
         exponent: sizeBy === 'cap' ? 0.3 : 0.5,
-        emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : res.noHistory ? noHistoryText(tfLabel(cat, tf)) : 'Nothing moved enough to show here.',
+        emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : 'Nothing moved enough to show here.',
       });
     }
     const source = cat === 'cryptos' || cat === 'ethereum' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';

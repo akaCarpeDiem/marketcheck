@@ -1,33 +1,23 @@
-/** Headlines by category, from /api/headlines (public RSS feeds, gathered server-side). */
+/**
+ * Headlines by topic (from /api/headlines) and the podcast directory (from
+ * /api/podcasts). The topics and content types are defined once, in
+ * functions/_shared/newsTopics.ts.
+ */
+import {
+  DEFAULT_TOPIC,
+  TOPICS,
+  topicFrom,
+  type ContentType,
+  type PodcastShow,
+  type TopicId,
+} from '../../functions/_shared/newsTopics';
 import { getJson } from '../lib/api';
 import { signal } from '../lib/store';
 
-export type NewsCategory =
-  | 'tradfi'
-  | 'crypto'
-  | 'podcasts'
-  | 'politics'
-  | 'housing'
-  | 'web3nfts'
-  | 'health'
-  | 'longevity'
-  | 'technology'
-  | 'ai'
-  | 'robotics';
-
-export const NEWS_CATEGORIES: { id: NewsCategory; label: string; short: string }[] = [
-  { id: 'tradfi', label: 'Markets & economy', short: 'Markets' },
-  { id: 'crypto', label: 'Crypto', short: 'Crypto' },
-  { id: 'technology', label: 'Technology', short: 'Tech' },
-  { id: 'ai', label: 'AI', short: 'AI' },
-  { id: 'politics', label: 'Finance in politics', short: 'Politics' },
-  { id: 'housing', label: 'US housing', short: 'Housing' },
-  { id: 'podcasts', label: 'Podcasts & video', short: 'Podcasts' },
-  { id: 'robotics', label: 'Robotics', short: 'Robotics' },
-  { id: 'web3nfts', label: 'Web3 & NFTs', short: 'Web3' },
-  { id: 'health', label: 'Health', short: 'Health' },
-  { id: 'longevity', label: 'Longevity', short: 'Longevity' },
-];
+export { DEFAULT_TOPIC, TOPICS, topicFrom, type ContentType, type TopicId };
+/** Kept as a name for the topic id; older parts of the code call it a category. */
+export type NewsCategory = TopicId;
+export const NEWS_CATEGORIES = TOPICS;
 
 export type Headline = {
   id: string;
@@ -39,7 +29,17 @@ export type Headline = {
   publishedAt: string | null;
   publishedMs: number | null;
   mediaType?: 'article' | 'video';
+  /** Topic the item is filed under. */
+  topic?: TopicId | null;
+  /** Article, video or podcast episode: independent of the topic. */
+  type?: ContentType;
+  /** For a podcast episode, the show's id in the directory. */
+  show?: string;
+  views?: number | null;
 };
+
+/** The content type of an item, whichever generation of the API it came from. */
+export const typeOf = (h: Headline): ContentType => h.type ?? (h.mediaType === 'video' ? 'video' : 'article');
 
 export type NewsState = {
   items: Headline[];
@@ -50,11 +50,11 @@ export type NewsState = {
 
 type Payload = { items?: Headline[]; stale?: boolean; thin?: boolean; note?: string | null; fetchedAt?: string };
 
-/** Category -> its headlines. A new Map is set on every change. */
-export const news = signal<Map<NewsCategory, NewsState>>(new Map());
+/** Topic -> its headlines. A new Map is set on every change. */
+export const news = signal<Map<TopicId, NewsState>>(new Map());
 
 const FRESH_MS = 6 * 60_000;
-const busy = new Map<NewsCategory, Promise<void>>();
+const busy = new Map<TopicId, Promise<void>>();
 
 /** Only http(s) links are allowed through to the page. */
 function safeUrl(u: string | null | undefined): string | null {
@@ -68,32 +68,37 @@ function safeUrl(u: string | null | undefined): string | null {
   }
 }
 
-function put(cat: NewsCategory, state: NewsState): void {
+function clean(list: Headline[] | undefined): Headline[] {
+  const items: Headline[] = [];
+  for (const raw of list ?? []) {
+    const link = safeUrl(raw.link);
+    if (!link || !raw.title) continue;
+    items.push({ ...raw, link, image: safeUrl(raw.image) });
+  }
+  return items;
+}
+
+function put(topic: TopicId, state: NewsState): void {
   const next = new Map(news.get());
-  next.set(cat, state);
+  next.set(topic, state);
   news.set(next);
 }
 
-/** Load a category if it is missing or older than six minutes. */
-export function loadNews(cat: NewsCategory, force = false): Promise<void> {
-  const have = news.get().get(cat);
+/** Load a topic if it is missing or older than six minutes. */
+export function loadNews(topic: TopicId, force = false): Promise<void> {
+  const have = news.get().get(topic);
   if (!force && have && have.status !== 'error' && Date.now() - have.at < FRESH_MS) return Promise.resolve();
-  const running = busy.get(cat);
+  const running = busy.get(topic);
   if (running) return running;
-  if (!have) put(cat, { items: [], at: 0, status: 'loading', note: '' });
+  if (!have) put(topic, { items: [], at: 0, status: 'loading', note: '' });
   const job = (async () => {
     try {
-      const d = await getJson<Payload>(`/api/headlines?category=${cat}`, { timeout: 25_000 });
-      const items: Headline[] = [];
-      for (const raw of d.items ?? []) {
-        const link = safeUrl(raw.link);
-        if (!link || !raw.title) continue;
-        items.push({ ...raw, link, image: safeUrl(raw.image) });
-      }
+      const d = await getJson<Payload>(`/api/headlines?topic=${topic}`, { timeout: 25_000 });
+      const items = clean(d.items);
       if (!items.length && have?.items.length) {
-        put(cat, { ...have, status: 'stale', at: Date.now() });
+        put(topic, { ...have, status: 'stale', at: Date.now() });
       } else {
-        put(cat, {
+        put(topic, {
           items,
           at: Date.now(),
           status: items.length ? (d.stale ? 'stale' : 'ok') : 'error',
@@ -101,12 +106,53 @@ export function loadNews(cat: NewsCategory, force = false): Promise<void> {
         });
       }
     } catch {
-      const prev = news.get().get(cat);
-      put(cat, prev?.items.length ? { ...prev, status: 'stale' } : { items: [], at: Date.now(), status: 'error', note: '' });
+      const prev = news.get().get(topic);
+      put(topic, prev?.items.length ? { ...prev, status: 'stale' } : { items: [], at: Date.now(), status: 'error', note: '' });
     } finally {
-      busy.delete(cat);
+      busy.delete(topic);
     }
   })();
-  busy.set(cat, job);
+  busy.set(topic, job);
   return job;
+}
+
+/* ── Podcast directory ─────────────────────────────────────────────────── */
+
+export type Show = PodcastShow & { url: string; episodes: Headline[] };
+
+export type PodcastState = {
+  status: 'idle' | 'loading' | 'ok' | 'error';
+  shows: Show[];
+  latest: Headline[];
+  /** Topics that have at least one show, in the site's order. */
+  topics: { id: TopicId; label: string; short: string }[];
+  at: number;
+};
+
+export const podcasts = signal<PodcastState>({ status: 'idle', shows: [], latest: [], topics: [], at: 0 });
+
+type PodcastPayload = { ok?: boolean; shows?: Show[]; latest?: Headline[]; topics?: PodcastState['topics'] };
+
+let podcastsBusy: Promise<void> | null = null;
+
+/** Load the directory unless a copy from the last twenty minutes is in hand. */
+export function loadPodcasts(): Promise<void> {
+  const have = podcasts.get();
+  if (have.status === 'ok' && Date.now() - have.at < 20 * 60_000) return Promise.resolve();
+  podcastsBusy ??= (async () => {
+    if (have.status !== 'ok') podcasts.set({ ...have, status: 'loading' });
+    try {
+      const d = await getJson<PodcastPayload>('/api/podcasts', { timeout: 25_000 });
+      const shows = (d.shows ?? [])
+        .map((s) => ({ ...s, url: safeUrl(s.url) ?? '#', episodes: clean(s.episodes) }))
+        .filter((s) => s.episodes.length > 0);
+      if (!shows.length) throw new Error('empty');
+      podcasts.set({ status: 'ok', shows, latest: clean(d.latest), topics: d.topics ?? [], at: Date.now() });
+    } catch {
+      podcasts.set({ ...podcasts.get(), status: podcasts.get().shows.length ? 'ok' : 'error' });
+    }
+  })().finally(() => {
+    podcastsBusy = null;
+  });
+  return podcastsBusy;
 }

@@ -3,6 +3,7 @@
  * scripts/build.mjs at build time; nothing here runs in the browser.
  */
 import { footerHtml, tabbarHtml, topbarHtml, type NavId } from './shell';
+import { PODCAST_SHOWS, TOPICS } from '../../functions/_shared/newsTopics';
 
 const SITE = 'https://marketcheck.money';
 const GA_ID = 'G-EN7YS4P0XE';
@@ -81,11 +82,25 @@ const APP_PAGES: Page[] = [
     path: '/news/',
     file: 'news/index.html',
     view: 'news',
-    title: 'Market headlines: finance, crypto, technology and AI · Market Check',
+    title: 'Money news by topic: markets, investing, crypto and more · Market Check',
     description:
-      'Recent headlines from major publishers on markets, crypto, the economy, technology and AI, gathered from public RSS feeds with source and time.',
+      'Recent headlines in ten topics: markets and the economy, investing, personal finance, crypto, real estate, technology, policy, business, commodities and healthcare. From major publishers, with source and time.',
     body: intro('Headlines', [
-      'Recent headlines on markets, crypto, the economy, technology and AI, gathered from the public RSS feeds of major publishers. Each links to the original story.',
+      'Money news from major publishers, sorted into ten topics. Each story links to the original.',
+      `<span class="topic-list">${TOPICS.map((t) => `<a href="/news/?topic=${t.id}">${t.label.replace(/&/g, '&amp;')}</a>`).join(' · ')}</span>`,
+      'Looking for something to listen to? The <a href="/podcasts/">podcast hub</a> has shows for every one of these topics.',
+    ]),
+  },
+  {
+    path: '/podcasts/',
+    file: 'podcasts/index.html',
+    view: 'podcasts',
+    title: 'Finance and business podcasts to browse · Market Check',
+    description:
+      'A hand-picked directory of podcasts on markets, investing, personal finance, crypto, real estate, technology, business, commodities and health, with the newest episode of each.',
+    body: intro('Podcasts', [
+      'A hand-picked directory of shows on markets, investing, personal finance, crypto, real estate, technology, business, commodities and health. Browse by topic and see the newest episode of each.',
+      `Shows include ${PODCAST_SHOWS.filter((s) => s.topic).slice(0, 12).map((s) => s.name).join(', ')} and more.`,
     ]),
   },
 ];

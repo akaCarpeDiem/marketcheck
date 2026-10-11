@@ -7,6 +7,8 @@
  *   node scripts/dev.mjs --port 5180     another port (default 5173)
  *   node scripts/dev.mjs --no-watch      build once, do not rebuild on change
  *   node scripts/dev.mjs --live          (with --mock) stock prices keep moving when the market is shut
+ *   node scripts/dev.mjs --history       turn on the hourly price record (4h and 8h crypto changes);
+ *                                        with --mock, ten hours of made-up history are filled in
  *
  * It rebuilds when files in src/, content/ or public/ change (reload the page
  * to see it). KV is an in-memory map, so saved layouts last until the server
@@ -85,6 +87,8 @@ const env = {
   LAYOUTS: kv,
   SESSION_SECRET: 'dev-only-secret-not-used-in-production',
   PUBLIC_ORIGIN: origin,
+  // 4h and 8h crypto changes from the hourly price record (see cryptoHistory.ts).
+  ...(flag('history') ? { PRICE_HISTORY: '1' } : {}),
 };
 
 /* ── Functions ───────────────────────────────────────────────────────────── */
@@ -112,7 +116,7 @@ async function loadFunctions() {
   await rm(work, { recursive: true, force: true });
   await mkdir(outdir, { recursive: true });
   const entryPoints = Object.fromEntries(files.map((f) => [f.replace(/\.ts$/, ''), path.join(root, 'functions', f)]));
-  for (const name of ['session', 'marketCalendar', 'sectors', 'universes']) {
+  for (const name of ['session', 'marketCalendar', 'sectors', 'universes', 'newsTopics']) {
     entryPoints[`_shared/${name}`] = path.join(root, 'functions', '_shared', `${name}.ts`);
   }
   await esbuild.build({
@@ -141,6 +145,7 @@ async function loadFunctions() {
     calendar: await load('marketCalendar'),
     sectors: await load('sectors'),
     universes: await load('universes'),
+    topics: await load('newsTopics'),
   };
   routes = next;
   middleware = mw;
@@ -319,8 +324,13 @@ async function handle(request) {
       const key = url.pathname.replace(/\/$/, '');
       const mod = routes.get(key);
       if (mod) {
+        // News comes from dozens of RSS feeds that cannot be stood in for one by one; mock the answers instead.
         if (useMock && key === '/api/headlines') {
-          return new Response(JSON.stringify(mock.headlines(url.searchParams.get('category') || 'tradfi')), {
+          const asked = url.searchParams.get('topic') || url.searchParams.get('category') || 'markets';
+          return new Response(JSON.stringify(mock.headlines(asked)), { headers: { 'Content-Type': 'application/json' } });
+        }
+        if (useMock && key === '/api/podcasts') {
+          return new Response(JSON.stringify(mock.podcasts(shared.topics.PODCAST_SHOWS, shared.topics.TOPICS)), {
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -372,7 +382,7 @@ async function rebuild(what) {
       await loadFunctions();
       if (useMock) {
         installMock();
-        if (![...kvStore.keys()].some((k) => k.startsWith('snap:crypto:'))) await seedPriceHistory();
+        if (flag('history') && ![...kvStore.keys()].some((k) => k.startsWith('snap:crypto:'))) await seedPriceHistory();
         if (![...kvStore.keys()].some((k) => k.startsWith('board:'))) seedBoard();
       }
     }
