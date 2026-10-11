@@ -73,7 +73,7 @@ export const mood = signal<Mood | null>(null);
 
 /* ── Crypto ────────────────────────────────────────────────────────────── */
 
-type CryptoPayload = { items?: Coin[]; ok?: boolean; stale?: boolean; fetchedAt?: string };
+type CryptoPayload = { items?: Coin[]; ok?: boolean; stale?: boolean; partial?: boolean; fetchedAt?: string };
 
 function setCoins(coins: Coin[], at: number, status: Status, target = crypto, partial = false): void {
   const byId = new Map<string, Coin>();
@@ -192,23 +192,27 @@ export function loadEth(): Promise<void> {
       coins = Array.isArray(data.items) ? data.items : [];
       if (data.fetchedAt) at = Date.parse(data.fetchedAt) || at;
       stale = Boolean(data.stale) && Date.now() - at > ETH_OLD_MS;
+      // The server could only offer the Ethereum tokens from its main list.
+      partial = Boolean(data.partial) && coins.length > 0;
     } catch {
       coins = [];
     }
-    if (!coins.length || stale) {
+    if (!coins.length || stale || partial) {
       const direct = await coinsDirect(CG_MARKETS_ETH, 20);
       if (direct) {
         // CoinGecko has no 4h or 8h figures; borrow them from the main list for coins in both.
         coins = withIntradayFrom(direct, crypto.get().coins);
         at = Date.now();
         stale = false;
+        partial = false;
       }
     }
-    if (!coins.length || stale) {
+    if (!coins.length || stale || partial) {
       const main = crypto.get();
       const known = ethFromMain(main.coins);
-      // Current prices for fewer tokens beat old prices for all of them.
-      if (known.length >= 8 && (!coins.length || main.at - at > ETH_OLD_MS)) {
+      // Current prices for fewer tokens beat old prices for all of them; and of two partial lists, the newer wins.
+      const better = !coins.length || (partial ? main.at >= at : main.at - at > ETH_OLD_MS);
+      if (known.length >= 8 && better) {
         coins = known;
         at = main.at;
         stale = main.status !== 'ok';

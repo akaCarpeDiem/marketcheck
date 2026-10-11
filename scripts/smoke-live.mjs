@@ -145,7 +145,9 @@ results.push(await check('/api/game/board', { expectJson: (j, row) => { if (!j.o
 results.push(
   await check('/api/cryptos?universe=eth', {
     expectJson: (j, row) => {
-      row.notes.push(`${j.items?.length ?? 0} tokens${j.error ? `; ${j.error}` : ''}`);
+      row.notes.push(
+        `${j.items?.length ?? 0} tokens${j.partial ? ' (from the main coin list: CoinGecko refused the full Ethereum list; a browser asks CoinGecko itself)' : ''}${j.stale ? ', older copy' : ''}${j.error ? `; ${j.error}` : ''}`,
+      );
     },
   }),
 );

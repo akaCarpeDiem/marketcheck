@@ -47,6 +47,8 @@ const mock = createMock({ universePrices: { ...SEED_PRICES }, shares: SEED_SHARE
 const upstream = [];
 /** Set to make CoinGecko refuse keyless requests, as it does to shared addresses. */
 let coinGeckoRefuses = false;
+/** Set to make CoinGecko refuse only the Ethereum-category request. */
+let ethListRefused = false;
 const coinGeckoKeysSeen = [];
 globalThis.fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
@@ -55,6 +57,7 @@ globalThis.fetch = async (input, init) => {
     const key = new Headers(init?.headers).get('x-cg-demo-api-key');
     if (key) coinGeckoKeysSeen.push(key);
     if (coinGeckoRefuses && !key) return new Response('{"status":{"error_code":429}}', { status: 429 });
+    if (ethListRefused && url.includes('category=ethereum-ecosystem')) return new Response('{"status":{"error_code":429}}', { status: 429 });
   }
   const res = await mock.handle(input);
   if (res) return res;
@@ -115,8 +118,18 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const t12 = await call(trending, '/api/trending?category=crypto&tf=12h');
   assert.equal(t12.body.effectiveTf, '8h');
 
+  // Refused before any copy of the Ethereum list exists: the answer is the Ethereum tokens of the main list, and says so.
+  ethListRefused = true;
+  const ethCold = await call(cryptos, '/api/cryptos?universe=eth');
+  ethListRefused = false;
+  assert.equal(ethCold.status, 200);
+  assert.equal(ethCold.body.partial, true);
+  assert.ok(ethCold.body.items.length >= 8 && ethCold.body.items[0].id === 'ethereum', `${ethCold.body.items.length} tokens from the main list`);
+  assert.ok(!ethCold.body.items.some((c) => c.id === 'bitcoin' || c.id === 'solana'));
+
   // The Ethereum list has the same shape and the same rules.
   const eth = await call(cryptos, '/api/cryptos?universe=eth');
+  assert.ok(!eth.body.partial, 'the full list as soon as CoinGecko answers again');
   assert.equal(eth.status, 200);
   assert.ok(eth.body.items.length >= 20 && eth.body.items.some((c) => c.id === 'ethereum'));
   assert.ok(!eth.body.items.some((c) => c.id === 'bitcoin'), 'Bitcoin is not an Ethereum token');

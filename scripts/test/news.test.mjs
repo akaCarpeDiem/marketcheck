@@ -128,6 +128,17 @@ assert.deepEqual(
   ]),
   ['FDA approves a new Alzheimer’s drug'],
 );
+// A channel that wanders off its subject is held to the topic, not trusted wholesale.
+assert.deepEqual(
+  titles('commodities', 'YT Kitco News', [
+    ['Gold Could Hit $5,000 Before Year End, Analyst Says', ''],
+    ['Home Prices Could Fall Up to 50% as Mortgages Head for 9%', ''],
+    ['Stock Market Crash Risk Changed in Just 3 Days', ''],
+    ['Silver squeeze: why miners are lagging', ''],
+  ]),
+  ['Gold Could Hit $5,000 Before Year End, Analyst Says', 'Silver squeeze: why miners are lagging'],
+);
+assert.ok(!feed('crypto', 'YT a16z').trustedTopic, 'a venture channel is only crypto when the episode is');
 // MarketWatch stays (owner's decision, 2026-10-11); Yahoo's RSS feed no longer answers and is gone.
 assert.ok(names('investing').includes('MarketWatch') && names('personal-finance').includes('MarketWatch Personal Finance'));
 for (const id of TOPIC_IDS) assert.ok(!listFeeds(id).some((f) => /finance\.yahoo\.com/.test(f.url)), `${id} does not read Yahoo's RSS feed`);
@@ -155,6 +166,8 @@ assert.notEqual(outletOf('CNBC Markets'), outletOf('YT CNBC'), 'written stories 
     story('BBC Business', 'Chip maker opens a new plant in Wales', 5),
     story('Reuters', 'Chip maker opens a new plant in Wales', 6),
     story('YT Fireship', 'Tech Now', 7, 'video'),
+    story('Nature News', 'Publisher Correction: Sleep chart of biological ageing clocks', 8),
+    story('Nature News', 'Author Correction: A map of the ageing brain', 9),
   ]);
   assert.deepEqual(out.map((it) => it.id), ['BBC Technology-3', 'Reuters-6', 'YT Fireship-7'], 'programme pages and repeats are dropped; the newest copy is kept');
 }

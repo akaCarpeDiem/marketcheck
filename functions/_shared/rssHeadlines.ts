@@ -143,7 +143,8 @@ const CRYPTO_FEEDS_RAW: FeedDef[] = [
   { name: 'YT Bankless', url: yt('UCAl9Ld79qaZxp9JzEOwd3aA'), mediaType: 'video', trustedTopic: true },
   { name: 'YT The Defiant', url: yt('UCL0J4MLEdLP0-UyLu0hCktg'), mediaType: 'video', trustedTopic: true },
   { name: 'YT Altcoin Daily', url: yt('UCbLhGKVY-bJPcawebgtNfbw'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT a16z', url: yt('UC9cn0TuPq4dnbTY-CBsm8XA'), mediaType: 'video', trustedTopic: true },
+  // A venture firm's channel: mostly AI and software now, so only its crypto episodes pass the topic gate.
+  { name: 'YT a16z', url: yt('UC9cn0TuPq4dnbTY-CBsm8XA'), mediaType: 'video' },
 ];
 
 const CRYPTO_FEEDS: FeedDef[] = CRYPTO_FEEDS_RAW.map((f) => ({
@@ -605,7 +606,8 @@ const COMMODITIES_FEEDS: FeedDef[] = [
   { name: 'CNBC Markets', url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
   { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
   { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
-  { name: 'YT Kitco News', ...ytMeta('UC9ijza42jVR3T6b8bColgvg', 'Kitco NEWS'), trustedTopic: true },
+  // A metals channel that also runs general market-crash commentary; keep the episodes about metals and energy.
+  { name: 'YT Kitco News', ...ytMeta('UC9ijza42jVR3T6b8bColgvg', 'Kitco NEWS'), keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
   { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
   { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
 ];
@@ -1486,6 +1488,8 @@ export function dedupeSort(items: HeadlineItem[]): HeadlineItem[] {
   for (const it of sorted) {
     const plain = plainTitle(it.title);
     if (it.mediaType !== 'video' && plain.split(' ').length < 3) continue;
+    // A journal's notice that an earlier paper was corrected is not a story.
+    if (/^(?:publisher|author|editorial)? ?(?:correction|erratum|retraction note|corrigendum)\b/i.test(it.title.trim())) continue;
     const byLink = it.link.replace(/\/$/, '').toLowerCase();
     const byTitle = `${outletOf(it.source)}|${plain}`;
     if (seen.has(byLink) || seen.has(byTitle)) continue;
