@@ -43,17 +43,25 @@ const origin = `http://127.0.0.1:${port}`;
 /* ── Workers runtime stand-ins ───────────────────────────────────────────── */
 
 const kvStore = new Map();
+const kvMeta = new Map();
 const kv = {
   async get(key, type) {
     const v = kvStore.get(key);
     if (v == null) return null;
     return type === 'json' ? JSON.parse(v) : v;
   },
-  async put(key, value) {
+  async put(key, value, options) {
     kvStore.set(key, String(value));
+    if (options?.metadata !== undefined) kvMeta.set(key, options.metadata);
+    else kvMeta.delete(key);
   },
   async delete(key) {
     kvStore.delete(key);
+    kvMeta.delete(key);
+  },
+  async list({ prefix = '', limit = 1000 } = {}) {
+    const keys = [...kvStore.keys()].filter((k) => k.startsWith(prefix)).sort().slice(0, limit);
+    return { keys: keys.map((name) => ({ name, metadata: kvMeta.get(name) })), list_complete: true };
   },
 };
 
@@ -162,6 +170,19 @@ function installMock() {
     if (res) return res;
     throw new TypeError(`mock: no stand-in for ${new URL(url).hostname}`);
   };
+}
+
+/** Mock mode only: a few made-up players so the leaderboard has something to show. */
+function seedBoard() {
+  const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit' }).format(Date.now());
+  const names = ['BullishBadger', 'Ada L', 'closing_bell', 'TapeReader', 'Mo', 'quietquant', 'Greta', 'J.P.', 'theta decay', 'Lin', 'SidewaysSam', 'Nora K'];
+  names.forEach((n, i) => {
+    const t = 28 - i * 2;
+    const w = Math.round(t * (0.72 - i * 0.03));
+    const mt = Math.min(t, 7 - (i % 3));
+    const mw = Math.max(0, Math.round(mt * (0.85 - i * 0.05)));
+    kv.put(`board:mock-${i}`, '1', { metadata: { n, w, t, s: Math.max(0, 5 - i), b: 9 - Math.floor(i / 2), m: month, mw, mt, p: [], f: 1_700_000_000_000 + i } });
+  });
 }
 
 /**
@@ -352,6 +373,7 @@ async function rebuild(what) {
       if (useMock) {
         installMock();
         if (![...kvStore.keys()].some((k) => k.startsWith('snap:crypto:'))) await seedPriceHistory();
+        if (![...kvStore.keys()].some((k) => k.startsWith('board:'))) seedBoard();
       }
     }
   } catch (e) {

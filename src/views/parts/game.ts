@@ -2,11 +2,13 @@
 import { etParts, marketStatus } from '../../../functions/_shared/marketCalendar';
 import { GAME_SYMBOL, currentTarget, pickForDay, picksFor, placeCall, referenceClose, settleCalls, tally } from '../../data/game';
 import { quotes, wantQuotes } from '../../data/market';
-import { data } from '../../data/user';
+import { board, loadBoard, rankOf } from '../../data/board';
+import { data, user } from '../../data/user';
 import { frame, html, on, raw, render } from '../../lib/dom';
 import { dir, etClock, level, pct, until } from '../../lib/format';
 import { icon } from '../../lib/icons';
 import type { Scope } from '../../lib/store';
+import { openBoard } from '../../ui/board';
 import { toast } from '../../ui/toast';
 
 const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long' });
@@ -90,9 +92,21 @@ function body(): string {
       <div><strong class="num">${t.total ? `${t.wins}/${t.total}` : '—'}</strong><span>right</span></div>
     </div>${raw(historyDots())}`;
 
+  // Where the player stands, if they are on the board; otherwise who leads this month.
+  const b = board.get();
+  const nick = user.get() ? data.get().game.nick : undefined;
+  const rank = rankOf(b.monthRows, nick);
+  const leader = b.monthRows[0];
+  const boardLine = rank
+    ? `You are #${rank} this month`
+    : leader
+      ? `${leader.name} leads with ${leader.wins} right`
+      : 'See who calls it best';
+  const boardBtn = html`<button type="button" class="btn btn-outline btn-sm call-board" data-call-board>${raw(icon.trophy(15))}<span><b>Leaderboard</b><em>${boardLine}</em></span></button>`;
+
   return html`<div class="call-icon">${raw(icon.target(22))}</div>
     <div class="call-main"><h2>Daily call</h2>${raw(main)}${raw(last)}</div>
-    <div class="call-side">${raw(stats)}</div>`;
+    <div class="call-side">${raw(stats)}${raw(boardBtn)}</div>`;
 }
 
 export function mountGame(el: HTMLElement, scope: Scope): void {
@@ -104,7 +118,10 @@ export function mountGame(el: HTMLElement, scope: Scope): void {
       paint();
     }),
     data.subscribe(paint),
+    board.subscribe(paint),
+    user.subscribe(paint),
     () => wantQuotes('game', []),
+    on(el, 'click', '[data-call-board]', () => openBoard()),
     on(el, 'click', '[data-call]', (_e, t) => {
       const dirn = t.dataset.call as 'up' | 'down';
       if (placeCall(dirn)) toast(`Called ${dirn === 'up' ? 'higher' : 'lower'}. Come back after the close to see how you did.`, 'good');
@@ -116,5 +133,6 @@ export function mountGame(el: HTMLElement, scope: Scope): void {
     paint();
   }, 30_000);
   void settleCalls();
+  void loadBoard();
   paint();
 }

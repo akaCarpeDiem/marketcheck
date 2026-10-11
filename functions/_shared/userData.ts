@@ -49,6 +49,8 @@ export type CallPick = {
   won?: boolean;
   /** The close matched the reference exactly: counts as neither a win nor a loss. */
   tie?: boolean;
+  /** 1 = the server saw this call arrive before the session opened. Only these count on the leaderboard. */
+  v?: 1;
 };
 
 export type GameState = {
@@ -57,6 +59,10 @@ export type GameState = {
   best: number;
   wins: number;
   total: number;
+  /** Display name on the leaderboard. Set only through /api/game/nick. */
+  nick?: string;
+  /** What the server last wrote to the board for this player, so it writes again only on a change. */
+  bs?: string;
 };
 
 export type UserData = {
@@ -141,6 +147,7 @@ function normalizeGame(raw: unknown): GameState {
         pick.won = p.won;
         if (p.tie === true) pick.tie = true;
       }
+      if (p.v === 1) pick.v = 1;
       out.picks.push(pick);
     }
   }
@@ -149,6 +156,10 @@ function normalizeGame(raw: unknown): GameState {
   out.best = Math.max(count(r.best), out.streak);
   out.wins = count(r.wins);
   out.total = Math.max(count(r.total), out.wins);
+  const nick = str(r.nick, 24);
+  if (nick) out.nick = nick;
+  const bs = str(r.bs, 600);
+  if (bs) out.bs = bs;
   return out;
 }
 

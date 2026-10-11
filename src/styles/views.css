@@ -1403,3 +1403,181 @@ td .cell-asset .cell-stack {
 .bubble-card .card-head {
   padding-bottom: 12px;
 }
+
+/* ── Daily call leaderboard ── */
+.call-board {
+  height: auto;
+  padding: 7px 12px;
+  gap: 9px;
+  text-align: left;
+  color: var(--text);
+}
+.call-board svg {
+  color: var(--warn, #f5b942);
+  flex: none;
+}
+.call-board span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.call-board b {
+  font-weight: 600;
+  font-size: 13px;
+}
+.call-board em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--text-3);
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overlay-panel.board {
+  width: min(560px, calc(100vw - 24px));
+}
+.board h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+  padding-right: 32px;
+}
+.board h2 svg {
+  color: var(--warn, #f5b942);
+}
+.board .muted {
+  margin-bottom: 14px;
+}
+.board-tabs {
+  margin-bottom: 10px;
+}
+.board-scroll {
+  max-height: min(46vh, 420px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  margin-bottom: 14px;
+}
+.board-table th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
+}
+.board-table td,
+.board-table th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.board-rank {
+  width: 44px;
+}
+.board-name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.board-table tr.is-me td {
+  background: var(--brand-soft);
+}
+.board-table td svg {
+  vertical-align: -2px;
+  color: var(--warn, #f5b942);
+}
+.medal {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1203;
+}
+.medal-1 {
+  background: #f5c542;
+}
+.medal-2 {
+  background: #c9d1dc;
+}
+.medal-3 {
+  background: #d99a5b;
+}
+.board-empty {
+  padding: 26px 12px;
+  text-align: center;
+  color: var(--text-2);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  margin-bottom: 14px;
+}
+.board-join {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--card-2);
+}
+.board-join p {
+  color: var(--text-2);
+  font-size: 13.5px;
+  align-self: center;
+}
+.board-join p strong {
+  color: var(--text);
+}
+.board-field {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.board-hint,
+.board-join .auth-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.board-join .auth-note.is-bad {
+  color: var(--down);
+}
+.board-table {
+  width: 100%;
+}
+.board-table td,
+.board-table th {
+  white-space: nowrap;
+}
+.board-table .board-name {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+@media (max-width: 520px) {
+  .board-table td,
+  .board-table th {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .board-rank {
+    width: 34px;
+  }
+  .board-rate {
+    display: none;
+  }
+}
+.board-table td svg {
+  display: inline-block;
+}

@@ -181,8 +181,9 @@ async function saveNow(): Promise<void> {
         const res = await sendJson<{ data: unknown }>('/api/user/data', 'PUT', { data: attempt, base: serverUpdatedAt });
         const saved = normalizeUserData(res.data);
         serverUpdatedAt = saved.updatedAt;
-        // Keep any change made while the request was in flight.
-        if (!dirty) data.set({ ...data.get(), updatedAt: saved.updatedAt });
+        // Keep any change made while the request was in flight. Otherwise take the
+        // server's copy of the game: it referees which calls count and how they ended.
+        if (!dirty) data.set({ ...data.get(), game: saved.game, updatedAt: saved.updatedAt });
         syncState.set('saved');
         persistLocal();
         break;
@@ -490,4 +491,38 @@ export async function deleteAccountData(): Promise<boolean> {
   apply({ user: null, guest: true, hero: DEFAULT_HERO, indexes: DEFAULT_INDEXES, panels: DEFAULT_PANELS, data: null });
   data.set(loadGuest());
   return true;
+}
+
+export type NickResult = { ok: true } | { ok: false; error: string };
+
+/** Choose the name shown on the daily call leaderboard, or pass null to leave the board. */
+export async function setNick(nick: string | null): Promise<NickResult> {
+  if (!user.get()) return { ok: false, error: 'unauthorized' };
+  clearTimeout(saveTimer);
+  if (dirty) await saveNow();
+  try {
+    const res = await sendJson<{ data: unknown }>('/api/game/nick', 'POST', { nick });
+    const saved = normalizeUserData(res.data);
+    serverUpdatedAt = saved.updatedAt;
+    data.set({ ...data.get(), game: saved.game, updatedAt: saved.updatedAt });
+    persistLocal();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof ApiError ? e.message : 'network' };
+  }
+}
+
+export function nickErrorText(code: string): string {
+  switch (code) {
+    case 'invalid_nick':
+      return 'Use 3 to 20 letters, numbers or spaces, and nothing rude or official-sounding.';
+    case 'nick_taken':
+      return 'Someone already plays under that name. Try another.';
+    case 'unauthorized':
+      return 'Sign in first.';
+    case 'network':
+      return 'No connection. Check your internet and try again.';
+    default:
+      return 'That could not be saved just now. Try again in a minute.';
+  }
 }

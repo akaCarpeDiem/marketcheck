@@ -1,66 +1,18 @@
 /**
- * The daily call: before each US session, guess whether the S&P 500 will close
- * higher or lower than its previous close. For fun; nothing is at stake.
- *
- * Rules, so results are unambiguous:
- * - A call is for one session (a trading day) and is measured close to close:
- *   that session's closing level against the previous session's.
- * - Calls for a session are accepted from the previous close until that
- *   session opens at 9:30 AM ET. While the market is open, calls are locked.
- * - The result is read from the index's daily closes after the session ends.
- *   An exact tie counts as neither a win nor a loss.
+ * The daily call in the browser: placing a call and reading results. The rules
+ * themselves (which session a call is for, how results are tallied) live in
+ * functions/_shared/game.ts and are shared with the server, which referees
+ * signed-in players' calls for the leaderboard.
  */
-import {
-  etParts,
-  etToMs,
-  marketStatus,
-  nextTradingDay,
-  prevTradingDay,
-  type TradingDay,
-} from '../../functions/_shared/marketCalendar';
+import { GAME_ASSET, GAME_SYMBOL, closesByDay, currentTarget, settleAfter, tally, type Target } from '../../functions/_shared/game';
+import { etParts } from '../../functions/_shared/marketCalendar';
 import type { CallPick, GameState } from '../../functions/_shared/userData';
 import { getJson } from '../lib/api';
 import { quotes } from './market';
 import { change, data } from './user';
 
-export const GAME_SYMBOL = '^GSPC';
-const ASSET = 'spx';
-
-export type Target = {
-  /** Session the next call is for. */
-  day: TradingDay;
-  /** The session before it, whose close is the reference. */
-  prev: TradingDay;
-  /** True while calls for `day` are accepted. */
-  open: boolean;
-  /** When `day` opens and closes (ms). */
-  opensAt: number;
-  closesAt: number;
-};
-
-/** The session a call would be for right now. */
-export function currentTarget(now = Date.now()): Target {
-  const p = etParts(now);
-  const s = marketStatus(now);
-  let day: TradingDay;
-  if (s.state === 'open') {
-    // Today's session is running: it can no longer be called, so the next call is for the session after it.
-    day = nextTradingDay(p.y, p.m, p.d, false);
-  } else {
-    const today = nextTradingDay(p.y, p.m, p.d, true);
-    const todayOpen = etToMs(today.y, today.m, today.d, today.open);
-    day = today.key === p.key && now >= todayOpen ? nextTradingDay(p.y, p.m, p.d, false) : today;
-  }
-  const d = new Date(Date.UTC(day.y, day.m - 1, day.d - 1));
-  const prev = prevTradingDay(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), true);
-  return {
-    day,
-    prev,
-    open: s.state !== 'open',
-    opensAt: etToMs(day.y, day.m, day.d, day.open),
-    closesAt: etToMs(day.y, day.m, day.d, day.close),
-  };
-}
+export { GAME_SYMBOL, currentTarget, tally, type Target };
+const ASSET = GAME_ASSET;
 
 /**
  * The reference close for a new call: the index's last close, but only when
@@ -78,23 +30,6 @@ export function pickForDay(day: string): CallPick | null {
   return picksFor(data.get().game).find((p) => p.day === day) ?? null;
 }
 
-/** Wins, losses and streaks from the settled calls. */
-export function tally(picks: CallPick[]): { wins: number; total: number; streak: number; best: number } {
-  const settled = picks.filter((p) => p.close != null && !p.tie).sort((a, b) => (a.day < b.day ? -1 : 1));
-  let wins = 0;
-  let run = 0;
-  let best = 0;
-  for (const p of settled) {
-    if (p.won) {
-      wins += 1;
-      run += 1;
-      best = Math.max(best, run);
-    } else {
-      run = 0;
-    }
-  }
-  return { wins, total: settled.length, streak: run, best };
-}
 
 export function placeCall(dir: 'up' | 'down'): boolean {
   const target = currentTarget();
@@ -108,16 +43,13 @@ export function placeCall(dir: 'up' | 'down'): boolean {
 }
 
 let settling: Promise<void> | null = null;
+/** Sessions already settled in this visit, so a result is sent to the account once, not on every refresh. */
+const settledThisVisit = new Set<string>();
 
 /** Read results for calls whose session has closed. Safe to call often. */
 export function settleCalls(): Promise<void> {
   const now = Date.now();
-  const due = picksFor(data.get().game).filter((p) => {
-    if (p.close != null) return false;
-    const [y, m, d] = p.day.split('-').map(Number) as [number, number, number];
-    // Ten minutes after the 4:00 PM close (1:00 PM on early-close days is earlier, so this is safe).
-    return now > etToMs(y, m, d, 16 * 60 + 10);
-  });
+  const due = picksFor(data.get().game).filter((p) => p.close == null && !settledThisVisit.has(p.day) && now > settleAfter(p.day));
   if (!due.length) return Promise.resolve();
   settling ??= (async () => {
     try {
@@ -125,14 +57,14 @@ export function settleCalls(): Promise<void> {
         `/api/chart?symbol=${encodeURIComponent(GAME_SYMBOL)}&range=3mo&interval=1d`,
       );
       if (!res.ok || !res.closes || !res.timestamps || res.closes.length !== res.timestamps.length) return;
-      const closeByDay = new Map<string, number>();
-      res.timestamps.forEach((t, i) => closeByDay.set(etParts(t * 1000).key, res.closes![i]!));
+      const closeByDay = closesByDay(res.timestamps, res.closes);
       const results = new Map<string, number>();
       for (const p of due) {
         const close = closeByDay.get(p.day);
         if (close != null) results.set(p.day, close);
       }
       if (!results.size) return;
+      for (const day of results.keys()) settledThisVisit.add(day);
       change((d) => {
         for (const p of d.game.picks) {
           if (p.asset !== ASSET || p.close != null) continue;

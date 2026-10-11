@@ -2,19 +2,21 @@
  * GET / PUT / DELETE /api/user/data — the signed-in user's watchlist, holdings,
  * preferences and game record (KV `data:<sub>`).
  *
- * DELETE removes everything stored for the account (this record and the saved
- * tile, index and panel layouts) and signs the browser out.
+ * DELETE removes everything stored for the account (this record, the saved
+ * tile, index and panel layouts and any leaderboard line) and signs the browser out.
  *
  * PUT body: { data: UserData, base: number }. `base` is the `updatedAt` the
  * browser last saw. If the stored copy is newer (changed on another device),
  * the answer is 409 with the stored copy so the browser can merge and retry.
  */
 
-import { jsonResponse } from '../../_shared/edgeCache';
+import { jsonResponse, type WaitUntil } from '../../_shared/edgeCache';
+import { reconcileGame } from '../../_shared/game';
+import { boardKey, indexCloses, syncBoardLine, type BoardKv } from '../../_shared/gameServer';
 import { type AuthEnv, clearSessionCookie, getSession } from '../../_shared/session';
 import { emptyUserData, normalizeUserData } from '../../_shared/userData';
 
-type Ctx = { request: Request; env: AuthEnv };
+type Ctx = { request: Request; env: AuthEnv; waitUntil?: WaitUntil };
 
 export const userDataKey = (sub: string): string => `data:${sub}`;
 
@@ -64,7 +66,13 @@ export async function onRequestPut(context: Ctx): Promise<Response> {
   }
 
   const next = normalizeUserData(body.data);
-  next.updatedAt = Math.max(Date.now(), current.updatedAt + 1);
+  const now = Date.now();
+  // The daily call is refereed here: which calls arrived in time, and how they turned out.
+  const hasCalls = next.game.picks.length > 0 || current.game.picks.length > 0;
+  const closes = hasCalls ? await indexCloses(context.waitUntil).catch(() => null) : null;
+  next.game = reconcileGame(current.game, next.game, now, closes);
+  if (next.game.nick || next.game.bs) await syncBoardLine(context.env.LAYOUTS as unknown as BoardKv, session.sub, next.game, now);
+  next.updatedAt = Math.max(now, current.updatedAt + 1);
   try {
     await context.env.LAYOUTS.put(key, JSON.stringify(next));
   } catch (e) {
@@ -80,7 +88,7 @@ export async function onRequestDelete(context: Ctx): Promise<Response> {
   if (!session) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   const kv = context.env.LAYOUTS;
   if (!kv) return jsonResponse({ error: 'storage_unavailable' }, { status: 503 });
-  const keys = [userDataKey(session.sub), `hero:${session.sub}`, `indexes:${session.sub}`, `panels:${session.sub}`];
+  const keys = [userDataKey(session.sub), boardKey(session.sub), `hero:${session.sub}`, `indexes:${session.sub}`, `panels:${session.sub}`];
   const results = await Promise.allSettled(keys.map((k) => kv.delete(k)));
   if (results.some((r) => r.status === 'rejected')) {
     console.error('user data delete failed', results);
