@@ -4,7 +4,7 @@
  * index and headlines. Views subscribe to the signals; the refresh loops at
  * the bottom keep them current while the tab is visible.
  */
-import { CG_MARKETS, CG_MARKETS_ETH, coinsFromCoinGecko, withIntradayFrom, type Coin } from '../../functions/_shared/cryptoUniverse';
+import { CG_MARKETS, CG_MARKETS_ETH, coinsFromCoinGecko, ethFromMain, withIntradayFrom, type Coin } from '../../functions/_shared/cryptoUniverse';
 import type { Equity } from '../../functions/_shared/equityUniverse';
 import { marketStatus } from '../../functions/_shared/marketCalendar';
 import { getJson } from '../lib/api';
@@ -23,6 +23,8 @@ export type CryptoState = {
   bySymbol: Map<string, Coin>;
   at: number;
   status: Status;
+  /** Ethereum list only: true when this is the part of it found in the main list, not the full list. */
+  partial?: boolean;
 };
 
 export type EquityState = {
@@ -73,7 +75,7 @@ export const mood = signal<Mood | null>(null);
 
 type CryptoPayload = { items?: Coin[]; ok?: boolean; stale?: boolean; fetchedAt?: string };
 
-function setCoins(coins: Coin[], at: number, status: Status, target = crypto): void {
+function setCoins(coins: Coin[], at: number, status: Status, target = crypto, partial = false): void {
   const byId = new Map<string, Coin>();
   const bySymbol = new Map<string, Coin>();
   for (const c of coins) {
@@ -81,7 +83,7 @@ function setCoins(coins: Coin[], at: number, status: Status, target = crypto): v
     // The list is in market-cap order, so the first coin with a ticker is the biggest.
     if (!bySymbol.has(c.symbol)) bySymbol.set(c.symbol, c);
   }
-  target.set({ coins, byId, bySymbol, at, status });
+  target.set(partial ? { coins, byId, bySymbol, at, status, partial } : { coins, byId, bySymbol, at, status });
 }
 
 /** The last list this browser saw, so a return visit paints at once and an outage still shows something. */
@@ -162,20 +164,34 @@ export async function refreshCrypto(): Promise<void> {
 /* ── Ethereum tokens (on demand) ────────────────────────────────────────── */
 
 let ethBusy: Promise<void> | null = null;
+let ethTriedAt = 0;
+/** A copy older than this is not shown as current. */
+const ETH_OLD_MS = 15 * 60_000;
 
-/** Load the Ethereum list if it is missing or more than two minutes old. */
+/**
+ * Load the Ethereum list if it is missing or due for a refresh. Three sources,
+ * in order: our server; CoinGecko asked from this browser (when the server was
+ * refused or only has an old copy); and, if neither has it, the Ethereum
+ * tokens in the main coin list, which is already on the page and has fallbacks
+ * of its own. So the tab is only ever empty when the site has no coin prices at all.
+ */
 export function loadEth(): Promise<void> {
+  if (ethBusy) return ethBusy;
   const have = eth.get();
-  if (have.coins.length && Date.now() - have.at < 120_000 && have.status !== 'error') return Promise.resolve();
-  ethBusy ??= (async () => {
+  // Views ask on every repaint: a full, current list is good for two minutes, anything less is retried sooner.
+  const wait = have.coins.length && have.status === 'ok' && !have.partial ? 120_000 : 45_000;
+  if (Date.now() - ethTriedAt < wait) return Promise.resolve();
+  ethTriedAt = Date.now();
+  ethBusy = (async () => {
     let coins: Coin[] = [];
     let at = Date.now();
     let stale = false;
+    let partial = false;
     try {
       const data = await getJson<CryptoPayload>('/api/cryptos?universe=eth', { timeout: 20_000 });
       coins = Array.isArray(data.items) ? data.items : [];
       if (data.fetchedAt) at = Date.parse(data.fetchedAt) || at;
-      stale = Boolean(data.stale) && Date.now() - at > 15 * 60_000;
+      stale = Boolean(data.stale) && Date.now() - at > ETH_OLD_MS;
     } catch {
       coins = [];
     }
@@ -188,8 +204,22 @@ export function loadEth(): Promise<void> {
         stale = false;
       }
     }
-    if (coins.length) setCoins(coins, at, stale ? 'stale' : 'ok', eth);
-    else eth.set({ ...eth.get(), at: Date.now(), status: eth.get().coins.length ? 'stale' : 'error' });
+    if (!coins.length || stale) {
+      const main = crypto.get();
+      const known = ethFromMain(main.coins);
+      // Current prices for fewer tokens beat old prices for all of them.
+      if (known.length >= 8 && (!coins.length || main.at - at > ETH_OLD_MS)) {
+        coins = known;
+        at = main.at;
+        stale = main.status !== 'ok';
+        partial = true;
+      }
+    }
+    if (coins.length) {
+      setCoins(coins, at, stale ? 'stale' : 'ok', eth, partial);
+    } else {
+      eth.set({ ...eth.get(), at: Date.now(), status: eth.get().coins.length ? 'stale' : 'error' });
+    }
   })().finally(() => {
     ethBusy = null;
   });

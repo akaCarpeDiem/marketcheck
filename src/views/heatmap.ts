@@ -172,7 +172,9 @@ export const heatmapView: View = {
       const what = cat === 'cryptos' ? 'coins' : cat === 'solana' ? 'Solana tokens' : cat === 'ethereum' ? 'Ethereum tokens' : cat === 'stocks' ? 'stocks' : 'ETFs';
       render(
         el.querySelector('[data-sub]'),
-        html`${effMode === 'bubbles' ? `The ${count} biggest moves among ${cat === 'cryptos' ? 'liquid top-250 coins' : cat === 'ethereum' ? 'liquid Ethereum tokens' : what} over ${label}.` : `${count} ${what} sized by ${sizeBy === 'move' ? 'value (balanced)' : cat === 'etfs' ? 'assets' : 'market cap'}, coloured by change over ${label}.`} Select one for details.`,
+        count === 0
+          ? html`${status === 'loading' ? 'Loading…' : `Nothing to show for ${what} right now.`}`
+          : html`${effMode === 'bubbles' ? `The ${count} biggest moves among ${cat === 'cryptos' ? 'liquid top-250 coins' : cat === 'ethereum' ? (eth.get().partial ? 'the liquid Ethereum tokens in the top 250 (the full Ethereum list is not available right now)' : 'liquid Ethereum tokens') : what} over ${label}.` : `${count} ${what} sized by ${sizeBy === 'move' ? 'value (balanced)' : cat === 'etfs' ? 'assets' : 'market cap'}, coloured by change over ${label}.`} Select one for details.`,
       );
       const full = fullScale(cat, tf);
       render(
@@ -182,7 +184,7 @@ export const heatmapView: View = {
           : `<span>${icon.bubbles(14)} Bigger bubble: ${sizeBy === 'cap' ? 'larger market value' : 'bigger move'}. Brighter colour: bigger move.</span>`,
       );
       const source = cat === 'cryptos' || cat === 'ethereum' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
-      render(el.querySelector('[data-note]'), html`${statusNote(status, at, source)}. Third-party data, may be delayed.`);
+      render(el.querySelector('[data-note]'), html`${statusNote(status, at, source).replace(/[.…]$/, '')}. Third-party data, may be delayed.`);
     });
 
     scope.add(

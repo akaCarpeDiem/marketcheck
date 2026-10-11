@@ -70,11 +70,22 @@ CoinGecko (crypto), Yahoo Finance (stocks, ETFs, indexes, commodities), Nasdaq (
 
 CoinGecko limits its free API by address, and Cloudflare's outgoing addresses are shared, so the server is sometimes refused (HTTP 429) through no fault of its own. When that happens the server answers from its last good copy, and a browser that gets nothing asks CoinGecko directly (`refreshCrypto` in `src/data/market.ts`). Setting a free CoinGecko demo key as the secret `COINGECKO_API_KEY` is optional: it is used only to retry a refused request.
 
-Data is cached in the Cloudflare Cache API, not in KV. KV (`LAYOUTS`) holds only what belongs to a signed-in visitor, sign-in codes, and a rare last-good snapshot of the two big lists. The free plan allows 1,000 KV writes a day, so keep it that way.
+The Ethereum tab has its own list (CoinGecko's `ethereum-ecosystem` category) and three ways to fill it, tried in order by `loadEth` in `src/data/market.ts`: the server (`/api/cryptos?universe=eth`, with a last good copy in KV); CoinGecko asked from the browser; and `ethFromMain()` in `functions/_shared/cryptoUniverse.ts`, which picks the known Ethereum tokens out of the main list already on the page. The last one shows fewer tokens and the page says so.
+
+Data is cached in the Cloudflare Cache API, not in KV. KV (`LAYOUTS`) holds only what belongs to a signed-in visitor, sign-in codes, and a rare last-good snapshot of the big lists (coins, Ethereum tokens, share counts). The free plan allows 1,000 KV writes a day, so keep it that way.
 
 ## News topics and podcasts
 
 `functions/_shared/newsTopics.ts` is the one place that defines the ten topics, the content types (article, video, podcast) and the podcast directory. Which feeds belong to which topic is in `functions/_shared/rssHeadlines.ts` (`FEEDS_BY_CAT`). To add a show to the podcast hub, add a line to `PODCAST_SHOWS` with its YouTube channel id. The ids of the old categories (`tradfi`, `housing`, `ai` and so on) are still accepted and mapped to the topic that replaced them.
+
+How a story gets into a topic, in `rssHeadlines.ts`:
+
+- A feed marked `trustedTopic` is about the topic and everything in it is taken. A general feed (a whole business or politics desk) has a `keywordFilter`; with `matchTitle` the headline itself has to match, not a word somewhere in the summary.
+- `dedupeSort` keeps one copy of a story (same link, or same headline from the same outlet) and drops one- and two-word headlines, which are programme pages.
+- `spreadBySource` limits each outlet to 4 written stories and each channel to 2 videos per topic, loosening a little only when a topic would otherwise be short. "NYT Business" and "NYT DealBook" count as one outlet (`outletOf`).
+- The answer lists `feedsUsed`, `feedsQuiet` (answered, nothing on topic just now: normal) and `feedsFailed` (could not be read: worth a look if it persists). `npm run smoke` prints all three.
+
+MarketWatch (the Dow Jones news site) is a source in Investing, Personal Finance and Commodities. An earlier note said never to use its feeds because the site once went by a similar name; the owner lifted that on 2026-10-11.
 
 ## Daily call leaderboard
 

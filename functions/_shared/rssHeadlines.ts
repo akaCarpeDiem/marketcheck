@@ -37,7 +37,10 @@ export type HeadlinesResult = {
   category: HeadlineCategory;
   items: HeadlineItem[];
   feedsUsed: string[];
+  /** Feeds that could not be read. */
   feedsFailed: string[];
+  /** Feeds that answered but had nothing on this topic right now. */
+  feedsQuiet: string[];
   thin: boolean;
   note: string | null;
   stale: boolean;
@@ -49,6 +52,18 @@ type FeedDef = {
   url: string;
   /** If set, keep only items whose title/summary match. */
   keywordFilter?: RegExp;
+  /**
+   * Test keywordFilter against the headline only. For general feeds (a whole
+   * business or politics desk): a story is on topic when its headline says so,
+   * not when the word turns up somewhere in the summary.
+   */
+  matchTitle?: boolean;
+  /**
+   * With matchTitle: a story whose headline says nothing still passes if its
+   * summary matches this, a shorter list of words that leave no doubt. (A
+   * headline about a company often names it and nothing else.)
+   */
+  summaryFilter?: RegExp;
   /** If set, drop items whose title/summary match (routed to another category). */
   excludeFilter?: RegExp;
   /** YouTube Atom channel feeds → video cards. */
@@ -136,50 +151,71 @@ const CRYPTO_FEEDS: FeedDef[] = CRYPTO_FEEDS_RAW.map((f) => ({
   excludeFilter: CRYPTO_POLICY_EXCLUDE,
 }));
 
+/**
+ * Policy, regulation and politics as they bear on money: regulators, central
+ * banks, tax and spending, trade, and the lawmakers who decide them. General
+ * political news (campaign colour, foreign affairs, crime) is not this topic.
+ */
 const POLITICS_KEYWORDS =
-  /\b(SEC|CFTC|bill\b|legislation|regulat|hearing|ETF|crypto|bitcoin|ethereum|blockchain|DeFi|stablecoin|tokeniz|Clarity Act|CLARITY Act|GENIUS Act|FIT21|FIT 21|market structure bill|MiCA|banking|Federal Reserve|\bFed\b|treasury|FDIC|OCC|CFPB|IPO|commodit|sanctions|tariff|trade war|financial|markets?\b|DOJ)\b/i;
+  /\b(SEC|CFTC|FDIC|OCC|CFPB|FTC|DOJ|IRS|Federal Reserve|the Fed|Fed (?:chair|governor|officials?|cuts?|holds?|raises?|rate)|Powell|central banks?|ECB|Bank of England|Bank of Japan|Treasury|interest rates?|rate (?:cut|hike|rise)s?|inflation|tariffs?|trade (?:war|deal|talks|pact|policy)|sanctions|export controls?|tax(?:es|ation)?|tax (?:cuts?|bill|credit|break)s?|budget|deficit|debt ceiling|national debt|shutdown|stimulus|subsid\w+|spending bill|appropriations|regulat\w+|deregulat\w+|antitrust|legislation|lawmakers|Congress|Senate|House (?:bill|panel|committee|Republicans|Democrats|passes|votes?)|White House|executive order|Clarity Act|GENIUS Act|FIT ?21|market structure bill|MiCA|stablecoins?|crypto(?:currency)?|bitcoin|ETFs?|banks?|banking|Wall Street|minimum wage|Social Security|Medicare|Medicaid|Obamacare|Affordable Care Act|IMF|World Bank|OPEC|economy|economic|recession|jobs report|unemployment)\b/i;
 
 const POLITICS_FEEDS: FeedDef[] = [
   { name: 'SEC Press', url: 'https://www.sec.gov/news/pressreleases.rss', trustedTopic: true },
-  { name: 'Federal Reserve', url: 'https://www.federalreserve.gov/feeds/press_all.xml', trustedTopic: true },
+  // Every press release, including routine approvals of bank applications; those are not news.
+  { name: 'Federal Reserve', url: 'https://www.federalreserve.gov/feeds/press_all.xml', trustedTopic: true, excludeFilter: /approval of (?:the )?(?:application|proposal|notice)|announces approval/i },
   {
     name: 'NYT Politics',
     url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml',
     keywordFilter: POLITICS_KEYWORDS,
+    matchTitle: true,
   },
   {
     name: 'NYT Business',
     url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml',
     keywordFilter: POLITICS_KEYWORDS,
+    matchTitle: true,
   },
   {
     name: 'BBC Business',
     url: 'https://feeds.bbci.co.uk/news/business/rss.xml',
     keywordFilter: POLITICS_KEYWORDS,
+    matchTitle: true,
   },
   {
     name: 'Guardian US News',
     url: 'https://www.theguardian.com/us-news/rss',
     keywordFilter: POLITICS_KEYWORDS,
+    matchTitle: true,
   },
   {
     name: 'CoinDesk Policy',
     url: 'https://www.coindesk.com/arc/outboundfeeds/rss/',
     keywordFilter: POLITICS_KEYWORDS,
   },
-  { name: 'YT BBC News', url: yt('UC16niRr50-MSBwiO3YDb3RA'), mediaType: 'video' },
-  { name: 'YT WSJ', url: yt('UCK7tptUDHh-RYDsdxO1-5QQ'), mediaType: 'video' },
-  { name: 'YT Reuters', url: yt('UChqUTb7kYRX8-EiaN3XFrSQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS },
-  { name: 'YT PBS NewsHour', url: yt('UC6ZFN9Tx6xh-skXCuRHCDpQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS },
-  { name: 'YT Sky News', url: yt('UCoMdktPbSTixAyNGwb-UYkQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS },
-  { name: 'YT CNBC', url: yt('UCvJJ_dzjViJCoLf5uKUTwoA'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS },
+  { name: 'YT BBC News', url: yt('UC16niRr50-MSBwiO3YDb3RA'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS, matchTitle: true },
+  { name: 'YT WSJ', url: yt('UCK7tptUDHh-RYDsdxO1-5QQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS, matchTitle: true },
+  { name: 'YT Reuters', url: yt('UChqUTb7kYRX8-EiaN3XFrSQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS, matchTitle: true },
+  { name: 'YT PBS NewsHour', url: yt('UC6ZFN9Tx6xh-skXCuRHCDpQ'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS, matchTitle: true },
+  { name: 'YT CNBC', url: yt('UCvJJ_dzjViJCoLf5uKUTwoA'), mediaType: 'video', keywordFilter: POLITICS_KEYWORDS, matchTitle: true },
 ];
 
 const HOUSING_KEYWORDS =
   /\b(housing|mortgage|home\s?prices?|homebuyers?|homeowners?|real\s?estate|REIT|rents?\b|rental|landlord|apartment|condo|house\s?prices?|property\s?market|construction|homebuilder|builder|housing\s?market|Fannie|Freddie|HUD|mortgage\s?rate|refinanc|foreclos|vacancy|Zillow|Redfin)\b/i;
 
+/**
+ * Headlines about buying, selling, renting or financing a home. Narrower than
+ * HOUSING_KEYWORDS on purpose: it is used on a property section that also runs
+ * decorating and "at home with" pieces, where a word like "apartment" proves nothing.
+ */
+const PROPERTY_MARKET =
+  /\b(housing|mortgages?|home\s?prices?|house\s?prices?|homebuyers?|home\s?buyers?|homeowners?|real\s?estate|rents?|rentals?|renters?|landlords?|tenants?|leases?|evictions?|for sale|on the market|buyers?|sellers?|listings?|brokers?|closing|walk-?through|down payments?|property tax(?:es)?|zoning|foreclos\w+|refinanc\w+|afford\w*|co-?op boards?|condo (?:boards?|associations?|fees)|HOA|market|prices?|(?:home|house|apartment|one) did (?:they|she|he) (?:pick|choose|buy))\b|\$\d/i;
+
+/** What any story in Real Estate has to mention somewhere. */
+const REAL_ESTATE_GATE = new RegExp(`${HOUSING_KEYWORDS.source}|${PROPERTY_MARKET.source}`, 'i');
+
 const HOUSING_FEEDS: FeedDef[] = [
-  { name: 'NYT Real Estate', url: 'https://rss.nytimes.com/services/xml/rss/nyt/RealEstate.xml', trustedTopic: true },
+  // The section also carries decorating and lifestyle pieces; keep the ones about the market.
+  { name: 'NYT Real Estate', url: 'https://rss.nytimes.com/services/xml/rss/nyt/RealEstate.xml', keywordFilter: PROPERTY_MARKET, matchTitle: true },
   { name: 'Guardian Housing', url: 'https://www.theguardian.com/money/property/rss', trustedTopic: true },
   {
     name: 'Guardian Money',
@@ -190,17 +226,18 @@ const HOUSING_FEEDS: FeedDef[] = [
     name: 'BBC Business',
     url: 'https://feeds.bbci.co.uk/news/business/rss.xml',
     keywordFilter: HOUSING_KEYWORDS,
+    matchTitle: true,
   },
   {
     name: 'CNBC Real Estate',
     url: 'https://www.cnbc.com/id/10000115/device/rss/rss.html',
     keywordFilter: HOUSING_KEYWORDS,
   },
-  { name: 'YT CNBC', url: yt('UCvJJ_dzjViJCoLf5uKUTwoA'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS },
+  { name: 'YT CNBC', url: yt('UCvJJ_dzjViJCoLf5uKUTwoA'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS, matchTitle: true },
   { name: 'YT Redfin', url: yt('UCMIuo1QSGcmWnevT9jdC_Ow'), mediaType: 'video', trustedTopic: true },
   { name: 'YT Zillow', url: yt('UCzY5ButfegucMnsF2JeyGGQ'), mediaType: 'video', trustedTopic: true },
-  { name: 'YT Yahoo Finance', url: yt('UCEAZeUIeJs0IjQiqTCdVSIg'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS },
-  { name: 'YT WSJ', url: yt('UCK7tptUDHh-RYDsdxO1-5QQ'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS },
+  { name: 'YT Yahoo Finance', url: yt('UCEAZeUIeJs0IjQiqTCdVSIg'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS, matchTitle: true },
+  { name: 'YT WSJ', url: yt('UCK7tptUDHh-RYDsdxO1-5QQ'), mediaType: 'video', keywordFilter: HOUSING_KEYWORDS, matchTitle: true },
 ];
 
 const WEB3_NFT_KEYWORDS =
@@ -261,7 +298,8 @@ const HEALTH_FEEDS: FeedDef[] = [
   { name: 'Guardian Health', url: 'https://www.theguardian.com/society/health/rss', trustedTopic: true },
   { name: 'NIH News', url: 'https://www.nih.gov/news-releases/feed.xml', trustedTopic: true },
   { name: 'CNBC Health & Science', url: 'https://www.cnbc.com/id/10000108/device/rss/rss.html' },
-  { name: 'STAT', url: 'https://www.statnews.com/feed/', trustedTopic: true },
+  // "STAT+" stories are for subscribers only; a reader following the link meets a paywall.
+  { name: 'STAT', url: 'https://www.statnews.com/feed/', trustedTopic: true, excludeFilter: /^STAT\+/ },
   { name: 'YT NIH', url: yt('UCcTKzTCQAhW4mpGPyO70mWg'), mediaType: 'video', trustedTopic: true },
   { name: 'YT SciShow', url: yt('UCZYTClx2T1of7BRZ86-8fow'), mediaType: 'video' },
   { name: 'YT NEJM', url: yt('UCqO3GxVYutcugyknCWdAcUA'), mediaType: 'video', trustedTopic: true },
@@ -300,6 +338,7 @@ const LONGEVITY_FEEDS: FeedDef[] = [
     name: 'STAT',
     url: 'https://www.statnews.com/feed/',
     keywordFilter: LONGEVITY_KEYWORDS,
+    excludeFilter: /^STAT\+/,
   },
   {
     name: 'YT TED',
@@ -325,7 +364,8 @@ const TECHNOLOGY_FEEDS: FeedDef[] = [
   { name: 'Guardian Technology', url: 'https://www.theguardian.com/technology/rss' },
   { name: 'CNBC Tech', url: 'https://www.cnbc.com/id/19854910/device/rss/rss.html' },
   { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', trustedTopic: true },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', trustedTopic: true },
+  // Ars also covers film, games and science; without trustedTopic those are held to the technology gate.
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
   { name: 'NVIDIA Blog', url: 'https://blogs.nvidia.com/feed/', trustedTopic: true },
   { name: 'YT Veritasium', url: yt('UCHnyfMqiRRG1u-2MsSQLbXA'), mediaType: 'video' },
   { name: 'YT ColdFusion', url: yt('UC4QZ_LsYcvcq7qOsOhpAX4A'), mediaType: 'video', trustedTopic: true },
@@ -488,62 +528,66 @@ const ROBOTICS_FEEDS: FeedDef[] = [
 /* ── Topics added with the ten-topic structure ─────────────────────────── */
 
 const INVESTING_KEYWORDS =
-  /\b(invest(?:or|ors|ing|ment|ments)?|stocks?|shares|equit(?:y|ies)|ETFs?|index funds?|mutual funds?|portfolio|dividends?|earnings|analysts?|price target|upgrades?|downgrades?|valuation|bull(?:ish)?|bear(?:ish)?|rally|sell-?off|IPO|buybacks?|bonds?|yields?|hedge funds?|Buffett|Berkshire|S&P 500|Nasdaq|Dow)\b/i;
+  /\b(invest(?:or|ors|ing|ment|ments)?|stocks?|shares|equit(?:y|ies)|ETFs?|index funds?|mutual funds?|portfolio|dividends?|earnings|analysts?|price target|upgrades?|downgrades?|valuation|bull(?:ish)?|bear(?:ish)?|rally|sell-?off|IPO|buybacks?|bonds?|yields?|hedge funds?|funds?|markets?|Wall Street|Buffett|Berkshire|S&P 500|Nasdaq|Dow)\b/i;
 
 const INVESTING_FEEDS: FeedDef[] = [
   { name: 'CNBC Investing', url: 'https://www.cnbc.com/id/15839069/device/rss/rss.html', trustedTopic: true },
-  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: INVESTING_KEYWORDS },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
   { name: 'MarketWatch Market Pulse', url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse', trustedTopic: true },
   { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', trustedTopic: true },
-  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', keywordFilter: INVESTING_KEYWORDS },
   { name: 'Seeking Alpha', url: 'https://seekingalpha.com/market_currents.xml', trustedTopic: true },
   { name: 'Motley Fool', url: 'https://www.fool.com/feeds/index.aspx', trustedTopic: true },
-  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: INVESTING_KEYWORDS },
-  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: INVESTING_KEYWORDS },
-  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: INVESTING_KEYWORDS },
-  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: INVESTING_KEYWORDS },
-  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: INVESTING_KEYWORDS },
+  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
+  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
+  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: INVESTING_KEYWORDS, matchTitle: true },
   { name: 'YT The Compound', ...ytMeta('UCBRpqrzuuqE8TZcWw75JSdw', 'The Compound'), trustedTopic: true },
   { name: 'YT Real Vision', ...ytMeta('UCGXWKlq1Oxr3ddEtmKhAkPg', 'Real Vision'), trustedTopic: true },
 ];
 
 const PERSONAL_FINANCE_KEYWORDS =
-  /\b(sav(?:e|ing|ings)|budget(?:s|ing)?|retire(?:ment|es?)?|401\(?k\)?|IRAs?|Roth|pensions?|credit (?:cards?|scores?)|debts?|loans?|student loans?|mortgages?|refinanc\w*|tax(?:es)?|IRS|insurance|Social Security|Medicare|paychecks?|salar(?:y|ies)|wages?|cost of living|household|scams?|fraud|bank accounts?|interest rates?|emergency fund|inheritance|estate plan\w*|financial advis\w*|money)\b/i;
+  /\b(sav(?:e|ing|ings)|budget(?:s|ing)?|retire(?:ment|es?)?|401\(?k\)?|IRAs?|Roth|pensions?|credit (?:cards?|scores?)|debts?|loans?|student loans?|mortgages?|refinanc\w*|tax(?:es)?|IRS|insurance|Social Security|Medicare|paychecks?|salar(?:y|ies)|wages?|cost of living|household|scams?|fraud|bank accounts?|interest rates?|emergency fund|inheritance|heirs?|estate plan\w*|down payments?|nest egg|financial advis\w*|money)\b/i;
 
 const PERSONAL_FINANCE_FEEDS: FeedDef[] = [
   { name: 'CNBC Personal Finance', url: 'https://www.cnbc.com/id/21324812/device/rss/rss.html', trustedTopic: true },
   { name: 'NYT Your Money', url: 'https://rss.nytimes.com/services/xml/rss/nyt/YourMoney.xml', trustedTopic: true },
   { name: 'Guardian Money', url: 'https://www.theguardian.com/uk/money/rss', trustedTopic: true },
-  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: PERSONAL_FINANCE_KEYWORDS, matchTitle: true },
   { name: 'MarketWatch Personal Finance', url: 'https://feeds.content.dowjones.io/public/rss/RSSPersonalFinance', trustedTopic: true },
-  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
-  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
-  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: PERSONAL_FINANCE_KEYWORDS, matchTitle: true },
   { name: 'YT Caleb Hammer', ...ytMeta('UCLe_q9axMaeTbjN0hy1Z9xA', 'Caleb Hammer'), trustedTopic: true },
   { name: 'YT The Ramsey Show', ...ytMeta('UC7eBNeDW1GQf2NJQ6G6gAxw', 'The Ramsey Show Highlights'), trustedTopic: true },
   { name: 'YT The Money Guy Show', ...ytMeta('UC9vUu4vlIlMC0dHQCTvQPbg', 'The Money Guy Show'), trustedTopic: true },
-  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: PERSONAL_FINANCE_KEYWORDS },
+  { name: 'YT Yahoo Finance', ...ytMeta('UCEAZeUIeJs0IjQiqTCdVSIg', 'Yahoo Finance'), keywordFilter: PERSONAL_FINANCE_KEYWORDS, matchTitle: true },
 ];
 
+/**
+ * Company news. Words that mean something else in a general headline are only
+ * counted in their business sense: "strike" needs workers, "deal" needs a buyer.
+ */
 const BUSINESS_KEYWORDS =
-  /\b(compan(?:y|ies)|corporat\w*|CEOs?|CFOs?|chief executive|executives?|boards?|earnings|profits?|revenue|sales|mergers?|acquisitions?|acquire[sd]?|takeovers?|buyouts?|deals?|IPO|layoffs?|job cuts|hiring|strikes?|unions?|antitrust|bankrupt\w*|restructur\w*|startups?|founders?|retailers?|airlines?|automakers?|supply chains?|franchis\w*|shareholders?|activist investors?)\b/i;
+  /\b(compan(?:y|ies)|corporat\w*|CEOs?|CFOs?|chief executive|executives?|boardroom|board of directors|earnings|profits?|revenue|sales|mergers?|acquisitions?|acquire[sd]?|takeovers?|buyouts?|(?:merger|takeover|buyout|licensing|all-stock|all-cash) deal|deal to (?:buy|acquire|sell|merge)|agrees? to (?:buy|acquire|sell|merge)|\$[\d.]+ ?(?:billion|bn|million|m) (?:deal|bid|offer)|IPO|layoffs?|job cuts|hiring|(?:workers?|union|pilots?|staff|labor|labour|drivers?) (?:go on |on )?strikes?|walkouts?|unions?|antitrust|bankrupt\w*|restructur\w*|startups?|founders?|retailers?|airlines?|automakers?|carmakers?|supply chains?|franchis\w*|shareholders?|activist investors?|recalls?)\b/i;
+
+/** Words in a summary that settle it: the story is about a company. */
+const BUSINESS_CORE =
+  /\b(compan(?:y|ies)|retailers?|bankrupt\w*|shareholders?|CEOs?|chief executive|profits?|revenue|sales|earnings|antitrust|mergers?|acquisitions?|takeovers?|layoffs?|job cuts|startups?)\b/i;
 
 const BUSINESS_FEEDS: FeedDef[] = [
   { name: 'CNBC Business', url: 'https://www.cnbc.com/id/10001147/device/rss/rss.html', trustedTopic: true },
   { name: 'CNBC Earnings', url: 'https://www.cnbc.com/id/15839135/device/rss/rss.html', trustedTopic: true },
-  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'NYT Business', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', keywordFilter: BUSINESS_KEYWORDS, matchTitle: true, summaryFilter: BUSINESS_CORE },
   { name: 'NYT DealBook', url: 'https://rss.nytimes.com/services/xml/rss/nyt/Dealbook.xml', trustedTopic: true },
   { name: 'WSJ Business', url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', trustedTopic: true },
-  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: BUSINESS_KEYWORDS },
-  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: BUSINESS_KEYWORDS },
-  { name: 'Fortune', url: 'https://fortune.com/feed/', keywordFilter: BUSINESS_KEYWORDS },
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', keywordFilter: /\b(raises?|funding|valuation|acqui\w+|IPO|layoffs?|revenue|startup)\b/i },
-  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: BUSINESS_KEYWORDS },
-  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: BUSINESS_KEYWORDS },
-  { name: 'YT WSJ', ...ytMeta('UCK7tptUDHh-RYDsdxO1-5QQ', 'Wall Street Journal'), keywordFilter: BUSINESS_KEYWORDS },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: BUSINESS_KEYWORDS, matchTitle: true, summaryFilter: BUSINESS_CORE },
+  { name: 'Guardian Business', url: 'https://www.theguardian.com/uk/business/rss', keywordFilter: BUSINESS_KEYWORDS, matchTitle: true, summaryFilter: BUSINESS_CORE },
+  { name: 'Fortune', url: 'https://fortune.com/feed/', keywordFilter: BUSINESS_KEYWORDS, matchTitle: true, summaryFilter: BUSINESS_CORE },
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', keywordFilter: /\b(raises?|funding|valuation|acqui\w+|IPO|layoffs?|revenue|startup)\b/i, matchTitle: true },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: BUSINESS_KEYWORDS, matchTitle: true },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: BUSINESS_KEYWORDS, matchTitle: true },
+  { name: 'YT WSJ', ...ytMeta('UCK7tptUDHh-RYDsdxO1-5QQ', 'Wall Street Journal'), keywordFilter: BUSINESS_KEYWORDS, matchTitle: true },
   { name: 'YT All-In', ...ytMeta('UCESLZhusAkFfsNsApnjF_Cg', 'All-In Podcast'), trustedTopic: true },
   { name: 'YT Acquired', ...ytMeta('UCyFqFYfTW2VoIQKylJ04Rtw', 'Acquired'), trustedTopic: true },
-  { name: 'YT The Diary Of A CEO', ...ytMeta('UCGq-a57w-aPwyi3pW7XLiHw', 'The Diary Of A CEO'), trustedTopic: true },
 ];
 
 const COMMODITIES_KEYWORDS =
@@ -556,14 +600,14 @@ const COMMODITIES_FEEDS: FeedDef[] = [
   { name: 'Mining.com', url: 'https://www.mining.com/feed/', trustedTopic: true },
   { name: 'Guardian Energy', url: 'https://www.theguardian.com/environment/energy/rss', trustedTopic: true },
   { name: 'Guardian Commodities', url: 'https://www.theguardian.com/business/commodities/rss', trustedTopic: true },
-  { name: 'NYT Energy & Environment', url: 'https://rss.nytimes.com/services/xml/rss/nyt/EnergyEnvironment.xml', keywordFilter: COMMODITIES_KEYWORDS },
-  { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', keywordFilter: COMMODITIES_KEYWORDS },
-  { name: 'CNBC Markets', url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html', keywordFilter: COMMODITIES_KEYWORDS },
-  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: COMMODITIES_KEYWORDS },
-  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'NYT Energy & Environment', url: 'https://rss.nytimes.com/services/xml/rss/nyt/EnergyEnvironment.xml', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
+  { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
+  { name: 'CNBC Markets', url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
+  { name: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
   { name: 'YT Kitco News', ...ytMeta('UC9ijza42jVR3T6b8bColgvg', 'Kitco NEWS'), trustedTopic: true },
-  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: COMMODITIES_KEYWORDS },
-  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: COMMODITIES_KEYWORDS },
+  { name: 'YT Bloomberg Television', ...ytMeta('UCdK2BueKxC9VxXh7e1Ne4oQ', 'Bloomberg Television'), keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
+  { name: 'YT CNBC', ...ytMeta('UCvJJ_dzjViJCoLf5uKUTwoA', 'CNBC'), keywordFilter: COMMODITIES_KEYWORDS, matchTitle: true },
 ];
 
 /** Extra property sources for Real Estate, on top of the old housing list. */
@@ -600,7 +644,7 @@ const FEEDS_BY_CAT: Record<HeadlineCategory, FeedDef[]> = {
   investing: INVESTING_FEEDS,
   'personal-finance': PERSONAL_FINANCE_FEEDS,
   // Crypto and the old "Web3 & NFTs" list. Single-brand NFT channels are left out of a finance feed.
-  crypto: merged([CRYPTO_FEEDS, WEB3_NFT_FEEDS], { maxVideo: 8, maxTotal: 22, drop: /Claynosaurz|Pudgy Penguins|VeeFriends/ }),
+  crypto: merged([CRYPTO_FEEDS, WEB3_NFT_FEEDS], { maxVideo: 8, maxTotal: 22, drop: /Claynosaurz|Pudgy Penguins|VeeFriends|CoinDesk NFT/ }),
   'real-estate': merged([HOUSING_FEEDS, REAL_ESTATE_EXTRA], { maxVideo: 6, maxTotal: 16 }),
   // Technology, AI and robotics.
   technology: merged([TECHNOLOGY_FEEDS, AI_FEEDS, ROBOTICS_FEEDS], { maxVideo: 8, maxTotal: 24, drop: /PBS Space Time|Linus Tech Tips|TechLinked|Unitree|Agility|^YT TED$|^YT Veritasium$/ }),
@@ -632,11 +676,7 @@ const TRADFI_TOPIC =
 const CRYPTO_TOPIC =
   /\b(crypto|bitcoin|ethereum|blockchain|stablecoin|web3|token|defi|solana|NFTs?)\b/i;
 
-const POLITICS_TOPIC =
-  /\b(election|congress|senate|white house|bill\b|policy|Fed chair|regulation|tariff|president|democrat|republican|Clarity Act|GENIUS|SEC|CFTC|legislation|Federal Reserve|\bFed\b)\b/i;
-
-const HOUSING_TOPIC =
-  /\b(housing|mortgage|home prices?|rent|real estate|Zillow|Redfin|Fannie|Freddie|housing market|homebuyers?|REIT)\b/i;
+const POLITICS_TOPIC = POLITICS_KEYWORDS;
 
 const WEB3_NFT_TOPIC =
   /\b(NFTs?|web3|opensea|blur\b|mint\b|collection|digital arts?|crypto arts?|non-?fungible|Pudgy|Claynosaurz|VeeFriends|BAYC|Azuki|Yuga|CryptoPunks?|collectibles?)\b/i;
@@ -656,7 +696,7 @@ const CATEGORY_TOPIC: Record<HeadlineCategory, RegExp | null> = {
   investing: INVESTING_KEYWORDS,
   'personal-finance': PERSONAL_FINANCE_KEYWORDS,
   crypto: CRYPTO_ALL_TOPIC,
-  'real-estate': HOUSING_TOPIC,
+  'real-estate': REAL_ESTATE_GATE,
   technology: TECH_ALL_TOPIC,
   policy: POLITICS_TOPIC,
   business: BUSINESS_KEYWORDS,
@@ -665,7 +705,7 @@ const CATEGORY_TOPIC: Record<HeadlineCategory, RegExp | null> = {
 };
 
 
-function matchesCategory(category: HeadlineCategory, item: HeadlineItem, feed: FeedDef): boolean {
+export function matchesCategory(category: HeadlineCategory, item: HeadlineItem, feed: FeedDef): boolean {
   if (feed.trustedTopic) return true;
   const re = CATEGORY_TOPIC[category];
   if (!re) return true;
@@ -1174,7 +1214,7 @@ function snippetFrom(block: string): string {
   return '';
 }
 
-function parseFeedXml(xml: string, feed: FeedDef): HeadlineItem[] {
+export function parseFeedXml(xml: string, feed: FeedDef): HeadlineItem[] {
   const items: HeadlineItem[] = [];
   const blocks = [
     ...(xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? []),
@@ -1188,7 +1228,9 @@ function parseFeedXml(xml: string, feed: FeedDef): HeadlineItem[] {
 
     const summary = snippetFrom(block);
     const hay = `${title} ${summary}`;
-    if (feed.keywordFilter && !feed.keywordFilter.test(hay)) continue;
+    if (feed.keywordFilter && !feed.keywordFilter.test(feed.matchTitle ? title : hay)) {
+      if (!feed.matchTitle || !feed.summaryFilter || !feed.summaryFilter.test(summary)) continue;
+    }
     if (feed.excludeFilter && feed.excludeFilter.test(hay)) continue;
 
     const pubRaw =
@@ -1408,7 +1450,8 @@ async function fetchAtomFeed(feed: FeedDef): Promise<{ items: HeadlineItem[]; ok
 
 async function fetchFeed(feed: FeedDef): Promise<{ items: HeadlineItem[]; ok: boolean }> {
   const atom = await fetchAtomFeed(feed);
-  if (atom.ok && atom.items.length) return atom;
+  // A feed that answered with nothing on topic is quiet, not broken: no second request for it.
+  if (atom.ok) return atom;
 
   if (feed.mediaType === 'video') {
     const piped = await fetchPipedVideos(feed);
@@ -1418,17 +1461,65 @@ async function fetchFeed(feed: FeedDef): Promise<{ items: HeadlineItem[]; ok: bo
   return { items: [], ok: false };
 }
 
-function dedupeSort(items: HeadlineItem[]): HeadlineItem[] {
+/**
+ * The newsroom behind a feed. "NYT Business" and "NYT DealBook" are one outlet,
+ * and so are "CoinDesk" and "CoinDesk Policy"; a video channel is its own outlet.
+ */
+export function outletOf(source: string): string {
+  if (source.startsWith('YT ')) return `v:${source.slice(3)}`;
+  const family = /^(NYT|BBC|CNBC|WSJ|Guardian|MarketWatch|CoinDesk|Cointelegraph|TechCrunch)\b/.exec(source)?.[1];
+  return `a:${family ?? source}`;
+}
+
+const plainTitle = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Newest first, one copy of each story. A story is the same if it has the same
+ * link, or the same headline from the same outlet (programme pages such as
+ * "Tech Now" are republished under one title every week). A written story with
+ * a one- or two-word headline is a programme or section page, not a story.
+ */
+export function dedupeSort(items: HeadlineItem[]): HeadlineItem[] {
+  const sorted = [...items].sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0));
   const seen = new Set<string>();
   const out: HeadlineItem[] = [];
-  for (const it of items) {
-    const key = it.link.replace(/\/$/, '').toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
+  for (const it of sorted) {
+    const plain = plainTitle(it.title);
+    if (it.mediaType !== 'video' && plain.split(' ').length < 3) continue;
+    const byLink = it.link.replace(/\/$/, '').toLowerCase();
+    const byTitle = `${outletOf(it.source)}|${plain}`;
+    if (seen.has(byLink) || seen.has(byTitle)) continue;
+    seen.add(byLink);
+    seen.add(byTitle);
     out.push(it);
   }
-  out.sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0));
   return out;
+}
+
+/** Most written stories one outlet may have in a topic, and most videos one channel may have. */
+const MAX_PER_OUTLET = 4;
+const MAX_PER_CHANNEL = 2;
+
+/**
+ * The best `want` of `ranked` (best first) with no outlet taking more than
+ * `cap`. If that leaves the list short, the limit is loosened one step at a
+ * time, `slack` steps at most: a short list from many voices beats a full one
+ * from a single desk.
+ */
+export function spreadBySource(ranked: HeadlineItem[], cap: number, want: number, slack = 2): HeadlineItem[] {
+  const used = new Map<string, number>();
+  const taken = new Set<number>();
+  for (let limit = cap; limit <= cap + slack && taken.size < want; limit++) {
+    for (let i = 0; i < ranked.length && taken.size < want; i++) {
+      if (taken.has(i)) continue;
+      const outlet = outletOf(ranked[i]!.source);
+      const n = used.get(outlet) ?? 0;
+      if (n >= limit) continue;
+      used.set(outlet, n + 1);
+      taken.add(i);
+    }
+  }
+  return ranked.filter((_, i) => taken.has(i));
 }
 
 
@@ -1440,6 +1531,7 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
   const feeds = FEEDS_BY_CAT[category];
   const feedsUsed: string[] = [];
   const feedsFailed: string[] = [];
+  const feedsQuiet: string[] = [];
   const collected: HeadlineItem[] = [];
 
   // Parallel fetch with modest concurrency (was sequential + sleep — slow tab switches)
@@ -1449,14 +1541,14 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
     return { feed, items, ok };
   });
   for (const { feed, items, ok } of results) {
-    if (ok && items.length) {
-      // A video needs its thumbnail; a written story is welcome without a picture.
-      const kept = items.filter((it) => (it.mediaType !== 'video' || !!it.image) && matchesCategory(category, it, feed));
-      feedsUsed.push(feed.name);
-      collected.push(...kept);
-    } else {
+    if (!ok) {
       feedsFailed.push(feed.name);
+      continue;
     }
+    // A video needs its thumbnail; a written story is welcome without a picture.
+    const kept = items.filter((it) => (it.mediaType !== 'video' || !!it.image) && matchesCategory(category, it, feed));
+    (kept.length ? feedsUsed : feedsQuiet).push(feed.name);
+    collected.push(...kept);
   }
 
   const now = Date.now();
@@ -1502,11 +1594,16 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
   const videoCap = VIDEO_CAP_BY_CAT[category] ?? VIDEO_CAP;
   const boosted = ranked.filter((it) => categoryPriorityBoost(category, it) > 0);
   const boostedIds = new Set(boosted.map((it) => it.link));
-  const videos = ranked
-    .filter((it) => it.mediaType === 'video' && !boostedIds.has(it.link))
-    .slice(0, videoCap);
-  const articles = ranked.filter(
-    (it) => it.mediaType !== 'video' && !boostedIds.has(it.link),
+  const videos = spreadBySource(
+    ranked.filter((it) => it.mediaType === 'video' && !boostedIds.has(it.link)),
+    MAX_PER_CHANNEL,
+    videoCap,
+    1,
+  );
+  const articles = spreadBySource(
+    ranked.filter((it) => it.mediaType !== 'video' && !boostedIds.has(it.link)),
+    MAX_PER_OUTLET,
+    TARGET_COUNT,
   );
   const mixed: HeadlineItem[] = [];
   // Priority boosts (Optimus / Claynosaurz) pin to the front
@@ -1550,6 +1647,7 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
     items,
     feedsUsed,
     feedsFailed,
+    feedsQuiet,
     thin,
     note,
     stale: false,

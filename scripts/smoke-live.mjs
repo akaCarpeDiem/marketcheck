@@ -120,7 +120,14 @@ for (const topic of ['markets', 'investing', 'personal-finance', 'crypto', 'real
     await check(`/api/headlines?topic=${topic}`, {
       expectJson: (j, row) => {
         const n = j.items?.length ?? 0;
-        row.notes.push(`${n} stories; feeds ok ${j.feedsUsed?.length ?? 0}, failed ${j.feedsFailed?.length ?? 0}${j.feedsFailed?.length ? ` (${j.feedsFailed.join(', ')})` : ''}`);
+        const bySource = new Map();
+        for (const it of j.items ?? []) bySource.set(it.source, (bySource.get(it.source) ?? 0) + 1);
+        const most = [...bySource.entries()].sort((x, y) => y[1] - x[1])[0];
+        row.notes.push(
+          `${n} stories from ${bySource.size} sources${most ? ` (most from one: ${most[0]}, ${most[1]})` : ''}; ` +
+            `feeds with stories ${j.feedsUsed?.length ?? 0}, nothing on topic right now ${j.feedsQuiet?.length ?? 0}, ` +
+            `could not be read ${j.feedsFailed?.length ?? 0}${j.feedsFailed?.length ? ` (${j.feedsFailed.join(', ')})` : ''}`,
+        );
         if (n < 4) row.ok = false;
       },
     }),

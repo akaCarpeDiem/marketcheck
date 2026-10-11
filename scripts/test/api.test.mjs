@@ -5,7 +5,7 @@ import { createMock } from '../mock-upstream.mjs';
 import * as calendar from '../../functions/_shared/marketCalendar.ts';
 import { SEED_PRICES, SEED_SHARES } from '../../functions/_shared/sectors.ts';
 import { ETF_UNIVERSE, STOCK_UNIVERSE } from '../../functions/_shared/universes.ts';
-import { CG_MARKETS, MOVER_MIN_VOLUME, coinsFromCoinGecko, gainersAndLosers, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
+import { CG_MARKETS, MOVER_MIN_VOLUME, coinsFromCoinGecko, ethFromMain, gainersAndLosers, isMoverCandidate, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
 import { kvPutIfOlder } from '../../functions/_shared/edgeCache.ts';
 import { onRequestGet as cryptos } from '../../functions/api/cryptos.ts';
 import { onRequestGet as equities } from '../../functions/api/equities.ts';
@@ -212,6 +212,15 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.ok(coins.length >= 200 && coins[0].symbol === 'BTC' && typeof coins[0].ch['7d'] === 'number');
   assert.throws(() => coinsFromCoinGecko({ status: { error_code: 429 } }), 'an error body is not a coin list');
 
+  // The Ethereum tab's last resort: the Ethereum tokens already in the main list.
+  const known = ethFromMain(coins);
+  assert.ok(known.length >= 8, `the main list holds ${known.length} known Ethereum tokens`);
+  assert.equal(known[0].id, 'ethereum', 'ether leads, in market-cap order');
+  for (const id of ['bitcoin', 'solana', 'ripple', 'dogecoin', 'cardano', 'tron', 'binancecoin']) assert.ok(!known.some((c) => c.id === id), `${id} is not an Ethereum token`);
+  assert.ok(known.filter(isMoverCandidate).length >= 5, 'enough of them trade freely to fill a map');
+  assert.ok(known.every((c) => coins.includes(c)), 'the same objects, so the same prices as the rest of the site');
+  assert.deepEqual(ethFromMain([]), []);
+
   // Tokenized funds and other pegged tokens are grouped with stablecoins; a quiet giant is not.
   const row = (o) => ({ id: o.symbol, symbol: o.symbol, name: o.name ?? o.symbol, current_price: o.price ?? 5, market_cap: 1e9, total_volume: 5e7, market_cap_rank: o.rank,
     price_change_percentage_24h_in_currency: o.d, price_change_percentage_7d_in_currency: o.w, price_change_percentage_30d_in_currency: o.m });
@@ -323,6 +332,7 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
 /* ── Storage budget ─────────────────────────────────────────────────────── */
 // The free plan allows 1,000 KV writes a day, shared with sign-in and saved layouts.
 // Loading every data endpoint from cold must cost at most a few.
+assert.ok(kvWrites.some((k) => k.includes('crypto-eth')), 'the Ethereum list keeps a last good copy in KV');
 assert.ok(kvWrites.length <= 4, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
 
 console.log(`api: ok (${upstream.length} upstream requests, ${kvWrites.length} KV writes)`);

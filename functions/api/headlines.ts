@@ -53,7 +53,7 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
     }
     let data: HeadlinesResult;
     try {
-      const hit = await cached(`headlines:v2:${topic}`, {
+      const hit = await cached(`headlines:v3:${topic}`, {
         freshMs: 6 * 60_000,
         keepSec: 12 * 3600,
         retryMs: 60_000,
@@ -74,6 +74,7 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
         items: data.items,
         feedsUsed: data.feedsUsed,
         feedsFailed: data.feedsFailed,
+        feedsQuiet: data.feedsQuiet ?? [],
         thin: data.thin,
         note: data.note,
         stale: data.stale,

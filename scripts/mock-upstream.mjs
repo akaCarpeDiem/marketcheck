@@ -459,6 +459,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       items,
       feedsUsed: sources.slice(0, 4),
       feedsFailed: [],
+      feedsQuiet: [],
       thin: false,
       note: null,
       stale: false,

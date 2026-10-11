@@ -459,11 +459,13 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
       cat === 'cryptos'
         ? `${res.items.length} biggest moves among liquid top-250 coins`
         : cat === 'ethereum'
-          ? `${res.items.length} biggest moves among liquid Ethereum tokens`
+          ? eth.get().partial
+            ? `${res.items.length} biggest moves among the Ethereum tokens in the top 250 (full list not available right now)`
+            : `${res.items.length} biggest moves among liquid Ethereum tokens`
           : cat === 'solana'
           ? `${res.items.length} biggest moves among verified Solana tokens`
           : `${res.items.length} biggest moves in the ${cat === 'stocks' ? 'stock' : 'ETF'} list`;
-    render(bubbleEl.querySelector('[data-note]'), html`${what} · ${statusNote(res.status, res.at, source)}`);
+    render(bubbleEl.querySelector('[data-note]'), res.items.length ? html`${what} · ${statusNote(res.status, res.at, source)}` : html`${statusNote(res.status, res.at, source)}`);
   });
 
   scope.add(

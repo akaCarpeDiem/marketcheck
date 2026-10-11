@@ -265,6 +265,11 @@ export const CG_MARKETS_ETH = `${CG_MARKETS}&category=ethereum-ecosystem`;
  * The Ethereum list for the "Ethereum" tab. Asked for only when someone opens
  * that tab, kept five minutes. 4h and 8h changes are copied from the main list
  * for coins that are in both (the hourly record covers the main list only).
+ *
+ * The last good list is also written to KV (twice a day at most), so a part of
+ * the network that has never fetched it still has an older copy to show when
+ * CoinGecko refuses. The browser has two more fallbacks of its own: asking
+ * CoinGecko itself, and ethFromMain() below.
  */
 export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitUntil): Promise<CryptoUniverse> {
   const hit = await cached<Coin[]>('crypto-eth:v1', {
@@ -273,6 +278,9 @@ export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitU
     load: () => loadFromCoinGecko(CG_MARKETS_ETH, env?.COINGECKO_API_KEY),
     valid: (coins) => coins.length >= 20,
     waitUntil,
+    kv: env?.LAYOUTS ?? null,
+    kvKey: 'cache:crypto-eth:v1',
+    kvEveryMs: 12 * 3_600_000,
     retryMs: 60_000,
   });
   let coins = hit.data;
@@ -283,6 +291,39 @@ export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitU
     /* without the main list the 4h and 8h columns stay empty */
   }
   return { coins, at: hit.at, stale: hit.stale, source: 'coingecko' };
+}
+
+/**
+ * Tokens issued on Ethereum, by CoinGecko id: ether itself, the large DeFi,
+ * layer-2, stablecoin and meme tokens. Not the whole ecosystem (CoinGecko's
+ * category has thousands) but the ones big enough to be in the top 250.
+ * An id that is no longer listed is simply never matched.
+ */
+const ETH_KNOWN_IDS = new Set([
+  'ethereum', 'tether', 'usd-coin', 'dai', 'usds', 'ethena-usde', 'paypal-usd', 'first-digital-usd', 'true-usd', 'frax',
+  'ripple-usd', 'usd1-wlfi', 'staked-ether', 'wrapped-steth', 'weth', 'wrapped-bitcoin', 'wrapped-eeth', 'rocket-pool-eth',
+  'chainlink', 'uniswap', 'aave', 'maker', 'sky', 'lido-dao', 'ethena', 'ondo-finance', 'pendle', 'morpho', 'eigenlayer',
+  'ether-fi', 'curve-dao-token', 'compound-governance-token', 'convex-finance', 'frax-share', 'rocket-pool', 'havven',
+  '1inch', 'sushi', 'yearn-finance', 'balancer', 'cow-protocol', 'uma', 'bancor', '0x', 'dydx', 'dydx-chain', 'syrup', 'usual',
+  'arbitrum', 'optimism', 'mantle', 'polygon-ecosystem-token', 'matic-network', 'immutable-x', 'starknet', 'zksync', 'linea',
+  'scroll', 'taiko', 'metis-token', 'loopring', 'skale', 'gnosis', 'layerzero',
+  'shiba-inu', 'pepe', 'floki', 'mog-coin', 'spx6900', 'turbo',
+  'worldcoin-wld', 'fetch-ai', 'render-token', 'the-graph', 'quant-network', 'ethereum-name-service', 'livepeer', 'ankr',
+  'api3', 'band-protocol', 'ssv-network', 'safe', 'arkham', 'aethir', 'golem', 'storj', 'numeraire', 'iexec-rlc', 'origintrail',
+  'threshold-network-token', 'celer-network', 'reserve-rights-token', 'amp-token', 'holotoken', 'mask-network', 'request-network',
+  'basic-attention-token', 'decentraland', 'the-sandbox', 'apecoin', 'axie-infinity', 'gala', 'enjincoin', 'chiliz', 'illuvium',
+  'blur', 'beam-2', 'world-liberty-financial',
+  'leo-token', 'crypto-com-chain', 'okb', 'bitget-token', 'nexo', 'pax-gold', 'tether-gold',
+]);
+
+/**
+ * The Ethereum tokens found in the main list. Shown on the Ethereum tab when
+ * the full list cannot be had from anywhere: fewer tokens, but the same live
+ * prices as the rest of the site, so the tab is filled whenever the site has
+ * coin prices at all.
+ */
+export function ethFromMain(main: Coin[]): Coin[] {
+  return main.filter((c) => ETH_KNOWN_IDS.has(c.id));
 }
 
 /** Copies of `coins` carrying the 4h and 8h changes of the same coins in `main`. */
