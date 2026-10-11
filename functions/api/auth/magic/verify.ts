@@ -42,7 +42,7 @@ export async function onRequestPost(context: Ctx): Promise<Response> {
   const result = await verifyCode(env, email, code);
   if (!result.ok) {
     const status =
-      result.reason === 'misconfigured'
+      result.reason === 'misconfigured' || result.reason === 'unavailable'
         ? 503
         : result.reason === 'locked' || result.reason === 'expired'
           ? 429

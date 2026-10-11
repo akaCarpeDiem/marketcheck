@@ -2307,6 +2307,9 @@ function magicErrorMessage(code: string): string {
       return 'Email sign-in is limited right now — try Google or Microsoft';
     case 'send_failed':
       return 'Could not send code — try again';
+    case 'temporarily_unavailable':
+    case 'unavailable':
+      return 'Email sign-in is temporarily unavailable — try Google or Microsoft';
     case 'network':
       return 'Network error';
     case 'invalid':

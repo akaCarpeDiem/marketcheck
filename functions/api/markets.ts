@@ -5,9 +5,9 @@
  * No API keys required (Yahoo spark + chart fallback; Nasdaq for ETF AUM).
  */
 
-import { fetchYahooQuotes, type McapKv } from '../_shared/yahooQuote';
+import { fetchYahooQuotes } from '../_shared/yahooQuote';
 
-type Env = { LAYOUTS?: McapKv };
+type Env = Record<string, unknown>;
 
 function wantsMarketCap(symbol: string): boolean {
   if (!symbol) return false;
@@ -57,7 +57,6 @@ export async function onRequestGet(context: {
   const quotes = await fetchYahooQuotes(symbols, {
     phase,
     asset,
-    kv: context.env?.LAYOUTS ?? null,
     waitUntil: context.waitUntil,
   });
   const normalized = quotes.map((q, i) => ({

@@ -14,6 +14,9 @@ const FRESH_TTL_MS = 180_000;
 /** Keep last-good in KV long enough to cover CG outages. */
 const KV_TTL_SEC = 60 * 60 * 24;
 const MEM_TTL_MS = 45_000;
+/** Durable KV last-good copy is refreshed at most this often (free plan: 1,000 KV writes/day). */
+const KV_REFRESH_MS = 6 * 60 * 60 * 1000;
+let lastKvCheckAt = 0;
 const CACHE_API_URL = 'https://marketcheck.money/__internal/cache/cryptos-v1';
 
 type CGMarket = {
@@ -152,7 +155,14 @@ async function readKv(env: Env): Promise<{ payload: CachedPayload; at: number } 
 
 async function writeKv(env: Env, payload: CachedPayload): Promise<void> {
   if (!env.LAYOUTS) return;
+  // Best-effort and throttled: hot caching lives in memory + Cache API; KV only keeps
+  // a durable last-good copy for when every live source fails.
+  const now = Date.now();
+  if (now - lastKvCheckAt < 30 * 60 * 1000) return;
+  lastKvCheckAt = now;
   try {
+    const current = await readKv(env);
+    if (current && now - current.at < KV_REFRESH_MS) return;
     const stored = JSON.stringify({ ...payload, storedAt: Date.now() });
     await env.LAYOUTS.put(KV_KEY, stored, { expirationTtl: KV_TTL_SEC });
   } catch (e) {
@@ -291,17 +301,7 @@ export async function onRequestGet(context: Ctx): Promise<Response> {
     return jsonResponse(memCache.body, { xCache: 'MEM' });
   }
 
-  // Fresh durable hit (KV / Cache API within FRESH_TTL)
-  const kvHit = await readKv(env);
-  if (kvHit && now - kvHit.at < FRESH_TTL_MS && kvHit.payload.items.length) {
-    const body = JSON.stringify({
-      ...kvHit.payload,
-      stale: false,
-      source: kvHit.payload.source || 'cache',
-    });
-    memCache = { at: now, body };
-    return jsonResponse(body, { xCache: 'KV-FRESH' });
-  }
+  // Fresh edge hit (Cache API within FRESH_TTL)
   const apiHit = await readCacheApi();
   if (apiHit?.items?.length) {
     const storedAt = (apiHit as CachedPayload & { storedAt?: number }).storedAt;
@@ -332,8 +332,8 @@ export async function onRequestGet(context: Ctx): Promise<Response> {
     cgError = e instanceof Error ? e.message : 'fetch failed';
   }
 
-  // Stale last-good (KV then Cache API) — never empty if we have it
-  const staleKv = kvHit ?? (await readKv(env));
+  // Stale last-good (Cache API, else durable KV copy) — never empty if we have it
+  const staleKv = apiHit?.items?.length ? null : await readKv(env);
   if (staleKv?.payload?.items?.length) {
     const payload: CachedPayload = {
       ...staleKv.payload,

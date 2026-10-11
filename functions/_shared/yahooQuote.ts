@@ -259,17 +259,11 @@ async function fetchNasdaqMarketCap(
 const MCAP_TTL_SEC = 30 * 60;
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark';
 
-export type McapKv = {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<unknown>;
-};
-
 export type YahooFetchOpts = {
   /** quotes: prices + fast Yahoo mcaps (no Nasdaq). mcaps: fill caps only. */
   phase?: 'quotes' | 'mcaps';
   /** mcaps phase: which Nasdaq asset class to hit when Yahoo trailing is empty. */
   asset?: 'etf' | 'equity';
-  kv?: McapKv | null;
   waitUntil?: (promise: Promise<unknown>) => void;
 };
 
@@ -296,10 +290,11 @@ function mcapEdgeRequest(symbol: string): Request {
   return new Request(`https://marketcheck.internal/yahoo-mcap/v1/${encodeURIComponent(symbol)}`);
 }
 
+// Market caps are cached in memory + the Workers Cache API only. KV was used here
+// before and burned the free-plan daily write quota (one put per symbol per refresh).
 function rememberMcap(
   symbol: string,
   value: number,
-  kv?: McapKv | null,
   waitUntil?: (promise: Promise<unknown>) => void,
 ): void {
   mcapCache.set(symbol, { v: value });
@@ -311,20 +306,13 @@ function rememberMcap(
     });
     tasks.push(edge.put(mcapEdgeRequest(symbol), res).catch(() => undefined));
   }
-  if (kv) {
-    tasks.push(
-      kv
-        .put(`yahoo-mcap:v1:${symbol}`, String(value), { expirationTtl: MCAP_TTL_SEC })
-        .catch(() => undefined),
-    );
-  }
   if (!tasks.length) return;
   const all = Promise.all(tasks);
   if (waitUntil) waitUntil(all);
   else void all;
 }
 
-async function readStoredMcap(symbol: string, kv?: McapKv | null): Promise<number | null> {
+async function readStoredMcap(symbol: string): Promise<number | null> {
   const hit = mcapCache.get(symbol);
   if (hit) return hit.v;
   const edge = edgeCaches();
@@ -337,18 +325,6 @@ async function readStoredMcap(symbol: string, kv?: McapKv | null): Promise<numbe
           mcapCache.set(symbol, { v: n });
           return n;
         }
-      }
-    } catch {
-      /* miss */
-    }
-  }
-  if (kv) {
-    try {
-      const raw = await kv.get(`yahoo-mcap:v1:${symbol}`);
-      const n = raw != null ? Number(raw) : NaN;
-      if (Number.isFinite(n) && n > 0) {
-        mcapCache.set(symbol, { v: n });
-        return n;
       }
     } catch {
       /* miss */
@@ -490,7 +466,7 @@ export async function fetchYahooSparklines(
 }
 
 async function trailingMcap(symbol: string, opts?: YahooFetchOpts): Promise<number | null> {
-  const stored = await readStoredMcap(symbol, opts?.kv);
+  const stored = await readStoredMcap(symbol);
   if (stored != null) return stored;
   if (mcapNegCache.get(symbol)) {
     const stale = mcapCache.getStale(symbol);
@@ -498,7 +474,7 @@ async function trailingMcap(symbol: string, opts?: YahooFetchOpts): Promise<numb
   }
   const raw = await fetchTrailingMarketCap(symbol);
   if (raw != null) {
-    rememberMcap(symbol, raw, opts?.kv, opts?.waitUntil);
+    rememberMcap(symbol, raw, opts?.waitUntil);
     return raw;
   }
   return mcapCache.getStale(symbol)?.v ?? null;
@@ -509,7 +485,7 @@ async function nasdaqMcap(
   asset: 'etf' | 'equity',
   opts?: YahooFetchOpts,
 ): Promise<number | null> {
-  const stored = await readStoredMcap(symbol, opts?.kv);
+  const stored = await readStoredMcap(symbol);
   if (stored != null) return stored;
   if (mcapNegCache.get(symbol)) {
     return mcapCache.getStale(symbol)?.v ?? null;
@@ -524,7 +500,7 @@ async function nasdaqMcap(
     raw = await fetchNasdaqMarketCap(symbol, asset === 'etf' ? 'etf' : 'stocks');
   }
   if (raw != null) {
-    rememberMcap(symbol, raw, opts?.kv, opts?.waitUntil);
+    rememberMcap(symbol, raw, opts?.waitUntil);
     return raw;
   }
   if (stale) return stale.v;
