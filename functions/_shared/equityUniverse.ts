@@ -17,7 +17,7 @@
  * so it was a 5-day change, and "7d" / "30d" were measured over 1 and 3 months.)
  */
 
-import { cached, cacheGet, cachePut, type KvLike, type WaitUntil } from './edgeCache';
+import { cached, cacheGet, cachePut, type KvLike, type WaitUntil, kvPutIfOlder } from './edgeCache';
 import { mapPool } from './cache';
 import { etParts, marketStatus } from './marketCalendar';
 import { ETF_UNIVERSE, STOCK_UNIVERSE } from './universes';
@@ -233,8 +233,8 @@ async function refreshShareBook(
     if (env?.LAYOUTS && (!book.kvAt || now - book.kvAt > 12 * 3_600_000)) {
       book.kvAt = now;
       jobs.push(
-        env.LAYOUTS.put(SHARES_KV_KEY, JSON.stringify(book), { expirationTtl: 60 * 86_400 }).catch(
-          () => undefined,
+        kvPutIfOlder(env.LAYOUTS, SHARES_KV_KEY, JSON.stringify(book), 12 * 3_600_000, 60 * 86_400, (s) =>
+          typeof (s as ShareBook)?.kvAt === 'number' ? (s as ShareBook).kvAt! : null,
         ),
       );
     }

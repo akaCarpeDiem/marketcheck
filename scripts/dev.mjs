@@ -164,6 +164,26 @@ function installMock() {
   };
 }
 
+/**
+ * Mock mode only: nine hours of hourly price records, so the 4h and 8h views
+ * have something to show without waiting half a day (see cryptoHistory.ts).
+ */
+async function seedPriceHistory() {
+  const res = await mock.handle('https://api.coingecko.com/api/v3/coins/markets?per_page=250');
+  const rows = await res.json();
+  const HOUR = 3_600_000;
+  const now = Date.now();
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  const drift = new Map(rows.map((r) => [r.id, /usd|tether/i.test(`${r.id} ${r.name}`) ? 0 : rand() * 0.012 + (rand() > 0.9 ? rand() * 0.03 : 0)]));
+  for (let h = 1; h <= 10; h++) {
+    const at = Math.floor(now / HOUR) * HOUR - h * HOUR + 5 * 60_000;
+    const p = {};
+    for (const r of rows) p[r.id] = Number((r.current_price * (1 - drift.get(r.id) * h * (1 + 0.2 * rand()))).toPrecision(7));
+    kvStore.set(`snap:crypto:v1:${Math.floor(at / HOUR)}`, JSON.stringify({ at, p }));
+  }
+}
+
 /* ── HTTP ────────────────────────────────────────────────────────────────── */
 
 const TYPES = {
@@ -329,7 +349,10 @@ async function rebuild(what) {
     if (what !== 'functions') await build({ dev: true });
     if (what !== 'site') {
       await loadFunctions();
-      if (useMock) installMock();
+      if (useMock) {
+        installMock();
+        if (![...kvStore.keys()].some((k) => k.startsWith('snap:crypto:'))) await seedPriceHistory();
+      }
     }
   } catch (e) {
     console.error('build failed:', e?.message || e);

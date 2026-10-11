@@ -75,6 +75,40 @@ function writeEdge<T>(key: string, entry: Entry<T>, keepSec: number): Promise<un
   return c.put(edgeRequest(key), res).catch(() => undefined);
 }
 
+/**
+ * Write a snapshot to KV unless the copy already there is younger than
+ * `everyMs`. Every Cloudflare location runs this code with its own cache, so
+ * without the check each one would write its own copy and together they would
+ * use up the daily write allowance. Reads are plentiful; writes are not.
+ * Never throws: a failed write (allowance used up) must not break the request.
+ */
+export async function kvPutIfOlder(
+  kv: KvLike,
+  kvKey: string,
+  value: string,
+  everyMs: number,
+  ttlSec: number,
+  /** Reads the time (ms) out of the stored copy. Default: its `at` field. */
+  stamp: (stored: unknown) => number | null = (s) =>
+    typeof (s as { at?: unknown })?.at === 'number' ? (s as { at: number }).at : null,
+): Promise<boolean> {
+  try {
+    const raw = await kv.get(kvKey);
+    if (raw) {
+      const at = stamp(JSON.parse(raw));
+      if (at != null && Date.now() - at < everyMs) return false;
+    }
+  } catch {
+    /* unreadable copy: replace it */
+  }
+  try {
+    await kv.put(kvKey, value, { expirationTtl: ttlSec });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function readKv<T>(kv: KvLike | null | undefined, kvKey: string): Promise<Entry<T> | null> {
   if (!kv) return null;
   try {
@@ -144,11 +178,7 @@ export async function cached<T>(key: string, opts: CachedOpts<T>): Promise<Cache
         const every = opts.kvEveryMs ?? 6 * 3_600_000;
         if (!entry.kvAt || at - entry.kvAt >= every) {
           entry.kvAt = at;
-          jobs.push(
-            opts.kv
-              .put(opts.kvKey, JSON.stringify({ data, at }), { expirationTtl: 7 * 86_400 })
-              .catch(() => undefined),
-          );
+          jobs.push(kvPutIfOlder(opts.kv, opts.kvKey, JSON.stringify({ data, at }), every, 7 * 86_400));
         }
       }
       mem.set(key, entry);

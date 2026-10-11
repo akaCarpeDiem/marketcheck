@@ -24,7 +24,7 @@ export const FOOT_LINKS: { href: string; label: string }[] = [
 ];
 
 export function logoHtml(): string {
-  return `<a class="logo" href="/" aria-label="Market Check home">${logoMark(30)}<span class="logo-word"><span class="logo-a">Market</span><span class="logo-b">Check</span></span></a>`;
+  return `<a class="logo" href="/" aria-label="Market Check home">${logoMark(40)}<span class="logo-word"><span class="logo-a">Market</span><span class="logo-b">Check</span></span></a>`;
 }
 
 /**

@@ -60,20 +60,18 @@ export const GOOGLE_MARK =
 export const MICROSOFT_MARK =
   '<svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><rect x="1" y="1" width="7.5" height="7.5" fill="#F25022"/><rect x="9.5" y="1" width="7.5" height="7.5" fill="#7FBA00"/><rect x="1" y="9.5" width="7.5" height="7.5" fill="#00A4EF"/><rect x="9.5" y="9.5" width="7.5" height="7.5" fill="#FFB900"/></svg>';
 
-/** The logo mark: a magnifier over candles that fall, then rise (a check). */
+/**
+ * The Market Check mark: a magnifying glass over a run of candles that falls
+ * and then climbs out through the gap in the ring. Traced from the brand
+ * artwork (ring centre, radii, gap angles and every candle measured from the
+ * original), in the brand's own colours so it reads the same in both themes.
+ */
 export function logoMark(size = 28): string {
-  return `<svg class="logo-mark" viewBox="46 16 172 176" width="${size}" height="${size}" fill="none" aria-hidden="true">
-  <g stroke-linecap="round">
-    <line x1="78" y1="78" x2="78" y2="118" stroke="var(--down)" stroke-width="3"/><rect x="71" y="88" width="14" height="24" rx="2" fill="var(--down)"/>
-    <line x1="96" y1="92" x2="96" y2="128" stroke="var(--down)" stroke-width="3"/><rect x="89" y="100" width="14" height="22" rx="2" fill="var(--down)"/>
-    <line x1="114" y1="108" x2="114" y2="142" stroke="var(--down)" stroke-width="3"/><rect x="107" y="116" width="14" height="20" rx="2" fill="var(--down)"/>
-    <line x1="132" y1="100" x2="132" y2="136" stroke="var(--up)" stroke-width="3"/><rect x="125" y="108" width="14" height="22" rx="2" fill="var(--up)"/>
-    <line x1="150" y1="78" x2="150" y2="120" stroke="var(--up)" stroke-width="3"/><rect x="143" y="86" width="14" height="28" rx="2" fill="var(--up)"/>
-    <line x1="168" y1="52" x2="168" y2="100" stroke="var(--up)" stroke-width="3"/><rect x="161" y="60" width="14" height="34" rx="2" fill="var(--up)"/>
-    <line x1="186" y1="28" x2="186" y2="82" stroke="var(--up)" stroke-width="3"/><rect x="179" y="36" width="14" height="40" rx="2" fill="var(--up)"/>
-  </g>
-  <g stroke="var(--brand)" stroke-width="14" stroke-linecap="round">
-    <path d="M118 42a58 58 0 1 0 50 13"/><line x1="168" y1="148" x2="205" y2="185"/>
-  </g>
+  const w = Math.round((size * 860) / 925);
+  return `<svg class="logo-mark" viewBox="280 204 860 925" width="${w}" height="${size}" fill="none" aria-hidden="true">
+  <defs><linearGradient id="mc-ring" x1="330" y1="330" x2="930" y2="930" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#01bfdd"/><stop offset=".55" stop-color="#00b2d3"/><stop offset="1" stop-color="#008cb0"/></linearGradient><clipPath id="mc-cut"><path clip-rule="evenodd" d="M280 204h860v925h-860ZM800 560h260v201.5h-260Z"/></clipPath></defs>
+  <path d="M866.6 456.8A296.25 296.25 0 1 0 908.6 729.4" stroke="url(#mc-ring)" stroke-width="80.5" clip-path="url(#mc-cut)"/>
+  <g transform="translate(626.7 634.8) rotate(45)"><rect x="330" y="-38.5" width="70" height="77" fill="#0098bd"/><path d="M394-54H601a54 54 0 0 1 0 108H394q-16 0-16-16V-38q0-16 16-16Z" fill="#00a7cb"/></g>
+  <rect x="510" y="432" width="14" height="296" rx="2" fill="#e11420"/><rect x="485.5" y="482" width="63" height="200" rx="4" fill="#e11420"/><rect x="598" y="563" width="14" height="248" rx="2" fill="#e11420"/><rect x="573.5" y="604" width="63" height="167" rx="4" fill="#e11420"/><rect x="679.5" y="690" width="14" height="166" rx="2" fill="#e11420"/><rect x="655" y="729" width="63" height="86" rx="4" fill="#e11420"/><rect x="758.5" y="616" width="14" height="181" rx="2" fill="#339c4a"/><rect x="734" y="654" width="63" height="111" rx="4" fill="#339c4a"/><rect x="838.5" y="525" width="14" height="219" rx="2" fill="#339c4a"/><rect x="814" y="566" width="63" height="136" rx="4" fill="#339c4a"/><rect x="918" y="414" width="14" height="277" rx="2" fill="#339c4a"/><rect x="893.5" y="468" width="63" height="173" rx="4" fill="#339c4a"/><rect x="1001.5" y="314" width="14" height="293" rx="2" fill="#339c4a"/><rect x="977" y="365" width="63" height="190" rx="4" fill="#339c4a"/><rect x="1088.5" y="216" width="14" height="302" rx="2" fill="#339c4a"/><rect x="1064" y="269" width="63" height="193" rx="4" fill="#339c4a"/>
 </svg>`;
 }

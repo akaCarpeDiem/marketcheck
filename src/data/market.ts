@@ -4,10 +4,11 @@
  * index and headlines. Views subscribe to the signals; the refresh loops at
  * the bottom keep them current while the tab is visible.
  */
-import type { Coin } from '../../functions/_shared/cryptoUniverse';
+import { CG_MARKETS, CG_MARKETS_ETH, coinsFromCoinGecko, withIntradayFrom, type Coin } from '../../functions/_shared/cryptoUniverse';
 import type { Equity } from '../../functions/_shared/equityUniverse';
 import { marketStatus } from '../../functions/_shared/marketCalendar';
 import { getJson } from '../lib/api';
+import { readJson, writeJson } from '../lib/storage';
 import { poll, type Poller } from '../lib/poll';
 import { signal } from '../lib/store';
 
@@ -49,6 +50,8 @@ export type Quote = {
 
 export const crypto = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
 export const equities = signal<EquityState>({ items: [], bySymbol: new Map(), at: 0, status: 'loading' });
+/** Tokens of the Ethereum ecosystem, loaded when the Ethereum tab is opened. */
+export const eth = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
 /** Yahoo quotes for symbols outside the two universes. Replaced on every refresh. */
 export const quotes = signal<Map<string, Quote>>(new Map());
 /** Symbol -> thinned one-year close series. */
@@ -70,29 +73,127 @@ export const mood = signal<Mood | null>(null);
 
 type CryptoPayload = { items?: Coin[]; ok?: boolean; stale?: boolean; fetchedAt?: string };
 
+function setCoins(coins: Coin[], at: number, status: Status, target = crypto): void {
+  const byId = new Map<string, Coin>();
+  const bySymbol = new Map<string, Coin>();
+  for (const c of coins) {
+    byId.set(c.id, c);
+    // The list is in market-cap order, so the first coin with a ticker is the biggest.
+    if (!bySymbol.has(c.symbol)) bySymbol.set(c.symbol, c);
+  }
+  target.set({ coins, byId, bySymbol, at, status });
+}
+
+/** The last list this browser saw, so a return visit paints at once and an outage still shows something. */
+const CRYPTO_KEEP = 'mc-crypto-last-v1';
+const CRYPTO_KEEP_MS = 6 * 3_600_000;
+let cryptoKeptAt = 0;
+
+function keepCoins(coins: Coin[], at: number): void {
+  if (at - cryptoKeptAt < 5 * 60_000) return;
+  cryptoKeptAt = at;
+  writeJson(CRYPTO_KEEP, { at, coins });
+}
+
+function restoreCoins(): void {
+  const kept = readJson<{ at?: number; coins?: Coin[] } | null>(CRYPTO_KEEP, null);
+  if (!kept || typeof kept.at !== 'number' || !Array.isArray(kept.coins) || kept.coins.length < 50) return;
+  if (Date.now() - kept.at > CRYPTO_KEEP_MS) return;
+  if (!kept.coins.every((c) => c && typeof c.id === 'string' && typeof c.symbol === 'string' && c.ch)) return;
+  cryptoKeptAt = kept.at;
+  setCoins(kept.coins, kept.at, 'stale');
+}
+
+/**
+ * CoinGecko sometimes turns our server away (it limits by address, and the
+ * server's address is shared with other sites). The visitor's own browser is
+ * not affected, so it asks CoinGecko directly, at most once a minute.
+ */
+const directAt = new Map<string, number>();
+async function coinsDirect(url: string = CG_MARKETS, least = 50): Promise<Coin[] | null> {
+  if (Date.now() - (directAt.get(url) ?? 0) < 55_000) return null;
+  directAt.set(url, Date.now());
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 12_000);
+    const res = await fetch(url, { signal: ctl.signal, headers: { Accept: 'application/json' } });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const coins = coinsFromCoinGecko(await res.json());
+    return coins.length >= least ? coins : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function refreshCrypto(): Promise<void> {
-  const prev = crypto.get();
+  if (!crypto.get().coins.length) restoreCoins();
+  let coins: Coin[] = [];
+  let at = Date.now();
+  let stale = false;
   try {
     const data = await getJson<CryptoPayload>('/api/cryptos');
-    const coins = Array.isArray(data.items) ? data.items : [];
-    if (!coins.length) throw new Error('no coins');
-    const byId = new Map<string, Coin>();
-    const bySymbol = new Map<string, Coin>();
-    for (const c of coins) {
-      byId.set(c.id, c);
-      // The list is in market-cap order, so the first coin with a ticker is the biggest.
-      if (!bySymbol.has(c.symbol)) bySymbol.set(c.symbol, c);
-    }
-    crypto.set({
-      coins,
-      byId,
-      bySymbol,
-      at: data.fetchedAt ? Date.parse(data.fetchedAt) : Date.now(),
-      status: data.stale ? 'stale' : 'ok',
-    });
+    coins = Array.isArray(data.items) ? data.items : [];
+    if (data.fetchedAt) at = Date.parse(data.fetchedAt) || at;
+    stale = Boolean(data.stale);
   } catch {
-    crypto.set({ ...prev, status: prev.coins.length ? 'stale' : 'error' });
+    coins = [];
   }
+  // A copy a few minutes old is normal between CoinGecko refreshes and is not worth a warning.
+  if (stale && Date.now() - at <= 10 * 60_000) stale = false;
+  // Nothing from the server, or only an old copy: try CoinGecko from here.
+  if (!coins.length || stale) {
+    const direct = await coinsDirect();
+    if (direct) {
+      coins = direct;
+      at = Date.now();
+      stale = false;
+    }
+  }
+  if (coins.length) {
+    setCoins(coins, at, stale ? 'stale' : 'ok');
+    if (!stale) keepCoins(coins, at);
+    return;
+  }
+  const prev = crypto.get();
+  crypto.set({ ...prev, status: prev.coins.length ? 'stale' : 'error' });
+}
+
+/* ── Ethereum tokens (on demand) ────────────────────────────────────────── */
+
+let ethBusy: Promise<void> | null = null;
+
+/** Load the Ethereum list if it is missing or more than two minutes old. */
+export function loadEth(): Promise<void> {
+  const have = eth.get();
+  if (have.coins.length && Date.now() - have.at < 120_000 && have.status !== 'error') return Promise.resolve();
+  ethBusy ??= (async () => {
+    let coins: Coin[] = [];
+    let at = Date.now();
+    let stale = false;
+    try {
+      const data = await getJson<CryptoPayload>('/api/cryptos?universe=eth', { timeout: 20_000 });
+      coins = Array.isArray(data.items) ? data.items : [];
+      if (data.fetchedAt) at = Date.parse(data.fetchedAt) || at;
+      stale = Boolean(data.stale) && Date.now() - at > 15 * 60_000;
+    } catch {
+      coins = [];
+    }
+    if (!coins.length || stale) {
+      const direct = await coinsDirect(CG_MARKETS_ETH, 20);
+      if (direct) {
+        // CoinGecko has no 4h or 8h figures; borrow them from the main list for coins in both.
+        coins = withIntradayFrom(direct, crypto.get().coins);
+        at = Date.now();
+        stale = false;
+      }
+    }
+    if (coins.length) setCoins(coins, at, stale ? 'stale' : 'ok', eth);
+    else eth.set({ ...eth.get(), at: Date.now(), status: eth.get().coins.length ? 'stale' : 'error' });
+  })().finally(() => {
+    ethBusy = null;
+  });
+  return ethBusy;
 }
 
 /* ── Stocks and ETFs ───────────────────────────────────────────────────── */
@@ -292,10 +393,17 @@ type MoodPayload = {
   month?: { value: number } | null;
 };
 
+/** True once a reading was asked for and none came back. */
+export const moodMissing = signal(false);
+
 export async function refreshMood(): Promise<void> {
   try {
     const d = await getJson<MoodPayload>('/api/mood');
-    if (!d.ok || !d.now) return;
+    if (!d.ok || !d.now) {
+      if (!mood.get()) moodMissing.set(true);
+      return;
+    }
+    moodMissing.set(false);
     mood.set({
       value: d.now.value,
       label: d.now.label,
@@ -305,7 +413,7 @@ export async function refreshMood(): Promise<void> {
       at: d.now.at,
     });
   } catch {
-    /* the mood card hides itself when there is no reading */
+    if (!mood.get()) moodMissing.set(true);
   }
 }
 

@@ -104,7 +104,7 @@ export const marketsView: View = {
       if (group === 'l1') rows = rows.filter((c) => LAYER1.has(c.id));
       if (q) rows = rows.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
       const get = (c: Coin): number | string | null =>
-        s.key === 'rank' ? c.rank : s.key === 'name' ? c.symbol : s.key === 'price' ? c.price : s.key === 'cap' ? c.marketCap : s.key === 'vol' ? c.volume : c.ch[s.key as CryptoTf];
+        s.key === 'rank' ? c.rank : s.key === 'name' ? c.symbol : s.key === 'price' ? c.price : s.key === 'cap' ? c.marketCap : s.key === 'vol' ? c.volume : (c.ch[s.key as CryptoTf] ?? null);
       return [...rows].sort((a, b) => cmp(get(a), get(b), s.dir));
     };
 
@@ -136,7 +136,7 @@ export const marketsView: View = {
         total = s.coins.length;
         render(
           el.querySelector('[data-groups]'),
-          `<button type="button" class="chip-toggle${group === 'all' ? ' is-on' : ''}" data-group="all">All</button><button type="button" class="chip-toggle${group === 'l1' ? ' is-on' : ''}" data-group="l1">Layer 1s</button><label class="check"><input type="checkbox" data-hide-stable ${hideStable ? 'checked' : ''} /> Hide stablecoins and wrapped tokens</label>`,
+          `<button type="button" class="chip-toggle${group === 'all' ? ' is-on' : ''}" data-group="all">All</button><button type="button" class="chip-toggle${group === 'l1' ? ' is-on' : ''}" data-group="l1">Layer 1s</button><label class="check"><input type="checkbox" data-hide-stable ${hideStable ? 'checked' : ''} /> Hide stablecoins and pegged tokens</label>`,
         );
         render(head, `<tr><th class="star-cell"><span class="sr-only">Watch</span></th>${th('rank', '#', sort, 'rank')}${th('name', 'Asset', sort, '')}${CRYPTO_COLS.map((c) => th(c.key, c.label, sort)).join('')}</tr>`);
         render(

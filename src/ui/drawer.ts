@@ -185,7 +185,7 @@ function changeChips(p: Priced): string {
   const chip = (label: string, v: number | null | undefined) =>
     v == null ? '' : `<span class="chg-chip ${dir(v)}"><em>${label}</em><b class="num">${pct(v)}</b></span>`;
   if (p.coin) {
-    const tfs: CryptoTf[] = ['1h', '24h', '7d', '30d', '1y'];
+    const tfs: CryptoTf[] = ['1h', '4h', '8h', '24h', '7d', '30d', '1y'];
     return tfs.map((tf) => chip(tf, p.coin!.ch[tf])).join('');
   }
   if (p.equity) {

@@ -46,6 +46,9 @@ export async function onRequestPost(context: Ctx): Promise<Response> {
     if (challenge.reason === 'misconfigured') {
       return json({ error: 'auth_not_configured' }, 503);
     }
+    if (challenge.reason === 'unavailable') {
+      return json({ error: 'temporarily_unavailable' }, 503);
+    }
     // Rate limited — generic success (don't leak)
     return json({ ok: true });
   }

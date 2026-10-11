@@ -11,9 +11,11 @@
  * with no liquidity floor, which surfaced delisted pairs showing -99%.)
  */
 
+import { attachIntraday, recordSnapshot } from './cryptoHistory';
 import { cached, type KvLike, type WaitUntil } from './edgeCache';
 
-const CG_MARKETS =
+/** Public CoinGecko list. Also called straight from the browser when this server is turned away (see src/data/market.ts). */
+export const CG_MARKETS =
   'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc' +
   '&per_page=250&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d%2C1y';
 
@@ -22,8 +24,8 @@ const CG_HEADERS = {
   'User-Agent': 'MarketCheckDash/1.0 (+https://marketcheck.money)',
 };
 
-export type CryptoTf = '1h' | '24h' | '7d' | '30d' | '1y';
-export const CRYPTO_TF_LIST: CryptoTf[] = ['1h', '24h', '7d', '30d', '1y'];
+export type CryptoTf = '1h' | '4h' | '8h' | '24h' | '7d' | '30d' | '1y';
+export const CRYPTO_TF_LIST: CryptoTf[] = ['1h', '4h', '8h', '24h', '7d', '30d', '1y'];
 
 export type Coin = {
   /** CoinGecko id, e.g. "bitcoin". */
@@ -38,8 +40,12 @@ export type Coin = {
   marketCap: number | null;
   /** 24h traded volume in USD. */
   volume: number | null;
-  /** Percent change per timeframe; null when CoinGecko has none (new listings have no 1y). */
-  ch: Record<CryptoTf, number | null>;
+  /**
+   * Percent change per timeframe; null when there is none (new listings have no 1y).
+   * 4h and 8h come from the site's own hourly price record (cryptoHistory.ts) and
+   * are null until enough history exists.
+   */
+  ch: { '1h': number | null; '24h': number | null; '7d': number | null; '30d': number | null; '1y': number | null; '4h'?: number | null; '8h'?: number | null };
   high24: number | null;
   low24: number | null;
   /** All-time high and how far below it the price is (percent, negative). */
@@ -80,7 +86,8 @@ const STABLE_SYMBOLS = new Set([
   'USDT', 'USDC', 'DAI', 'USDS', 'USDE', 'FDUSD', 'PYUSD', 'TUSD', 'USD1', 'USDD', 'FRAX', 'FRXUSD',
   'GUSD', 'USDP', 'LUSD', 'RLUSD', 'BUSD', 'USD0', 'USDG', 'USDX', 'USDB', 'USDL', 'USDF', 'USDTB',
   'BFUSD', 'USYC', 'USDY', 'BUIDL', 'EURC', 'EURS', 'EURT', 'CRVUSD', 'GHO', 'DOLA', 'SUSD', 'USDT0',
-  'USDC.E', 'BSC-USD', 'OUSG', 'USTB', 'USDA', 'USR', 'USDO', 'USX', 'SATUSD', 'MIM',
+  'USDC.E', 'BSC-USD', 'OUSG', 'USTB', 'USDA', 'USR', 'USDO', 'USX', 'SATUSD', 'MIM', 'USAT', 'YLDS',
+  'REUSD', 'APYUSD', 'USTBL', 'JTRSY', 'JAAA', 'EUTBL', 'JPYC',
 ]);
 
 const WRAPPED_SYMBOLS = new Set([
@@ -95,10 +102,33 @@ const WRAPPED_SYMBOLS = new Set([
 const WRAPPED_NAME = /\b(wrapped|staked|restaked|bridged|liquid staking|staking pool|peg(?:ged)?)\b/i;
 const STABLE_NAME = /usd|dollar|stable|\beur/i;
 
-function classify(symbol: string, name: string, price: number | null): { stable: boolean; wrapped: boolean } {
+/**
+ * A price that has barely moved over a day, a week and a month is pegged to
+ * something: a stablecoin in another currency, or a tokenized fund (treasury
+ * bills, private credit) that CoinGecko lists among coins. No freely traded
+ * coin outside the very largest is this still for a whole month, so these are
+ * grouped with stablecoins. The 30 largest are never judged this way: a quiet
+ * month for Bitcoin must not hide Bitcoin.
+ */
+function barelyMoves(ch: Coin['ch']): boolean {
+  const d = ch['24h'];
+  const w = ch['7d'];
+  const m = ch['30d'];
+  if (d == null || w == null || m == null) return false;
+  return Math.abs(d) < 0.35 && Math.abs(w) < 0.6 && Math.abs(m) < 1.6;
+}
+
+function classify(
+  symbol: string,
+  name: string,
+  price: number | null,
+  ch: Coin['ch'],
+  rank: number,
+): { stable: boolean; wrapped: boolean } {
   const stable =
     STABLE_SYMBOLS.has(symbol) ||
-    (price != null && price > 0.97 && price < 1.03 && STABLE_NAME.test(`${name} ${symbol}`));
+    (price != null && price > 0.97 && price < 1.03 && STABLE_NAME.test(`${name} ${symbol}`)) ||
+    (rank > 30 && barelyMoves(ch));
   const wrapped = !stable && (WRAPPED_SYMBOLS.has(symbol) || WRAPPED_NAME.test(name));
   return { stable, wrapped };
 }
@@ -108,23 +138,25 @@ function toCoin(row: CgRow, index: number): Coin | null {
   const symbol = row.symbol.toUpperCase();
   const name = row.name || symbol;
   const price = num(row.current_price);
-  const { stable, wrapped } = classify(symbol, name, price);
+  const ch: Coin['ch'] = {
+    '1h': num(row.price_change_percentage_1h_in_currency),
+    '24h': num(row.price_change_percentage_24h_in_currency) ?? num(row.price_change_percentage_24h),
+    '7d': num(row.price_change_percentage_7d_in_currency),
+    '30d': num(row.price_change_percentage_30d_in_currency),
+    '1y': num(row.price_change_percentage_1y_in_currency),
+  };
+  const rank = num(row.market_cap_rank) ?? index + 1;
+  const { stable, wrapped } = classify(symbol, name, price, ch, rank);
   const coin: Coin = {
     id: row.id,
     symbol,
     name,
     image: row.image || null,
-    rank: num(row.market_cap_rank) ?? index + 1,
+    rank,
     price,
     marketCap: num(row.market_cap),
     volume: num(row.total_volume),
-    ch: {
-      '1h': num(row.price_change_percentage_1h_in_currency),
-      '24h': num(row.price_change_percentage_24h_in_currency) ?? num(row.price_change_percentage_24h),
-      '7d': num(row.price_change_percentage_7d_in_currency),
-      '30d': num(row.price_change_percentage_30d_in_currency),
-      '1y': num(row.price_change_percentage_1y_in_currency),
-    },
+    ch,
     high24: num(row.high_24h),
     low24: num(row.low_24h),
     ath: num(row.ath),
@@ -136,24 +168,38 @@ function toCoin(row: CgRow, index: number): Coin | null {
   return coin;
 }
 
-async function loadFromCoinGecko(): Promise<Coin[]> {
+/** CoinGecko's rows -> our coins. Shared by the server and the browser fallback. */
+export function coinsFromCoinGecko(rows: unknown): Coin[] {
+  if (!Array.isArray(rows)) throw new Error('CoinGecko sent an unexpected response');
+  const coins: Coin[] = [];
+  (rows as CgRow[]).forEach((row, i) => {
+    const coin = toCoin(row, i);
+    if (coin && coin.price != null) coins.push(coin);
+  });
+  return coins;
+}
+
+/**
+ * CoinGecko limits its free API per address, and Cloudflare's outgoing
+ * addresses are shared with every other site hosted there, so a 429 here says
+ * nothing about how often this site asks. One retry after a pause; then, if a
+ * free "demo" key has been set as the secret COINGECKO_API_KEY, once more with
+ * the key. The key is only spent when the keyless call is refused.
+ */
+async function loadFromCoinGecko(url: string, apiKey?: string): Promise<Coin[]> {
   let lastStatus = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(CG_MARKETS, { headers: CG_HEADERS });
+    const res = await fetch(url, { headers: CG_HEADERS });
     lastStatus = res.status;
-    if (res.status === 429 && attempt === 0) {
-      await new Promise((r) => setTimeout(r, 1200));
-      continue;
-    }
-    if (!res.ok) break;
-    const rows = (await res.json()) as CgRow[];
-    if (!Array.isArray(rows)) throw new Error('CoinGecko sent an unexpected response');
-    const coins: Coin[] = [];
-    rows.forEach((row, i) => {
-      const coin = toCoin(row, i);
-      if (coin && coin.price != null) coins.push(coin);
-    });
-    return coins;
+    if (res.ok) return coinsFromCoinGecko(await res.json());
+    if (res.status !== 429 || attempt === 1) break;
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  const key = apiKey?.trim();
+  if (key && (lastStatus === 429 || lastStatus === 403)) {
+    const res = await fetch(url, { headers: { ...CG_HEADERS, 'x-cg-demo-api-key': key } });
+    lastStatus = res.status;
+    if (res.ok) return coinsFromCoinGecko(await res.json());
   }
   throw new Error(`CoinGecko HTTP ${lastStatus}`);
 }
@@ -167,7 +213,7 @@ export type CryptoUniverse = {
   source: 'coingecko';
 };
 
-export type DataEnv = { LAYOUTS?: KvLike };
+export type DataEnv = { LAYOUTS?: KvLike; COINGECKO_API_KEY?: string };
 
 /** Refresh from CoinGecko at most every 2 minutes; keep the last good copy for a day. */
 const FRESH_MS = 120_000;
@@ -176,18 +222,65 @@ export async function getCryptoUniverse(
   env: DataEnv | undefined,
   waitUntil?: WaitUntil,
 ): Promise<CryptoUniverse> {
-  const hit = await cached<Coin[]>('crypto-universe:v1', {
+  const hit = await cached<Coin[]>('crypto-universe:v2', {
     freshMs: FRESH_MS,
     keepSec: 86_400,
-    load: loadFromCoinGecko,
+    load: async () => {
+      const coins = await loadFromCoinGecko(CG_MARKETS, env?.COINGECKO_API_KEY);
+      const kv = env?.LAYOUTS;
+      const now = Date.now();
+      await attachIntraday(coins, kv, now, waitUntil).catch(() => undefined);
+      if (kv && coins.length >= 50) {
+        const job = recordSnapshot(kv, coins, now);
+        if (waitUntil) waitUntil(job);
+        else await job;
+      }
+      return coins;
+    },
     valid: (coins) => coins.length >= 50,
     waitUntil,
     kv: env?.LAYOUTS ?? null,
-    kvKey: 'cache:crypto-universe:v1',
-    kvEveryMs: 2 * 3_600_000,
+    kvKey: 'cache:crypto-universe:v2',
+    kvEveryMs: 6 * 3_600_000,
     retryMs: 45_000,
   });
   return { coins: hit.data, at: hit.at, stale: hit.stale, source: 'coingecko' };
+}
+
+/** Tokens CoinGecko files under "Ethereum ecosystem", largest first. Same shape as the main list. */
+export const CG_MARKETS_ETH = `${CG_MARKETS}&category=ethereum-ecosystem`;
+
+/**
+ * The Ethereum list for the "Ethereum" tab. Asked for only when someone opens
+ * that tab, kept five minutes. 4h and 8h changes are copied from the main list
+ * for coins that are in both (the hourly record covers the main list only).
+ */
+export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitUntil): Promise<CryptoUniverse> {
+  const hit = await cached<Coin[]>('crypto-eth:v1', {
+    freshMs: 5 * 60_000,
+    keepSec: 86_400,
+    load: () => loadFromCoinGecko(CG_MARKETS_ETH, env?.COINGECKO_API_KEY),
+    valid: (coins) => coins.length >= 20,
+    waitUntil,
+    retryMs: 60_000,
+  });
+  let coins = hit.data;
+  try {
+    const main = await getCryptoUniverse(env, waitUntil);
+    coins = withIntradayFrom(coins, main.coins);
+  } catch {
+    /* without the main list the 4h and 8h columns stay empty */
+  }
+  return { coins, at: hit.at, stale: hit.stale, source: 'coingecko' };
+}
+
+/** Copies of `coins` carrying the 4h and 8h changes of the same coins in `main`. */
+export function withIntradayFrom(coins: Coin[], main: Coin[]): Coin[] {
+  const byId = new Map(main.map((c) => [c.id, c]));
+  return coins.map((c) => {
+    const m = byId.get(c.id);
+    return { ...c, ch: { ...c.ch, '4h': m?.ch['4h'] ?? null, '8h': m?.ch['8h'] ?? null } };
+  });
 }
 
 /** Least 24h volume (USD) for a coin to count as a mover. */
@@ -201,9 +294,10 @@ export function isMoverCandidate(c: Coin): boolean {
   return (c.volume ?? 0) >= MOVER_MIN_VOLUME;
 }
 
-/** Saved layouts may hold 4h/8h/12h, which CoinGecko does not publish. They show 24h. */
+/** A timeframe a saved layout or another tab may ask for -> one this list has. */
 export function cryptoTf(tf: string): CryptoTf {
-  return (CRYPTO_TF_LIST as string[]).includes(tf) ? (tf as CryptoTf) : '24h';
+  if ((CRYPTO_TF_LIST as string[]).includes(tf)) return tf as CryptoTf;
+  return tf === '6h' || tf === '12h' ? '8h' : '24h';
 }
 
 /** The coins that moved most (either direction) over a timeframe. */

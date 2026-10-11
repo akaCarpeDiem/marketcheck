@@ -94,15 +94,20 @@ async function checkRateLimit(kv: KVNamespace, eHash: string): Promise<boolean> 
   if (rec && rec.exp > now && rec.count >= RATE_MAX) return false;
   const count = rec && rec.exp > now ? rec.count + 1 : 1;
   const exp = rec && rec.exp > now ? rec.exp : now + RATE_TTL;
-  await kv.put(key, JSON.stringify({ count, exp }), {
-    expirationTtl: Math.max(60, exp - now),
-  });
+  try {
+    await kv.put(key, JSON.stringify({ count, exp }), {
+      expirationTtl: Math.max(60, exp - now),
+    });
+  } catch (e) {
+    // Best-effort: the challenge write below decides whether sign-in can proceed.
+    console.warn('[magic] rate-limit KV put failed', e);
+  }
   return true;
 }
 
 export type CreateChallengeResult =
   | { ok: true; code: string; linkToken: string }
-  | { ok: false; reason: 'rate_limited' | 'misconfigured' };
+  | { ok: false; reason: 'rate_limited' | 'misconfigured' | 'unavailable' };
 
 export async function createChallenge(
   env: AuthEnv,
@@ -121,20 +126,26 @@ export async function createChallenge(
   const exp = Math.floor(Date.now() / 1000) + CHALLENGE_TTL;
   const record: ChallengeRecord = { codeHash, token: linkToken, exp, attempts: 0 };
 
-  await env.LAYOUTS.put(`magic:${eHash}`, JSON.stringify(record), {
-    expirationTtl: CHALLENGE_TTL,
-  });
-  // Reverse lookup for magic-link callback
-  await env.LAYOUTS.put(`magictok:${linkToken}`, email, {
-    expirationTtl: CHALLENGE_TTL,
-  });
+  try {
+    await env.LAYOUTS.put(`magic:${eHash}`, JSON.stringify(record), {
+      expirationTtl: CHALLENGE_TTL,
+    });
+    // Reverse lookup for magic-link callback
+    await env.LAYOUTS.put(`magictok:${linkToken}`, email, {
+      expirationTtl: CHALLENGE_TTL,
+    });
+  } catch (e) {
+    // e.g. KV daily write quota exhausted — fail cleanly instead of throwing (1101).
+    console.error('[magic] challenge KV put failed', e);
+    return { ok: false, reason: 'unavailable' };
+  }
 
   return { ok: true, code, linkToken };
 }
 
 export type VerifyCodeResult =
   | { ok: true; session: Pick<SessionPayload, 'sub' | 'email' | 'name' | 'exp'> }
-  | { ok: false; reason: 'invalid' | 'expired' | 'locked' | 'misconfigured' };
+  | { ok: false; reason: 'invalid' | 'expired' | 'locked' | 'misconfigured' | 'unavailable' };
 
 export async function verifyCode(
   env: AuthEnv,
@@ -159,7 +170,7 @@ export async function verifyCode(
 
   const now = Math.floor(Date.now() / 1000);
   if (rec.exp < now) {
-    await env.LAYOUTS.delete(key);
+    await safeDelete(env.LAYOUTS, key);
     return { ok: false, reason: 'expired' };
   }
   if (rec.attempts >= MAX_ATTEMPTS) return { ok: false, reason: 'locked' };
@@ -168,18 +179,20 @@ export async function verifyCode(
   if (!timingSafeEqual(expect, rec.codeHash)) {
     rec.attempts += 1;
     const ttl = Math.max(30, rec.exp - now);
-    await env.LAYOUTS.put(key, JSON.stringify(rec), { expirationTtl: ttl });
+    try {
+      await env.LAYOUTS.put(key, JSON.stringify(rec), { expirationTtl: ttl });
+    } catch (e) {
+      // Fail closed: without recording the attempt we can't enforce the attempt limit.
+      console.error('[magic] attempt KV put failed', e);
+      return { ok: false, reason: 'unavailable' };
+    }
     if (rec.attempts >= MAX_ATTEMPTS) return { ok: false, reason: 'locked' };
     return { ok: false, reason: 'invalid' };
   }
 
-  // Consume challenge + reverse token
-  await env.LAYOUTS.delete(key);
-  try {
-    await env.LAYOUTS.delete(`magictok:${rec.token}`);
-  } catch {
-    /* ignore */
-  }
+  // Consume challenge + reverse token (best-effort; both also expire via TTL)
+  await safeDelete(env.LAYOUTS, key);
+  await safeDelete(env.LAYOUTS, `magictok:${rec.token}`);
 
   return { ok: true, session: sessionFields(email) };
 }
@@ -208,14 +221,22 @@ export async function verifyLinkToken(
   if (!rec || rec.token !== token) return null;
   const now = Math.floor(Date.now() / 1000);
   if (rec.exp < now) {
-    await env.LAYOUTS.delete(key);
-    await env.LAYOUTS.delete(`magictok:${token}`);
+    await safeDelete(env.LAYOUTS, key);
+    await safeDelete(env.LAYOUTS, `magictok:${token}`);
     return null;
   }
 
-  await env.LAYOUTS.delete(key);
-  await env.LAYOUTS.delete(`magictok:${token}`);
+  await safeDelete(env.LAYOUTS, key);
+  await safeDelete(env.LAYOUTS, `magictok:${token}`);
   return email;
+}
+
+async function safeDelete(kv: KVNamespace, key: string): Promise<void> {
+  try {
+    await kv.delete(key);
+  } catch (e) {
+    console.warn('[magic] KV delete failed', key.split(':')[0], e);
+  }
 }
 
 export { displayName as magicDisplayName, sessionFields as magicSessionFields };

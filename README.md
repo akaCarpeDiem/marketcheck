@@ -65,6 +65,8 @@ See [DEPLOY.md](./DEPLOY.md) for preview deployments, settings and secrets.
 
 CoinGecko (crypto), Yahoo Finance (stocks, ETFs, indexes, commodities), Nasdaq (fund sizes), Jupiter (Solana tokens), alternative.me (Crypto Fear & Greed) and publishers' RSS feeds (headlines). No API keys. What each endpoint does, how long it is cached and how each change is measured is described for visitors on [/sources/](https://marketcheck.money/sources/) and for developers at the top of each file in `functions/`.
 
+CoinGecko limits its free API by address, and Cloudflare's outgoing addresses are shared, so the server is sometimes refused (HTTP 429) through no fault of its own. When that happens the server answers from its last good copy, and a browser that gets nothing asks CoinGecko directly (`refreshCrypto` in `src/data/market.ts`). Setting a free CoinGecko demo key as the secret `COINGECKO_API_KEY` is optional: it is used only to retry a refused request.
+
 Data is cached in the Cloudflare Cache API, not in KV. KV (`LAYOUTS`) holds only what belongs to a signed-in visitor, sign-in codes, and a rare last-good snapshot of the two big lists. The free plan allows 1,000 KV writes a day, so keep it that way.
 
 ## `/api/markets` chunking

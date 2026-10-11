@@ -10,8 +10,8 @@ import {
   type PanelSort,
 } from '../../../functions/_shared/panelConfig';
 import { avatar, heroFromRef, lookup, priceText, refFromCoin, refFromEquity, refFromHero, stockLogo, type AssetRef } from '../../data/assets';
-import { crypto, equities, quotes, wantQuotes } from '../../data/market';
-import { MOVER_CATS, biggestMoves, loadSolana, moverTip, solana, tfLabel, tfOptions, type Mover, type MoverCat } from '../../data/movers';
+import { crypto, equities, eth, loadEth, quotes, wantQuotes } from '../../data/market';
+import { CRYPTO_TFS, MOVER_CATS, biggestMoves, effectiveTf, loadSolana, moverTip, noHistoryText, solana, tfLabel, tfOptions, type Mover, type MoverCat } from '../../data/movers';
 import { data, panels, pref, savePanels, savePanelsSoon, setPref, user } from '../../data/user';
 import { esc, frame, html, on, raw, render } from '../../lib/dom';
 import { compact, dir, pct } from '../../lib/format';
@@ -42,8 +42,11 @@ const MODE_LABEL: Record<PanelMode, string> = {
   filter_metals: 'Metals',
 };
 
-const CRYPTO_PANEL_TFS = ['1h', '24h', '7d', '30d', '1y'];
+const CRYPTO_PANEL_TFS = CRYPTO_TFS.map((o) => o.id);
 const STOCK_PANEL_TFS: [string, string][] = [['24h', '1D'], ['7d', '1W'], ['30d', '1M'], ['1y', '1Y']];
+
+/** The crypto timeframe a panel shows: saved layouts may hold one the bar no longer offers. */
+const panelCryptoTf = (tf: string) => effectiveTf('cryptos', tf) as ReturnType<typeof cryptoTf>;
 
 const hasTfBar = (m: PanelMode): boolean => m === 'movers_up' || m === 'movers_down' || m === 'stocks_up' || m === 'stocks_down';
 const hasSort = (m: PanelMode): boolean => m === 'filter_crypto' || m === 'filter_stocks' || m === 'curated' || m === 'watchlist' || m === 'filter_metals';
@@ -68,14 +71,16 @@ function panelRows(cfg: PanelConfig): { rows: Row[]; changeLabel: string; source
   switch (cfg.mode) {
     case 'movers_up':
     case 'movers_down': {
-      const tf = cryptoTf(cfg.tf);
-      const { gainers, losers } = gainersAndLosers(crypto.get().coins, tf, n);
+      const tf = panelCryptoTf(cfg.tf);
+      const coins = crypto.get().coins;
+      const { gainers, losers } = gainersAndLosers(coins, tf, n);
       const list = cfg.mode === 'movers_up' ? gainers : losers;
+      const noHistory = (tf === '4h' || tf === '8h') && coins.length > 0 && !coins.some((c) => c.ch[tf] != null);
       return {
-        rows: list.map((c) => ({ ref: refFromCoin(c), image: c.image, price: c.price, change: c.ch[tf], marketCap: c.marketCap, volume: c.volume })),
+        rows: list.map((c) => ({ ref: refFromCoin(c), image: c.image, price: c.price, change: c.ch[tf] ?? null, marketCap: c.marketCap, volume: c.volume })),
         changeLabel: tf,
         source: 'CoinGecko',
-        empty: cfg.mode === 'movers_up' ? `No liquid coin is up over ${tf}.` : `No liquid coin is down over ${tf}.`,
+        empty: noHistory ? noHistoryText(tf) : cfg.mode === 'movers_up' ? `No liquid coin is up over ${tf}.` : `No liquid coin is down over ${tf}.`,
       };
     }
     case 'stocks_up':
@@ -147,7 +152,7 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
   const tfBar = hasTfBar(cfg.mode)
     ? `<div class="seg" role="group" aria-label="Timeframe">${(cfg.mode.startsWith('stocks') ? STOCK_PANEL_TFS : CRYPTO_PANEL_TFS.map((t) => [t, t] as [string, string]))
         .map(([id, label]) => {
-          const on = (cfg.mode.startsWith('stocks') ? equityTf(cfg.tf) : cryptoTf(cfg.tf)) === id;
+          const on = (cfg.mode.startsWith('stocks') ? equityTf(cfg.tf) : panelCryptoTf(cfg.tf)) === id;
           return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-tf="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
         })
         .join('')}</div>`
@@ -404,7 +409,8 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
 
   bubbleEl.innerHTML = `<div class="card-head">
       <h2 class="card-title">${icon.bubbles(16)} Bubble map</h2>
-      <div class="card-tools" data-tools></div>
+      <div class="card-tools" data-size-tools></div>
+      <div class="bubble-tools" data-tools></div>
     </div>
     <div class="bubble-host" data-host></div>
     <div class="card-foot"><span data-note></span><a href="/heatmap/">Full-size heat map ${icon.chevronRight(13)}</a></div>`;
@@ -431,10 +437,14 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     render(
       bubbleEl.querySelector('[data-tools]'),
       `<div class="seg seg-scroll" role="group" aria-label="Market">${MOVER_CATS.map((c) => `<button type="button" class="seg-btn${c.id === cat ? ' is-on' : ''}" data-bubble-cat="${c.id}" aria-pressed="${c.id === cat ? 'true' : 'false'}">${c.label}</button>`).join('')}</div>
-       <div class="seg" role="group" aria-label="Timeframe">${options.map((o) => `<button type="button" class="seg-btn${o.id === tf ? ' is-on' : ''}" data-bubble-tf="${o.id}" aria-pressed="${o.id === tf ? 'true' : 'false'}">${o.label}</button>`).join('')}</div>
-       <div class="seg" role="group" aria-label="Bubble size">${([['move', 'By move'], ['cap', 'By value']] as const).map(([id, label]) => `<button type="button" class="seg-btn${id === sizeBy ? ' is-on' : ''}" data-bubble-size="${id}" aria-pressed="${id === sizeBy ? 'true' : 'false'}">${label}</button>`).join('')}</div>`,
+       <div class="seg" role="group" aria-label="Timeframe">${options.map((o) => `<button type="button" class="seg-btn${o.id === tf ? ' is-on' : ''}" data-bubble-tf="${o.id}" aria-pressed="${o.id === tf ? 'true' : 'false'}">${o.label}</button>`).join('')}</div>`,
+    );
+    render(
+      bubbleEl.querySelector('[data-size-tools]'),
+      `<div class="seg" role="group" aria-label="Bubble size">${([['move', 'By move'], ['cap', 'By value']] as const).map(([id, label]) => `<button type="button" class="seg-btn${id === sizeBy ? ' is-on' : ''}" data-bubble-size="${id}" aria-pressed="${id === sizeBy ? 'true' : 'false'}">${label}</button>`).join('')}</div>`,
     );
     if (cat === 'solana') void loadSolana(tf);
+    if (cat === 'ethereum') void loadEth();
     const res = biggestMoves(cat, tf, bubbleCount(host));
     current = new Map(res.items.map((m) => [m.key, m]));
     // Only re-pack when what is shown has changed; a price tick alone keeps the layout.
@@ -443,14 +453,16 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
       lastKey = key;
       map.set(toBubbles(res.items, sizeBy), {
         exponent: sizeBy === 'cap' ? 0.3 : 0.5,
-        emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : 'Nothing moved enough to show here.',
+        emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : res.noHistory ? noHistoryText(tfLabel(cat, tf)) : 'Nothing moved enough to show here.',
       });
     }
-    const source = cat === 'cryptos' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
+    const source = cat === 'cryptos' || cat === 'ethereum' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
     const what =
       cat === 'cryptos'
         ? `${res.items.length} biggest moves among liquid top-250 coins`
-        : cat === 'solana'
+        : cat === 'ethereum'
+          ? `${res.items.length} biggest moves among liquid Ethereum tokens`
+          : cat === 'solana'
           ? `${res.items.length} biggest moves among verified Solana tokens`
           : `${res.items.length} biggest moves in the ${cat === 'stocks' ? 'stock' : 'ETF'} list`;
     render(bubbleEl.querySelector('[data-note]'), html`${what} · ${statusNote(res.status, res.at, source)}`);
@@ -460,6 +472,7 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     crypto.subscribe(paintBubbles),
     equities.subscribe(paintBubbles),
     solana.subscribe(paintBubbles),
+    eth.subscribe(paintBubbles),
     on(bubbleEl, 'click', '[data-bubble-cat]', (_ev, t) => {
       setPref('ov.bubbleCat', (cat = t.dataset.bubbleCat as MoverCat));
       paintBubbles();
@@ -475,6 +488,7 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
   );
   scope.interval(() => {
     if (cat === 'solana') void loadSolana(tf);
+    if (cat === 'ethereum') void loadEth();
     paintBubbles();
   }, 60_000);
   paintBubbles();

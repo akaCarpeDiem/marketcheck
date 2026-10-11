@@ -5,7 +5,8 @@ import { createMock } from '../mock-upstream.mjs';
 import * as calendar from '../../functions/_shared/marketCalendar.ts';
 import { SEED_PRICES, SEED_SHARES } from '../../functions/_shared/sectors.ts';
 import { ETF_UNIVERSE, STOCK_UNIVERSE } from '../../functions/_shared/universes.ts';
-import { MOVER_MIN_VOLUME, gainersAndLosers, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
+import { CG_MARKETS, MOVER_MIN_VOLUME, coinsFromCoinGecko, gainersAndLosers, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
+import { kvPutIfOlder } from '../../functions/_shared/edgeCache.ts';
 import { onRequestGet as cryptos } from '../../functions/api/cryptos.ts';
 import { onRequestGet as equities } from '../../functions/api/equities.ts';
 import { onRequestGet as markets } from '../../functions/api/markets.ts';
@@ -44,9 +45,17 @@ const names = {};
 for (const d of [...STOCK_UNIVERSE, ...ETF_UNIVERSE]) names[d.yahoo] = d.name;
 const mock = createMock({ universePrices: { ...SEED_PRICES }, shares: SEED_SHARES, names, calendar });
 const upstream = [];
-globalThis.fetch = async (input) => {
+/** Set to make CoinGecko refuse keyless requests, as it does to shared addresses. */
+let coinGeckoRefuses = false;
+const coinGeckoKeysSeen = [];
+globalThis.fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
   upstream.push(url);
+  if (url.includes('api.coingecko.com')) {
+    const key = new Headers(init?.headers).get('x-cg-demo-api-key');
+    if (key) coinGeckoKeysSeen.push(key);
+    if (coinGeckoRefuses && !key) return new Response('{"status":{"error_code":429}}', { status: 429 });
+  }
   const res = await mock.handle(input);
   if (res) return res;
   throw new TypeError(`no stand-in for ${new URL(url).hostname}`);
@@ -98,9 +107,20 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.equal(t.body.pumps.length, 10);
   for (const m of [...t.body.pumps, ...t.body.dumps]) assert.ok(m.volume >= MOVER_MIN_VOLUME, `${m.symbol} volume`);
   assert.ok(t.body.dumps.every((m) => m.changePercent > -90), 'no dead market among the losers');
-  // 4h/8h/12h do not exist upstream; a saved layout asking for one gets 24h and is told so.
+  // 4h and 8h come from the site's own price record; with no record yet there is nothing to rank, and no error.
   const t4 = await call(trending, '/api/trending?category=crypto&tf=4h');
-  assert.equal(t4.body.effectiveTf, '24h');
+  assert.equal(t4.body.effectiveTf, '4h');
+  assert.equal(t4.body.pumps.length, 0, 'no history yet means no 4h movers, not 24h movers under a 4h label');
+  // A saved layout asking for a window that is no longer offered gets the nearest one and is told so.
+  const t12 = await call(trending, '/api/trending?category=crypto&tf=12h');
+  assert.equal(t12.body.effectiveTf, '8h');
+
+  // The Ethereum list has the same shape and the same rules.
+  const eth = await call(cryptos, '/api/cryptos?universe=eth');
+  assert.equal(eth.status, 200);
+  assert.ok(eth.body.items.length >= 20 && eth.body.items.some((c) => c.id === 'ethereum'));
+  assert.ok(!eth.body.items.some((c) => c.id === 'bitcoin'), 'Bitcoin is not an Ethereum token');
+  assert.ok(eth.body.items.every((c) => 'ch' in c && '4h' in c.ch), 'every coin carries the 4h field, empty or not');
 
   // A second call inside the fresh window must not go upstream again.
   const before = upstream.length;
@@ -182,6 +202,103 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
     assert.equal(typeof row.week, 'number');
     assert.ok(Math.abs(row.week) < 60, `${row.symbol} week change is plausible`);
   }
+}
+
+/* ── When CoinGecko turns the server away ───────────────────────────────── */
+{
+  // The browser fallback reads the same rows with the same code as the server.
+  const rows = await (await mock.handle(CG_MARKETS)).json();
+  const coins = coinsFromCoinGecko(rows);
+  assert.ok(coins.length >= 200 && coins[0].symbol === 'BTC' && typeof coins[0].ch['7d'] === 'number');
+  assert.throws(() => coinsFromCoinGecko({ status: { error_code: 429 } }), 'an error body is not a coin list');
+
+  // Tokenized funds and other pegged tokens are grouped with stablecoins; a quiet giant is not.
+  const row = (o) => ({ id: o.symbol, symbol: o.symbol, name: o.name ?? o.symbol, current_price: o.price ?? 5, market_cap: 1e9, total_volume: 5e7, market_cap_rank: o.rank,
+    price_change_percentage_24h_in_currency: o.d, price_change_percentage_7d_in_currency: o.w, price_change_percentage_30d_in_currency: o.m });
+  const [fund, quietBtc, alt, newcomer] = coinsFromCoinGecko([
+    row({ symbol: 'tfund', name: 'Some Treasury Fund', price: 1.12, rank: 140, d: 0.0, w: 0.1, m: 0.4 }),
+    row({ symbol: 'btc', name: 'Bitcoin', price: 80000, rank: 1, d: 0.1, w: -0.2, m: 0.9 }),
+    row({ symbol: 'alt', rank: 90, d: 0.2, w: -3.1, m: 12 }),
+    row({ symbol: 'new', rank: 200, d: 0.1, w: 0.2, m: null }),
+  ]);
+  assert.equal(fund.stable, 1, 'a price that never moves is a pegged token');
+  assert.ok(!quietBtc.stable, 'a quiet month must not hide Bitcoin');
+  assert.ok(!alt.stable && !newcomer.stable);
+
+  // With a copy in hand, a refusal is answered from the copy and marked stale.
+  coinGeckoRefuses = true;
+  const realNow = Date.now;
+  Date.now = () => realNow() + 10 * 60_000; // past the fresh window
+  try {
+    const held = await call(cryptos, '/api/cryptos');
+    assert.equal(held.body.ok, true);
+    assert.equal(held.body.stale, true, 'an old copy is labelled as old');
+    assert.ok(held.body.items.length >= 200);
+  } finally {
+    Date.now = realNow;
+  }
+
+  // With a demo key set as a secret, the refused request is retried with the key, and only then.
+  assert.equal(coinGeckoKeysSeen.length, 0, 'the key is never sent while keyless requests work');
+  Date.now = () => realNow() + 20 * 60_000;
+  try {
+    const res = await cryptos({
+      request: new Request('https://marketcheck.money/api/cryptos'),
+      env: { LAYOUTS: kv, COINGECKO_API_KEY: 'test-demo-key' },
+      waitUntil: (p) => pending.push(p),
+    });
+    const body = await res.json();
+    await Promise.allSettled(pending.splice(0));
+    assert.equal(body.stale, false, 'the keyed retry brought fresh data');
+    assert.deepEqual(coinGeckoKeysSeen, ['test-demo-key']);
+  } finally {
+    Date.now = realNow;
+  }
+
+  // From cold (a new location with no copy anywhere) the answer is an honest "nothing", not a crash.
+  // The universe module keeps its own memory, so load a second copy of it the way a fresh isolate would.
+  edge.clear();
+  kv.store.clear();
+  const fresh = await import('../../functions/_shared/edgeCache.ts');
+  assert.equal(typeof fresh.cached, 'function');
+  let threw = false;
+  try {
+    await fresh.cached('crypto-cold-test', {
+      freshMs: 1000,
+      load: async () => {
+        const res = await fetch(CG_MARKETS);
+        if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+        return res.json();
+      },
+    });
+  } catch (e) {
+    threw = /429/.test(String(e?.message));
+  }
+  assert.ok(threw, 'a refusal with no copy surfaces as an error the endpoint turns into ok:false');
+  coinGeckoRefuses = false;
+}
+
+/* ── One KV snapshot for the whole site, not one per location ───────────── */
+{
+  const store = new Map();
+  let puts = 0;
+  const shared = {
+    async get(k) {
+      return store.get(k) ?? null;
+    },
+    async put(k, v) {
+      puts += 1;
+      store.set(k, v);
+    },
+  };
+  const value = () => JSON.stringify({ data: [1], at: Date.now() });
+  assert.equal(await kvPutIfOlder(shared, 'snap', value(), 6 * 3_600_000, 60), true, 'first location writes');
+  for (let i = 0; i < 40; i++) assert.equal(await kvPutIfOlder(shared, 'snap', value(), 6 * 3_600_000, 60), false);
+  assert.equal(puts, 1, '40 more locations add no writes');
+  store.set('snap', JSON.stringify({ data: [1], at: Date.now() - 7 * 3_600_000 }));
+  assert.equal(await kvPutIfOlder(shared, 'snap', value(), 6 * 3_600_000, 60), true, 'an old snapshot is replaced');
+  const full = { get: async () => null, put: async () => { throw new Error('KV PUT failed: 429 daily limit'); } };
+  assert.equal(await kvPutIfOlder(full, 'snap', value(), 1, 60), false, 'a used-up write allowance is not an error');
 }
 
 /* ── Storage budget ─────────────────────────────────────────────────────── */

@@ -362,7 +362,12 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
 
     if (host === 'api.coingecko.com' && url.pathname === '/api/v3/coins/markets') {
       const per = Number(q.get('per_page')) || 100;
-      return json(coins().slice(0, per));
+      let list = coins();
+      // A stand-in for CoinGecko's "Ethereum ecosystem" category: ether plus a fixed share of the rest.
+      if (q.get('category') === 'ethereum-ecosystem') {
+        list = list.filter((c, i) => c.id === 'ethereum' || (i % 3 === 1 && !['bitcoin', 'solana', 'ripple'].includes(c.id)));
+      }
+      return json(list.slice(0, per));
     }
 
     if (host === 'api.nasdaq.com') {

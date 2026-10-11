@@ -101,10 +101,10 @@ function cryptoParagraph(): string {
   text += '.';
   const eth = s.byId.get('ethereum');
   if (eth?.price != null) text += ` Ether is at ${num(price(eth.price))} (${num(pct(eth.ch['24h']), eth.ch['24h'])}).`;
-  const top = s.coins.filter((c) => !c.stable && !c.wrapped && c.ch['24h'] != null).slice(0, 100);
+  const top = s.coins.filter((c) => isMoverCandidate(c) && c.ch['24h'] != null).slice(0, 100);
   if (top.length >= 50) {
     const up = top.filter((c) => c.ch['24h']! > 0).length;
-    text += ` ${num(String(up))} of the ${top.length} largest coins are up on the day.`;
+    text += ` ${num(String(up))} of the ${top.length} largest actively traded coins are up on the day.`;
   }
   const movers = s.coins.filter((c) => isMoverCandidate(c) && c.ch['24h'] != null);
   if (movers.length) {

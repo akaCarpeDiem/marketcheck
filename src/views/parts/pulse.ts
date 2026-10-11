@@ -1,13 +1,17 @@
 /** A strip of small cards: market breadth, the Fear & Greed gauge and what is coming up. */
 import { upcomingEvents } from '../../data/calendar';
-import { crypto, equities, mood } from '../../data/market';
+import { crypto, equities, mood, moodMissing } from '../../data/market';
 import { frame, html, raw, render } from '../../lib/dom';
+import { isMoverCandidate } from '../../../functions/_shared/cryptoUniverse';
 import { dayTime, day as fmtDay, pct, until } from '../../lib/format';
 import { icon } from '../../lib/icons';
 import type { Scope } from '../../lib/store';
 
 function breadthHtml(title: string, sub: string, changes: number[], loading: boolean): string {
-  if (loading || changes.length < 10) {
+  if (!loading && changes.length < 10) {
+    return html`<h3 class="pulse-title">${title}</h3><p class="pulse-sub pulse-none">Not available right now. This fills in as soon as prices load again.</p>`;
+  }
+  if (loading) {
     return html`<h3 class="pulse-title">${title}</h3><div class="pulse-big"><span class="sk">00 up</span></div><div class="breadth"><i style="width:50%"></i></div><p class="pulse-sub"><span class="sk">average change +0.00%</span></p>`;
   }
   const up = changes.filter((c) => c > 0.005).length;
@@ -24,6 +28,9 @@ function breadthHtml(title: string, sub: string, changes: number[], loading: boo
 
 function gaugeHtml(): string {
   const m = mood.get();
+  if (!m && moodMissing.get()) {
+    return html`<h3 class="pulse-title">Crypto Fear &amp; Greed</h3><p class="pulse-sub pulse-none">Not available right now. Published daily by alternative.me.</p>`;
+  }
   if (!m) {
     return html`<h3 class="pulse-title">Crypto Fear &amp; Greed</h3><div class="gauge-wrap"><span class="sk" style="width:120px;height:60px"></span></div><p class="pulse-sub faint">Published daily by alternative.me</p>`;
   }
@@ -71,7 +78,7 @@ export function mountPulse(el: HTMLElement, scope: Scope): void {
   el.innerHTML = `<div class="card pulse-card" data-p="crypto"></div><div class="card pulse-card" data-p="stocks"></div><div class="card pulse-card" data-p="mood"></div><div class="card pulse-card" data-p="events"></div>`;
   const paint = frame(() => {
     const c = crypto.get();
-    const coins = c.coins.filter((x) => !x.stable && !x.wrapped && x.ch['24h'] != null).slice(0, 100);
+    const coins = c.coins.filter((x) => isMoverCandidate(x) && x.ch['24h'] != null).slice(0, 100);
     render(el.querySelector('[data-p="crypto"]'), breadthHtml('Crypto breadth', `Top ${coins.length || 100} coins, 24h`, coins.map((x) => x.ch['24h']!), c.status === 'loading'));
     const e = equities.get();
     const stocks = e.items.filter((x) => x.kind === 'stock' && x.ok && x.ch['24h'] != null);
@@ -79,7 +86,7 @@ export function mountPulse(el: HTMLElement, scope: Scope): void {
     render(el.querySelector('[data-p="mood"]'), gaugeHtml());
     render(el.querySelector('[data-p="events"]'), eventsHtml());
   });
-  scope.add(crypto.subscribe(paint), equities.subscribe(paint), mood.subscribe(paint));
+  scope.add(crypto.subscribe(paint), equities.subscribe(paint), mood.subscribe(paint), moodMissing.subscribe(paint));
   scope.interval(paint, 60_000);
   paint();
 }

@@ -152,7 +152,6 @@ html.is-locked body {
 }
 .logo-mark {
   flex: none;
-  filter: drop-shadow(0 0 10px var(--brand-soft));
 }
 .logo-word {
   font-family: 'Inter Display Logo', var(--font);
@@ -752,8 +751,8 @@ kbd {
     font-size: 17px;
   }
   .logo-mark {
-    width: 26px;
-    height: 26px;
+    width: auto;
+    height: 32px;
   }
 }
 @media (max-width: 350px) {

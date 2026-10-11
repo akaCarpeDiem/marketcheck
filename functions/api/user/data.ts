@@ -68,8 +68,9 @@ export async function onRequestPut(context: Ctx): Promise<Response> {
   try {
     await context.env.LAYOUTS.put(key, JSON.stringify(next));
   } catch (e) {
+    // For example the daily storage-write allowance is used up. The browser keeps the change and retries.
     console.error('user data put failed', e);
-    return jsonResponse({ error: 'save_failed' }, { status: 500 });
+    return jsonResponse({ error: 'temporarily_unavailable' }, { status: 503 });
   }
   return jsonResponse({ data: next, guest: false });
 }

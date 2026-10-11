@@ -44,6 +44,7 @@ Sign-in is not expected to work on a preview address: the Google and Microsoft s
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Sign in with Microsoft |
 | `RESEND_API_KEY`, `MAGIC_FROM_EMAIL` | Emailing sign-in codes |
 | `PUBLIC_ORIGIN` | `https://marketcheck.money` |
+| `COINGECKO_API_KEY` | Optional. A free CoinGecko demo key, used only to retry when CoinGecko refuses the keyless request |
 
 ## What the hosting files do
 

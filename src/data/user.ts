@@ -143,6 +143,7 @@ let serverUpdatedAt = 0;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saving = false;
 let dirty = false;
+let saveFailures = 0;
 
 function persistLocal(): void {
   const d = data.get();
@@ -171,6 +172,7 @@ async function saveNow(): Promise<void> {
   }
   saving = true;
   dirty = false;
+  let failed = false;
   syncState.set('saving');
   try {
     let attempt = data.get();
@@ -195,13 +197,31 @@ async function saveNow(): Promise<void> {
         throw e;
       }
     }
+    saveFailures = 0;
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) user.set(null);
     syncState.set('error');
+    if (e instanceof ApiError && e.status === 401) {
+      user.set(null);
+    } else {
+      // Storage may be briefly unavailable. The change is safe in this browser; try again later.
+      saveFailures += 1;
+      failed = true;
+      dirty = true;
+    }
   } finally {
     saving = false;
-    if (dirty) queueSave();
+    if (dirty) {
+      if (failed) retrySave();
+      else queueSave();
+    }
   }
+}
+
+/** After a failed save: wait 30 seconds, then 2 minutes, then 10 minutes between tries. */
+function retrySave(): void {
+  clearTimeout(saveTimer);
+  const wait = saveFailures <= 1 ? 30_000 : saveFailures === 2 ? 120_000 : 600_000;
+  saveTimer = setTimeout(() => void saveNow(), wait);
 }
 
 function queueSave(): void {
@@ -409,6 +429,9 @@ export function magicErrorText(code: string): string {
       return 'Email sign-in is in test mode and cannot send to this address yet.';
     case 'send_failed':
       return 'The code could not be sent. Try again.';
+    case 'temporarily_unavailable':
+    case 'unavailable':
+      return 'Email sign-in is temporarily unavailable. Try Google or Microsoft, or try again later.';
     case 'rate_limited':
       return 'Too many requests. Wait a minute and try again.';
     case 'network':
