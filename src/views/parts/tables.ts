@@ -2,6 +2,7 @@
 import type { CryptoTf } from '../../../functions/_shared/cryptoUniverse';
 import { refFromCoin, refFromEquity, stockLogo } from '../../data/assets';
 import { LAYER1 } from '../../data/layer1';
+import { LAYER2 } from '../../data/layer2';
 import { crypto, equities, type Coin, type Equity } from '../../data/market';
 import { pref, setPref } from '../../data/user';
 import { frame, html, on, render } from '../../lib/dom';
@@ -89,11 +90,11 @@ export function mountTables(cryptoEl: HTMLElement, equityEl: HTMLElement, scope:
     const s = crypto.get();
     render(
       cryptoEl.querySelector('[data-tools]'),
-      seg('cryptoKind', [['all', 'All'], ['l1', 'Layer 1s']], cryptoKind) + seg('cryptoN', [['10', 'Top 10'], ['25', 'Top 25']], String(cryptoN)),
+      seg('cryptoKind', [['all', 'All'], ['l1', 'Layer 1s'], ['l2', 'Layer 2s']], cryptoKind) + seg('cryptoN', [['10', 'Top 10'], ['25', 'Top 25']], String(cryptoN)),
     );
-    const pool = cryptoKind === 'l1' ? s.coins.filter((c) => LAYER1.has(c.id)) : s.coins;
+    const pool = cryptoKind === 'l1' ? s.coins.filter((c) => LAYER1.has(c.id)) : cryptoKind === 'l2' ? s.coins.filter((c) => LAYER2.has(c.id)) : s.coins;
     const rows = pool.slice(0, cryptoN);
-    render(cryptoEl.querySelector('[data-sub]'), cryptoKind === 'l1' ? 'layer-1 networks by market cap' : 'by market cap');
+    render(cryptoEl.querySelector('[data-sub]'), cryptoKind === 'l1' ? 'layer-1 networks by market cap' : cryptoKind === 'l2' ? 'layer-2 networks by market cap' : 'by market cap');
     render(
       cryptoEl.querySelector('tbody'),
       rows.length

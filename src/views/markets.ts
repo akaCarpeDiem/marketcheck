@@ -3,6 +3,7 @@ import type { CryptoTf } from '../../functions/_shared/cryptoUniverse';
 import type { EquityTf } from '../../functions/_shared/equityUniverse';
 import { refFromCoin, refFromEquity, stockLogo } from '../data/assets';
 import { LAYER1 } from '../data/layer1';
+import { LAYER2 } from '../data/layer2';
 import { crypto, equities, type Coin, type Equity } from '../data/market';
 import { data, isWatched, pref, setPref, toggleWatch } from '../data/user';
 import { debounce, esc, frame, html, on, render } from '../lib/dom';
@@ -102,6 +103,7 @@ export const marketsView: View = {
       let rows = crypto.get().coins;
       if (hideStable) rows = rows.filter((c) => !c.stable && !c.wrapped);
       if (group === 'l1') rows = rows.filter((c) => LAYER1.has(c.id));
+      if (group === 'l2') rows = rows.filter((c) => LAYER2.has(c.id));
       if (q) rows = rows.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
       const get = (c: Coin): number | string | null =>
         s.key === 'rank' ? c.rank : s.key === 'name' ? c.symbol : s.key === 'price' ? c.price : s.key === 'cap' ? c.marketCap : s.key === 'vol' ? c.volume : (c.ch[s.key as CryptoTf] ?? null);
@@ -136,7 +138,7 @@ export const marketsView: View = {
         total = s.coins.length;
         render(
           el.querySelector('[data-groups]'),
-          `<button type="button" class="chip-toggle${group === 'all' ? ' is-on' : ''}" data-group="all">All</button><button type="button" class="chip-toggle${group === 'l1' ? ' is-on' : ''}" data-group="l1">Layer 1s</button><label class="check"><input type="checkbox" data-hide-stable ${hideStable ? 'checked' : ''} /> Hide stablecoins and pegged tokens</label>`,
+          `<button type="button" class="chip-toggle${group === 'all' ? ' is-on' : ''}" data-group="all">All</button><button type="button" class="chip-toggle${group === 'l1' ? ' is-on' : ''}" data-group="l1">Layer 1s</button><button type="button" class="chip-toggle${group === 'l2' ? ' is-on' : ''}" data-group="l2">Layer 2s</button><label class="check"><input type="checkbox" data-hide-stable ${hideStable ? 'checked' : ''} /> Hide stablecoins and pegged tokens</label>`,
         );
         render(head, `<tr><th class="star-cell"><span class="sr-only">Watch</span></th>${th('rank', '#', sort, 'rank')}${th('name', 'Asset', sort, '')}${CRYPTO_COLS.map((c) => th(c.key, c.label, sort)).join('')}</tr>`);
         render(

@@ -19,7 +19,10 @@ export type PanelSort = 'change' | 'mcap' | 'volume_24h' | 'volume_7d' | 'volume
 
 export type PanelSize = 10 | 25;
 
-export type PanelTf = '1h' | '4h' | '8h' | '12h' | '24h' | '7d' | '30d' | '1y';
+export type PanelTf = '1h' | '4h' | '6h' | '8h' | '12h' | '24h' | '7d' | '30d' | '1y';
+
+/** Which coins a crypto gainers / losers panel ranks: every chain, or one chain's tokens. */
+export type PanelChain = 'all' | 'eth' | 'sol' | 'bnb';
 
 export type PanelAssetRef = {
   id: string;
@@ -33,9 +36,15 @@ export type PanelConfig = {
   title: string;
   mode: PanelMode;
   size: PanelSize;
+  /**
+   * How the list is ordered. movers_up shows gainers with `change` and the
+   * most-traded coins with any volume sort; movers_down always ranks by change.
+   */
   sort: PanelSort;
   /** Change timeframe — meaningful for movers_* (and change-sort filters). */
   tf: PanelTf;
+  /** Crypto movers only: which chain's coins are ranked. */
+  chain: PanelChain;
   /** Curated asset picks (mode === 'curated'). Max 40 stored. */
   assets: PanelAssetRef[];
 };
@@ -65,7 +74,9 @@ const SORTS = new Set<PanelSort>([
   'volume_30d',
 ]);
 
-const TFS = new Set<PanelTf>(['1h', '4h', '8h', '12h', '24h', '7d', '30d', '1y']);
+const TFS = new Set<PanelTf>(['1h', '4h', '6h', '8h', '12h', '24h', '7d', '30d', '1y']);
+
+const CHAINS = new Set<PanelChain>(['all', 'eth', 'sol', 'bnb']);
 
 const UNITS = new Set<HeroUnit>(['usd', 'oz', 'oil', 'index']);
 
@@ -87,6 +98,7 @@ export const DEFAULT_PANEL_LEFT: PanelConfig = {
   size: 10,
   sort: 'change',
   tf: '24h',
+  chain: 'all',
   assets: [],
 };
 
@@ -96,6 +108,7 @@ export const DEFAULT_PANEL_RIGHT: PanelConfig = {
   size: 10,
   sort: 'change',
   tf: '24h',
+  chain: 'all',
   assets: [],
 };
 
@@ -124,6 +137,10 @@ function asSize(raw: unknown, fallback: PanelSize): PanelSize {
 
 function asTf(raw: unknown, fallback: PanelTf): PanelTf {
   return typeof raw === 'string' && TFS.has(raw as PanelTf) ? (raw as PanelTf) : fallback;
+}
+
+function asChain(raw: unknown): PanelChain {
+  return typeof raw === 'string' && CHAINS.has(raw as PanelChain) ? (raw as PanelChain) : 'all';
 }
 
 function normalizeAsset(raw: unknown): PanelAssetRef | null {
@@ -197,6 +214,7 @@ export function normalizePanelConfig(raw: unknown, fallback: PanelConfig): Panel
     size: asSize(o.size, fallback.size),
     sort: asSort(o.sort, fallback.sort),
     tf: asTf(o.tf, fallback.tf),
+    chain: asChain(o.chain),
     assets: normalizeAssets(o.assets),
   };
 }

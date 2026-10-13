@@ -1,11 +1,13 @@
 /** Full-size picture of a market: a bubble map of the biggest moves, or a heat map of everything by value. */
 import { LAYER1 } from '../data/layer1';
-import { crypto, equities, eth, loadEth } from '../data/market';
+import { bnb, crypto, equities, eth } from '../data/market';
 import {
   MOVER_CATS,
   biggestMoves,
+  coinState,
   effectiveTf,
-  loadSolana,
+  isCoinCat,
+  loadCat,
   moverPool,
   moverTip,
   solana,
@@ -30,7 +32,7 @@ type Mode = 'bubbles' | 'tiles';
 /** The change that earns the strongest colour, by timeframe. */
 function fullScale(cat: MoverCat, tf: string): number {
   const eff = effectiveTf(cat, tf);
-  const crypto = cat === 'cryptos' || cat === 'solana' || cat === 'ethereum';
+  const crypto = isCoinCat(cat) || cat === 'solana';
   switch (eff) {
     case '1h':
       return crypto ? 2 : 1;
@@ -118,8 +120,7 @@ export const heatmapView: View = {
           seg('hm-tf', options.map((o) => [o.id, o.label]), tf, 'Timeframe') +
           seg('hm-size', effMode === 'bubbles' ? [['move', 'Size: move'], ['cap', 'Size: value']] : [['cap', 'Size: value'], ['move', 'Size: balanced']], sizeBy, 'Size'),
       );
-      if (cat === 'solana') void loadSolana(tf);
-      if (cat === 'ethereum') void loadEth();
+      loadCat(cat, tf);
       ensure(effMode);
 
       const label = tfLabel(cat, tf);
@@ -144,7 +145,7 @@ export const heatmapView: View = {
         const pool = moverPool(cat, tf);
         // Everything with a value, largest first; crypto is capped so the smallest tiles stay readable.
         const ranked = pool.items.filter((m) => (m.marketCap ?? 0) > 0).sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
-        const list = cat === 'cryptos' || cat === 'ethereum' ? ranked.slice(0, 120) : ranked;
+        const list = isCoinCat(cat) ? ranked.slice(0, 120) : ranked;
         current = new Map(list.map((m) => [m.key, m]));
         const key = `t|${cat}|${tf}|${sizeBy}|${list.map((m) => `${m.key}:${(m.change ?? 0).toFixed(2)}`).join(',')}`;
         if (key !== lastKey) {
@@ -157,7 +158,7 @@ export const heatmapView: View = {
             change: m.change,
             // "Balanced" flattens the scale so a few giants do not crowd out everything else.
             weight: sizeBy === 'move' ? Math.pow(m.marketCap ?? 0, 0.45) : (m.marketCap ?? 0),
-            group: cat === 'ethereum' ? (m.key === 'c:ethereum' ? 'Ether' : 'Ethereum tokens') : cat === 'cryptos' ? (m.key === 'c:bitcoin' ? 'Bitcoin' : m.key === 'c:ethereum' ? 'Ethereum' : LAYER1.has(m.key.slice(2)) ? 'Other layer 1s' : 'Tokens and apps') : (es.get(m.sym)?.group ?? 'Other'),
+            group: cat === 'ethereum' ? (m.key === 'c:ethereum' ? 'Ether' : 'Ethereum tokens') : cat === 'bnb' ? (m.key === 'c:binancecoin' ? 'BNB' : 'BNB Chain tokens') : cat === 'cryptos' ? (m.key === 'c:bitcoin' ? 'Bitcoin' : m.key === 'c:ethereum' ? 'Ethereum' : LAYER1.has(m.key.slice(2)) ? 'Other layer 1s' : 'Tokens and apps') : (es.get(m.sym)?.group ?? 'Other'),
           }));
           tiles!.set(items, {
             full: fullScale(cat, tf),
@@ -169,12 +170,13 @@ export const heatmapView: View = {
         count = list.length;
       }
 
-      const what = cat === 'cryptos' ? 'coins' : cat === 'solana' ? 'Solana tokens' : cat === 'ethereum' ? 'Ethereum tokens' : cat === 'stocks' ? 'stocks' : 'ETFs';
+      const what = cat === 'cryptos' ? 'coins' : cat === 'solana' ? 'Solana tokens' : cat === 'ethereum' ? 'Ethereum tokens' : cat === 'bnb' ? 'BNB Chain tokens' : cat === 'stocks' ? 'stocks' : 'ETFs';
+      const chainWhat = cat === 'bnb' ? 'BNB Chain' : 'Ethereum';
       render(
         el.querySelector('[data-sub]'),
         count === 0
           ? html`${status === 'loading' ? 'Loading…' : `Nothing to show for ${what} right now.`}`
-          : html`${effMode === 'bubbles' ? `The ${count} biggest moves among ${cat === 'cryptos' ? 'liquid top-250 coins' : cat === 'ethereum' ? (eth.get().partial ? 'the liquid Ethereum tokens in the top 250 (the full Ethereum list is not available right now)' : 'liquid Ethereum tokens') : what} over ${label}.` : `${count} ${what} sized by ${sizeBy === 'move' ? 'value (balanced)' : cat === 'etfs' ? 'assets' : 'market cap'}, coloured by change over ${label}.`} Select one for details.`,
+          : html`${effMode === 'bubbles' ? `The ${count} biggest moves among ${cat === 'cryptos' ? 'liquid top-250 coins' : cat === 'ethereum' || cat === 'bnb' ? (coinState(cat).partial ? `the liquid ${chainWhat} tokens in the top 250 (the full ${chainWhat} list is not available right now)` : `liquid ${chainWhat} tokens`) : what} over ${label}.` : `${count} ${what} sized by ${sizeBy === 'move' ? 'value (balanced)' : cat === 'etfs' ? 'assets' : 'market cap'}, coloured by change over ${label}.`} Select one for details.`,
       );
       const full = fullScale(cat, tf);
       render(
@@ -183,7 +185,7 @@ export const heatmapView: View = {
           ? `<span class="num">−${full}%</span>${[1, 0.6, 0.2].map((s) => `<i class="heat-tile down" style="--s:${s}"></i>`).join('')}<i class="heat-tile flat" style="--s:0"></i>${[0.2, 0.6, 1].map((s) => `<i class="heat-tile up" style="--s:${s}"></i>`).join('')}<span class="num">+${full}%</span>`
           : `<span>${icon.bubbles(14)} Bigger bubble: ${sizeBy === 'cap' ? 'larger market value' : 'bigger move'}. Brighter colour: bigger move.</span>`,
       );
-      const source = cat === 'cryptos' || cat === 'ethereum' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
+      const source = isCoinCat(cat) ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
       render(el.querySelector('[data-note]'), html`${statusNote(status, at, source).replace(/[.…]$/, '')}. Third-party data, may be delayed.`);
     });
 
@@ -192,6 +194,7 @@ export const heatmapView: View = {
       equities.subscribe(paint),
       solana.subscribe(paint),
       eth.subscribe(paint),
+      bnb.subscribe(paint),
       on(el, 'click', '[data-hm-cat]', (_e, t) => {
         setPref('hm.cat', (cat = t.dataset.hmCat as MoverCat));
         paint();
@@ -210,8 +213,7 @@ export const heatmapView: View = {
       }),
     );
     scope.interval(() => {
-      if (cat === 'solana') void loadSolana(tf);
-      if (cat === 'ethereum') void loadEth();
+      loadCat(cat, tf);
       paint();
     }, 60_000);
     paint();

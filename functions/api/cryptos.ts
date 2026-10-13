@@ -1,14 +1,15 @@
 /**
- * GET /api/cryptos[?limit=250][&universe=eth]
+ * GET /api/cryptos[?limit=250][&universe=eth|bnb]
  * The crypto universe (top coins by market cap, CoinGecko), with 1h / 24h / 7d /
  * 30d / 1y changes from CoinGecko and 4h / 8h changes from the site's own hourly
  * price record. One upstream request serves every crypto view on the site.
- * `universe=eth` gives the Ethereum-ecosystem list in the same shape. If that
- * list cannot be had (CoinGecko refuses and no copy is held), the answer is the
- * Ethereum tokens found in the main list, marked `partial: true`.
+ * `universe=eth` gives the Ethereum-ecosystem list in the same shape, and
+ * `universe=bnb` the BNB Chain one. If that list cannot be had (CoinGecko
+ * refuses and no copy is held), the answer is the chain's tokens found in the
+ * main list, marked `partial: true`.
  */
 
-import { ethFromMain, getCryptoUniverse, getEthUniverse, type CryptoUniverse, type DataEnv } from '../_shared/cryptoUniverse';
+import { CHAIN_FROM_MAIN_MIN, CHAINS, chainFromMain, getChainUniverse, getCryptoUniverse, type Chain, type CryptoUniverse, type DataEnv } from '../_shared/cryptoUniverse';
 import { jsonResponse, type WaitUntil } from '../_shared/edgeCache';
 
 type Ctx = { request: Request; env?: DataEnv; waitUntil?: WaitUntil };
@@ -17,16 +18,17 @@ export async function onRequestGet(context: Ctx): Promise<Response> {
   const url = new URL(context.request.url);
   const limit = Math.min(250, Math.max(1, Number(url.searchParams.get('limit')) || 250));
   try {
-    const eth = url.searchParams.get('universe') === 'eth';
+    const asked = url.searchParams.get('universe');
+    const chain = CHAINS.includes(asked as Chain) ? (asked as Chain) : null;
     let u: CryptoUniverse;
     let partial = false;
-    if (eth) {
+    if (chain) {
       try {
-        u = await getEthUniverse(context.env, context.waitUntil);
+        u = await getChainUniverse(chain, context.env, context.waitUntil);
       } catch (e) {
         const main = await getCryptoUniverse(context.env, context.waitUntil);
-        const known = ethFromMain(main.coins);
-        if (known.length < 8) throw e;
+        const known = chainFromMain(chain, main.coins);
+        if (known.length < CHAIN_FROM_MAIN_MIN[chain]) throw e;
         u = { ...main, coins: known };
         partial = true;
       }

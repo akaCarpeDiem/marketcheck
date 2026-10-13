@@ -5,7 +5,9 @@ import { createMock } from '../mock-upstream.mjs';
 import * as calendar from '../../functions/_shared/marketCalendar.ts';
 import { SEED_PRICES, SEED_SHARES } from '../../functions/_shared/sectors.ts';
 import { ETF_UNIVERSE, STOCK_UNIVERSE } from '../../functions/_shared/universes.ts';
-import { CG_MARKETS, MOVER_MIN_VOLUME, coinsFromCoinGecko, ethFromMain, gainersAndLosers, isMoverCandidate, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
+import { CG_MARKETS, MOVER_MIN_VOLUME, chainFromMain, coinsFromCoinGecko, ethFromMain, gainersAndLosers, isMoverCandidate, topByVolume, topMovers } from '../../functions/_shared/cryptoUniverse.ts';
+import { normalizePanelConfig, DEFAULT_PANEL_LEFT } from '../../functions/_shared/panelConfig.ts';
+import { onRequestGet as bubbles } from '../../functions/api/bubbles.ts';
 import { kvPutIfOlder } from '../../functions/_shared/edgeCache.ts';
 import { onRequestGet as cryptos } from '../../functions/api/cryptos.ts';
 import { onRequestGet as equities } from '../../functions/api/equities.ts';
@@ -135,6 +137,20 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.ok(!eth.body.items.some((c) => c.id === 'bitcoin'), 'Bitcoin is not an Ethereum token');
   assert.ok(eth.body.items.every((c) => 'ch' in c && '4h' in c.ch), 'every coin carries the 4h field, empty or not');
 
+  // The BNB Chain list: same shape, its own tokens.
+  const bnb = await call(cryptos, '/api/cryptos?universe=bnb');
+  assert.equal(bnb.status, 200);
+  assert.ok(!bnb.body.partial);
+  assert.ok(bnb.body.items.length >= 20 && bnb.body.items.some((c) => c.id === 'binancecoin'), 'BNB is in its own list');
+  assert.ok(!bnb.body.items.some((c) => c.id === 'bitcoin' || c.id === 'ethereum'), 'neither Bitcoin nor Ether is a BNB Chain token');
+
+  // Top volume: the most-traded coins that trade freely, most first.
+  const main = (await call(cryptos, '/api/cryptos')).body.items;
+  const busiest = topByVolume(main, 10);
+  assert.equal(busiest.length, 10);
+  assert.ok(busiest.every((c, i) => i === 0 || busiest[i - 1].volume >= c.volume), 'in volume order');
+  assert.ok(busiest.every((c) => !c.stable && !c.wrapped), 'no stablecoin or wrapped coin');
+
   // A second call inside the fresh window must not go upstream again.
   const before = upstream.length;
   await call(cryptos, '/api/cryptos');
@@ -233,6 +249,9 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.ok(known.filter(isMoverCandidate).length >= 5, 'enough of them trade freely to fill a map');
   assert.ok(known.every((c) => coins.includes(c)), 'the same objects, so the same prices as the rest of the site');
   assert.deepEqual(ethFromMain([]), []);
+  const bnbKnown = chainFromMain('bnb', coins);
+  assert.ok(bnbKnown.some((c) => c.id === 'binancecoin'), 'BNB is found in the main list');
+  assert.ok(!bnbKnown.some((c) => c.id === 'ethereum' || c.id === 'bitcoin'));
 
   // Tokenized funds and other pegged tokens are grouped with stablecoins; a quiet giant is not.
   const row = (o) => ({ id: o.symbol, symbol: o.symbol, name: o.name ?? o.symbol, current_price: o.price ?? 5, market_cap: 1e9, total_volume: 5e7, market_cap_rank: o.rank,
@@ -319,6 +338,23 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   coinGeckoRefuses = false;
 }
 
+/* ── Movers panels: the chain and ranking they were saved with ──────────── */
+{
+  const saved = normalizePanelConfig({ ...DEFAULT_PANEL_LEFT, chain: 'sol', sort: 'volume_24h', tf: '6h' }, DEFAULT_PANEL_LEFT);
+  assert.equal(saved.chain, 'sol');
+  assert.equal(saved.sort, 'volume_24h');
+  assert.equal(saved.tf, '6h');
+  assert.equal(normalizePanelConfig({ ...DEFAULT_PANEL_LEFT, chain: 'doge' }, DEFAULT_PANEL_LEFT).chain, 'all', 'an unknown chain means every chain');
+  assert.equal(normalizePanelConfig({ title: 'Old layout', mode: 'movers_up' }, DEFAULT_PANEL_LEFT).chain, 'all', 'layouts saved before chains show every chain');
+
+  // Solana gainers, losers and top volume are ranked by the server, each in its own order.
+  const sol = async (rank) => (await call(bubbles, `/api/bubbles?category=solana&tf=24h&limit=20&rank=${rank}`)).body.items;
+  const [up, down, vol] = [await sol('up'), await sol('down'), await sol('volume')];
+  assert.ok(up.length && up.every((t, i) => t.changePercent > 0 && (i === 0 || up[i - 1].changePercent >= t.changePercent)), 'gainers rose, biggest first');
+  assert.ok(down.length && down.every((t, i) => t.changePercent < 0 && (i === 0 || down[i - 1].changePercent <= t.changePercent)), 'losers fell, biggest first');
+  assert.ok(vol.length && vol.every((t, i) => i === 0 || vol[i - 1].volume >= t.volume), 'top volume, most first');
+}
+
 /* ── One KV snapshot for the whole site, not one per location ───────────── */
 {
   const store = new Map();
@@ -346,6 +382,8 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
 // The free plan allows 1,000 KV writes a day, shared with sign-in and saved layouts.
 // Loading every data endpoint from cold must cost at most a few.
 assert.ok(kvWrites.some((k) => k.includes('crypto-eth')), 'the Ethereum list keeps a last good copy in KV');
-assert.ok(kvWrites.length <= 4, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
+assert.ok(kvWrites.some((k) => k.includes('crypto-bnb')), 'so does the BNB Chain list');
+// One write per list: the main coins, each chain (at most twice a day), share counts and the snapshot.
+assert.ok(kvWrites.length <= 5, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
 
 console.log(`api: ok (${upstream.length} upstream requests, ${kvWrites.length} KV writes)`);
