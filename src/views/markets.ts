@@ -4,7 +4,7 @@ import type { EquityTf } from '../../functions/_shared/equityUniverse';
 import { refFromCoin, refFromEquity, stockLogo } from '../data/assets';
 import { LAYER1 } from '../data/layer1';
 import { LAYER2 } from '../data/layer2';
-import { crypto, equities, type Coin, type Equity } from '../data/market';
+import { chains, crypto, equities, loadChain, type Coin, type Equity } from '../data/market';
 import { data, isWatched, pref, setPref, toggleWatch } from '../data/user';
 import { debounce, esc, frame, html, on, render } from '../lib/dom';
 import { compact, dir, pct, price } from '../lib/format';
@@ -100,10 +100,13 @@ export const marketsView: View = {
     const cryptoRows = (): Coin[] => {
       const s = sorts.crypto;
       const q = filter;
-      let rows = crypto.get().coins;
+      // Layer 2s: CoinGecko's full layer-2 list, loaded on demand; until it arrives (or if it cannot), the known ones in the top 250.
+      if (group === 'l2') void loadChain('l2');
+      const l2 = group === 'l2' ? chains.l2.get().coins : [];
+      let rows = l2.length ? l2 : crypto.get().coins;
       if (hideStable) rows = rows.filter((c) => !c.stable && !c.wrapped);
       if (group === 'l1') rows = rows.filter((c) => LAYER1.has(c.id));
-      if (group === 'l2') rows = rows.filter((c) => LAYER2.has(c.id));
+      if (group === 'l2' && !l2.length) rows = rows.filter((c) => LAYER2.has(c.id));
       if (q) rows = rows.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
       const get = (c: Coin): number | string | null =>
         s.key === 'rank' ? c.rank : s.key === 'name' ? c.symbol : s.key === 'price' ? c.price : s.key === 'cap' ? c.marketCap : s.key === 'vol' ? c.volume : (c.ch[s.key as CryptoTf] ?? null);
@@ -219,6 +222,7 @@ export const marketsView: View = {
 
     scope.add(
       crypto.subscribe(paint),
+      chains.l2.subscribe(paint),
       equities.subscribe(paint),
       data.subscribe(paint),
       on(el, 'click', '[data-tab]', (_e, t) => {
