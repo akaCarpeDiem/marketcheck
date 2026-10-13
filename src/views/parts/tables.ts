@@ -3,7 +3,7 @@ import type { CryptoTf } from '../../../functions/_shared/cryptoUniverse';
 import { refFromCoin, refFromEquity, stockLogo } from '../../data/assets';
 import { LAYER1 } from '../../data/layer1';
 import { LAYER2 } from '../../data/layer2';
-import { crypto, equities, type Coin, type Equity } from '../../data/market';
+import { chains, crypto, equities, loadChain, type Coin, type Equity } from '../../data/market';
 import { pref, setPref } from '../../data/user';
 import { frame, html, on, render } from '../../lib/dom';
 import { ago, compact, price } from '../../lib/format';
@@ -92,7 +92,10 @@ export function mountTables(cryptoEl: HTMLElement, equityEl: HTMLElement, scope:
       cryptoEl.querySelector('[data-tools]'),
       seg('cryptoKind', [['all', 'All'], ['l1', 'Layer 1s'], ['l2', 'Layer 2s']], cryptoKind) + seg('cryptoN', [['10', 'Top 10'], ['25', 'Top 25']], String(cryptoN)),
     );
-    const pool = cryptoKind === 'l1' ? s.coins.filter((c) => LAYER1.has(c.id)) : cryptoKind === 'l2' ? s.coins.filter((c) => LAYER2.has(c.id)) : s.coins;
+    // Layer 2s: CoinGecko's full layer-2 list, loaded on demand; until it arrives (or if it cannot), the known ones in the top 250.
+    if (cryptoKind === 'l2') void loadChain('l2');
+    const l2 = chains.l2.get().coins;
+    const pool = cryptoKind === 'l1' ? s.coins.filter((c) => LAYER1.has(c.id)) : cryptoKind === 'l2' ? (l2.length ? l2 : s.coins.filter((c) => LAYER2.has(c.id))) : s.coins;
     const rows = pool.slice(0, cryptoN);
     render(cryptoEl.querySelector('[data-sub]'), cryptoKind === 'l1' ? 'layer-1 networks by market cap' : cryptoKind === 'l2' ? 'layer-2 networks by market cap' : 'by market cap');
     render(
@@ -163,7 +166,7 @@ export function mountTables(cryptoEl: HTMLElement, equityEl: HTMLElement, scope:
       }),
     );
   }
-  scope.add(crypto.subscribe(paintCrypto), equities.subscribe(paintEquity));
+  scope.add(crypto.subscribe(paintCrypto), chains.l2.subscribe(paintCrypto), equities.subscribe(paintEquity));
   scope.interval(() => {
     paintCrypto();
     paintEquity();

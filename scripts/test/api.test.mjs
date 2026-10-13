@@ -144,6 +144,14 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.ok(bnb.body.items.length >= 20 && bnb.body.items.some((c) => c.id === 'binancecoin'), 'BNB is in its own list');
   assert.ok(!bnb.body.items.some((c) => c.id === 'bitcoin' || c.id === 'ethereum'), 'neither Bitcoin nor Ether is a BNB Chain token');
 
+  // Layer 2s: CoinGecko's layer-2 category, without Nervos (a layer 1).
+  const l2 = await call(cryptos, '/api/cryptos?universe=l2');
+  assert.equal(l2.status, 200);
+  assert.ok(!l2.body.partial);
+  assert.ok(l2.body.items.length >= 20 && l2.body.items.some((c) => c.id === 'arbitrum') && l2.body.items.some((c) => c.id === 'okb'), 'the layer-2 list holds the networks');
+  assert.ok(!l2.body.items.some((c) => c.id === 'nervos-network'), 'Nervos is left out');
+  assert.ok(!l2.body.items.some((c) => c.id === 'bitcoin' || c.id === 'ethereum'), 'neither Bitcoin nor Ether is a layer 2');
+
   // Top volume: the most-traded coins that trade freely, most first.
   const main = (await call(cryptos, '/api/cryptos')).body.items;
   const busiest = topByVolume(main, 10);
@@ -252,6 +260,8 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const bnbKnown = chainFromMain('bnb', coins);
   assert.ok(bnbKnown.some((c) => c.id === 'binancecoin'), 'BNB is found in the main list');
   assert.ok(!bnbKnown.some((c) => c.id === 'ethereum' || c.id === 'bitcoin'));
+  const l2Known = chainFromMain('l2', coins);
+  assert.ok(l2Known.some((c) => c.id === 'arbitrum') && !l2Known.some((c) => c.id === 'ethereum'), 'the known layer 2s are found in the main list');
 
   // Tokenized funds and other pegged tokens are grouped with stablecoins; a quiet giant is not.
   const row = (o) => ({ id: o.symbol, symbol: o.symbol, name: o.name ?? o.symbol, current_price: o.price ?? 5, market_cap: 1e9, total_volume: 5e7, market_cap_rank: o.rank,
@@ -383,7 +393,8 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
 // Loading every data endpoint from cold must cost at most a few.
 assert.ok(kvWrites.some((k) => k.includes('crypto-eth')), 'the Ethereum list keeps a last good copy in KV');
 assert.ok(kvWrites.some((k) => k.includes('crypto-bnb')), 'so does the BNB Chain list');
-// One write per list: the main coins, each chain (at most twice a day), share counts and the snapshot.
-assert.ok(kvWrites.length <= 5, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
+assert.ok(kvWrites.some((k) => k.includes('crypto-l2')), 'and the layer-2 list');
+// One write per list: the main coins, each chain list (at most twice a day), share counts and the snapshot.
+assert.ok(kvWrites.length <= 6, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
 
 console.log(`api: ok (${upstream.length} upstream requests, ${kvWrites.length} KV writes)`);

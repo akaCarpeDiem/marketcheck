@@ -401,6 +401,11 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       if (q.get('category') === 'binance-smart-chain') {
         list = list.filter((c, i) => c.id === 'binancecoin' || (i % 4 === 2 && !['bitcoin', 'ethereum', 'solana', 'ripple'].includes(c.id)));
       }
+      // And for "Layer 2": known networks plus another share, with Nervos (which CoinGecko also files there).
+      if (q.get('category') === 'layer-2') {
+        const nervos = { ...list[list.length - 1], id: 'nervos-network', symbol: 'ckb', name: 'Nervos Network' };
+        list = [...list.filter((c, i) => ['okb', 'mantle', 'arbitrum'].includes(c.id) || (i % 5 === 3 && !['bitcoin', 'ethereum', 'solana', 'ripple', 'binancecoin'].includes(c.id))), nervos];
+      }
       return json(list.slice(0, per));
     }
 

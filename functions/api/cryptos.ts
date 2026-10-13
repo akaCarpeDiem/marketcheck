@@ -1,10 +1,10 @@
 /**
- * GET /api/cryptos[?limit=250][&universe=eth|bnb]
+ * GET /api/cryptos[?limit=250][&universe=eth|bnb|l2]
  * The crypto universe (top coins by market cap, CoinGecko), with 1h / 24h / 7d /
  * 30d / 1y changes from CoinGecko and 4h / 8h changes from the site's own hourly
  * price record. One upstream request serves every crypto view on the site.
  * `universe=eth` gives the Ethereum-ecosystem list in the same shape, and
- * `universe=bnb` the BNB Chain one. If that list cannot be had (CoinGecko
+ * `universe=bnb` the BNB Chain one, and `universe=l2` layer-2 networks. If that list cannot be had (CoinGecko
  * refuses and no copy is held), the answer is the chain's tokens found in the
  * main list, marked `partial: true`.
  */

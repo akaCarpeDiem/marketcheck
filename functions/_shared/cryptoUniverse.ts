@@ -258,15 +258,25 @@ export async function getCryptoUniverse(
   return { coins: hit.data, at: hit.at, stale: hit.stale, source: 'coingecko' };
 }
 
-/** Chains with a token list of their own: Ethereum and BNB Chain. */
-export type Chain = 'eth' | 'bnb';
-export const CHAINS: Chain[] = ['eth', 'bnb'];
+/** Lists of their own besides the main one: Ethereum and BNB Chain tokens, and layer-2 networks. */
+export type Chain = 'eth' | 'bnb' | 'l2';
+export const CHAINS: Chain[] = ['eth', 'bnb', 'l2'];
 
 /** Tokens CoinGecko files under each chain's ecosystem category, largest first. Same shape as the main list. */
 export const CG_MARKETS_CHAIN: Record<Chain, string> = {
   eth: `${CG_MARKETS}&category=ethereum-ecosystem`,
   bnb: `${CG_MARKETS}&category=binance-smart-chain`,
+  l2: `${CG_MARKETS}&category=layer-2`,
 };
+
+/** Coins CoinGecko files under a list's category that the site leaves out (Nervos is a layer 1). */
+const CHAIN_EXCLUDE: Partial<Record<Chain, Set<string>>> = { l2: new Set(['nervos-network']) };
+
+/** A list's coins without the ones it leaves out. */
+export function chainCoins(chain: Chain, coins: Coin[]): Coin[] {
+  const out = CHAIN_EXCLUDE[chain];
+  return out ? coins.filter((c) => !out.has(c.id)) : coins;
+}
 export const CG_MARKETS_ETH = CG_MARKETS_CHAIN.eth;
 
 /**
@@ -283,7 +293,7 @@ export async function getChainUniverse(chain: Chain, env: DataEnv | undefined, w
   const hit = await cached<Coin[]>(`crypto-${chain}:v1`, {
     freshMs: 5 * 60_000,
     keepSec: 86_400,
-    load: () => loadFromCoinGecko(CG_MARKETS_CHAIN[chain], env?.COINGECKO_API_KEY),
+    load: async () => chainCoins(chain, await loadFromCoinGecko(CG_MARKETS_CHAIN[chain], env?.COINGECKO_API_KEY)),
     valid: (coins) => coins.length >= 20,
     waitUntil,
     kv: env?.LAYOUTS ?? null,
@@ -291,7 +301,7 @@ export async function getChainUniverse(chain: Chain, env: DataEnv | undefined, w
     kvEveryMs: 12 * 3_600_000,
     retryMs: 60_000,
   });
-  let coins = hit.data;
+  let coins = chainCoins(chain, hit.data);
   try {
     const main = await getCryptoUniverse(env, waitUntil);
     coins = withIntradayFrom(coins, main.coins);
@@ -338,7 +348,15 @@ const BNB_KNOWN_IDS = new Set([
   'world-liberty-financial', 'cheems-token', 'broccoli-714', 'mubarak', 'tst-token', 'bnb48-club-token',
 ]);
 
-const KNOWN_IDS: Record<Chain, Set<string>> = { eth: ETH_KNOWN_IDS, bnb: BNB_KNOWN_IDS };
+/** CoinGecko ids of well-known layer-2 networks. Stands in for the layer-2 list when CoinGecko cannot be reached. */
+export const L2_KNOWN_IDS = new Set<string>([
+  'arbitrum', 'optimism', 'mantle', 'polygon-ecosystem-token', 'matic-network', 'immutable-x', 'starknet', 'zksync',
+  'linea', 'scroll', 'taiko', 'metis-token', 'loopring', 'skale', 'blast', 'manta-network', 'mode', 'zora', 'celo',
+  'lisk', 'boba-network', 'cartesi', 'zircuit', 'merlin-chain', 'bob-build-first', 'hemi', 'sophon', 'kinto',
+  'swell-network', 'soon-2', 'morph-l2', 'xai-blockchain',
+]);
+
+const KNOWN_IDS: Record<Chain, Set<string>> = { eth: ETH_KNOWN_IDS, bnb: BNB_KNOWN_IDS, l2: L2_KNOWN_IDS };
 
 /**
  * A chain's tokens found in the main list. Shown on that chain's tab when
@@ -353,7 +371,7 @@ export function chainFromMain(chain: Chain, main: Coin[]): Coin[] {
 export const ethFromMain = (main: Coin[]): Coin[] => chainFromMain('eth', main);
 
 /** Least the main list must offer before its share of a chain stands in for the full list. */
-export const CHAIN_FROM_MAIN_MIN: Record<Chain, number> = { eth: 8, bnb: 3 };
+export const CHAIN_FROM_MAIN_MIN: Record<Chain, number> = { eth: 8, bnb: 3, l2: 3 };
 
 /** The coins with the most 24h trading volume (CoinGecko publishes volume for 24h only). */
 export function topByVolume(coins: Coin[], limit: number): Coin[] {

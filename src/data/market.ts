@@ -4,7 +4,7 @@
  * index and headlines. Views subscribe to the signals; the refresh loops at
  * the bottom keep them current while the tab is visible.
  */
-import { CG_MARKETS, CG_MARKETS_CHAIN, CHAIN_FROM_MAIN_MIN, chainFromMain, coinsFromCoinGecko, withIntradayFrom, type Chain, type Coin } from '../../functions/_shared/cryptoUniverse';
+import { CG_MARKETS, CG_MARKETS_CHAIN, CHAIN_FROM_MAIN_MIN, chainCoins, chainFromMain, coinsFromCoinGecko, withIntradayFrom, type Chain, type Coin } from '../../functions/_shared/cryptoUniverse';
 import type { Equity } from '../../functions/_shared/equityUniverse';
 import { marketStatus } from '../../functions/_shared/marketCalendar';
 import { getJson } from '../lib/api';
@@ -57,7 +57,9 @@ export const eth = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: n
 /** Tokens of the BNB Chain ecosystem, loaded when the BNB tab is opened. */
 export const bnb = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
 /** The list held for each chain. */
-export const chains: Record<Chain, typeof eth> = { eth, bnb };
+/** Layer-2 networks (CoinGecko's layer-2 category), loaded when the top crypto table's Layer 2s filter is picked. */
+export const l2 = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
+export const chains: Record<Chain, typeof eth> = { eth, bnb, l2 };
 /** Yahoo quotes for symbols outside the two universes. Replaced on every refresh. */
 export const quotes = signal<Map<string, Quote>>(new Map());
 /** Symbol -> thinned one-year close series. */
@@ -207,7 +209,7 @@ export function loadChain(chain: Chain): Promise<void> {
       const direct = await coinsDirect(CG_MARKETS_CHAIN[chain], 20);
       if (direct) {
         // CoinGecko has no 4h or 8h figures; borrow them from the main list for coins in both.
-        coins = withIntradayFrom(direct, crypto.get().coins);
+        coins = withIntradayFrom(chainCoins(chain, direct), crypto.get().coins);
         at = Date.now();
         stale = false;
         partial = false;
