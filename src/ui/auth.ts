@@ -93,7 +93,7 @@ async function submit(form: HTMLFormElement): Promise<void> {
   const res = await requestCode(ui.email);
   if (res.ok) {
     ui.phase = 'sent';
-    ui.note = `We sent a code to ${ui.email}. It can take a minute to arrive.`;
+    ui.note = `We sent a code to ${ui.email}. It can take a minute to arrive. Also check your junk or spam folder.`;
     ui.bad = false;
     paint('input[name="code"]');
   } else {
