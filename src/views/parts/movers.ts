@@ -1,17 +1,33 @@
 /** The two movers panels (customisable) and the bubble map card on the overview. */
-import { cryptoTf, gainersAndLosers } from '../../../functions/_shared/cryptoUniverse';
+import { gainersAndLosers, topByVolume, type CryptoTf } from '../../../functions/_shared/cryptoUniverse';
 import { equityTf } from '../../../functions/_shared/equityUniverse';
 import {
   DEFAULT_PANEL_LEFT,
   DEFAULT_PANEL_RIGHT,
   METALS_PRESET,
+  type PanelChain,
   type PanelConfig,
   type PanelMode,
   type PanelSort,
 } from '../../../functions/_shared/panelConfig';
 import { avatar, heroFromRef, lookup, priceText, refFromCoin, refFromEquity, refFromHero, stockLogo, type AssetRef } from '../../data/assets';
-import { crypto, equities, eth, loadEth, quotes, wantQuotes } from '../../data/market';
-import { MOVER_CATS, biggestMoves, effectiveTf, loadSolana, moverTip, solana, tfLabel, tfOptions, type Mover, type MoverCat } from '../../data/movers';
+import { bnb, crypto, equities, eth, quotes, wantQuotes } from '../../data/market';
+import {
+  MOVER_CATS,
+  biggestMoves,
+  coinState,
+  effectiveTf,
+  isCoinCat,
+  loadCat,
+  loadSolana,
+  moverTip,
+  solana,
+  solanaPool,
+  tfLabel,
+  tfOptions,
+  type Mover,
+  type MoverCat,
+} from '../../data/movers';
 import { data, panels, pref, savePanels, savePanelsSoon, setPref, user } from '../../data/user';
 import { esc, frame, html, on, raw, render } from '../../lib/dom';
 import { compact, dir, pct } from '../../lib/format';
@@ -28,7 +44,16 @@ import { statusNote } from './tables';
 
 type Side = 'left' | 'right';
 
-type Row = { ref: AssetRef; image: string | null; price: number | null; change: number | null; marketCap: number | null; volume: number | null };
+type Row = {
+  ref: AssetRef;
+  /** Where a click goes when there is no asset sheet (Solana tokens). */
+  href?: string;
+  image: string | null;
+  price: number | null;
+  change: number | null;
+  marketCap: number | null;
+  volume: number | null;
+};
 
 const MODE_LABEL: Record<PanelMode, string> = {
   movers_up: 'Crypto: biggest gainers',
@@ -44,8 +69,18 @@ const MODE_LABEL: Record<PanelMode, string> = {
 
 const STOCK_PANEL_TFS: [string, string][] = [['24h', '1D'], ['7d', '1W'], ['30d', '1M'], ['1y', '1Y']];
 
-/** The crypto timeframe a panel shows: saved layouts may hold one the bar no longer offers. */
-const panelCryptoTf = (tf: string) => effectiveTf('cryptos', tf) as ReturnType<typeof cryptoTf>;
+/** The chain tabs on the crypto gainers and losers panels, and where each one's coins come from. */
+const CHAIN_TABS: { id: PanelChain; label: string; title: string; cat: MoverCat; name: string }[] = [
+  { id: 'all', label: 'All Crypto', title: 'Every coin in the top 250, on any chain', cat: 'cryptos', name: '' },
+  { id: 'eth', label: 'ETH', title: 'Ethereum tokens', cat: 'ethereum', name: 'Ethereum ' },
+  { id: 'sol', label: 'SOL', title: 'Solana tokens', cat: 'solana', name: 'Solana ' },
+  { id: 'bnb', label: 'BNB', title: 'BNB Chain (Binance) tokens', cat: 'bnb', name: 'BNB Chain ' },
+];
+const chainTab = (chain: PanelChain) => CHAIN_TABS.find((c) => c.id === chain) ?? CHAIN_TABS[0]!;
+
+const isCryptoMovers = (m: PanelMode): boolean => m === 'movers_up' || m === 'movers_down';
+/** A gainers panel switched to "Top volume": the most-traded coins instead of the biggest rises. */
+const byVolume = (cfg: PanelConfig): boolean => cfg.mode === 'movers_up' && cfg.sort.startsWith('volume');
 
 const hasTfBar = (m: PanelMode): boolean => m === 'movers_up' || m === 'movers_down' || m === 'stocks_up' || m === 'stocks_down';
 const hasSort = (m: PanelMode): boolean => m === 'filter_crypto' || m === 'filter_stocks' || m === 'curated' || m === 'watchlist' || m === 'filter_metals';
@@ -64,23 +99,51 @@ function fromRefs(refs: AssetRef[]): Row[] {
   });
 }
 
+const fromMover = (m: Mover): Row => ({
+  ref: m.ref ?? { key: m.key, sym: m.sym, name: m.name, kind: 'crypto' },
+  href: m.ref ? undefined : m.href,
+  image: m.image,
+  price: m.price,
+  change: m.change,
+  marketCap: m.marketCap,
+  volume: m.volume,
+});
+
+type PanelRows = { rows: Row[]; changeLabel: string; source: string; empty: string; loading?: boolean };
+
+/** Crypto gainers, losers or top volume, for every chain or one. */
+function cryptoMoverRows(cfg: PanelConfig): PanelRows {
+  const n = cfg.size;
+  const tab = chainTab(cfg.chain);
+  const up = cfg.mode === 'movers_up';
+  const vol = byVolume(cfg);
+  const label = tfLabel(tab.cat, cfg.tf);
+  const coins = tab.id === 'all' ? 'coin' : `${tab.name}token`;
+  const empty = vol ? `No ${coins} trading data right now.` : up ? `No liquid ${coins} is up over ${label}.` : `No liquid ${coins} is down over ${label}.`;
+  if (tab.cat === 'solana') {
+    const pool = solanaPool(cfg.tf, vol ? 'volume' : up ? 'up' : 'down');
+    return { rows: pool.items.slice(0, n).map(fromMover), changeLabel: vol ? `Vol ${label}` : label, source: 'Jupiter', empty, loading: pool.status === 'loading' };
+  }
+  const s = coinState(tab.cat);
+  const tf = effectiveTf(tab.cat, cfg.tf) as CryptoTf;
+  // CoinGecko publishes trading volume for the last 24 hours only, whatever the timeframe.
+  const list = vol ? topByVolume(s.coins, n) : gainersAndLosers(s.coins, tf, n)[up ? 'gainers' : 'losers'];
+  return {
+    rows: list.map((c) => ({ ref: refFromCoin(c), image: c.image, price: c.price, change: c.ch[tf] ?? null, marketCap: c.marketCap, volume: c.volume })),
+    changeLabel: vol ? 'Vol 24h' : label,
+    source: 'CoinGecko',
+    empty,
+    loading: s.status === 'loading',
+  };
+}
+
 /** The rows a panel shows right now, and the label for its change column. */
-function panelRows(cfg: PanelConfig): { rows: Row[]; changeLabel: string; source: string; empty: string } {
+function panelRows(cfg: PanelConfig): PanelRows {
   const n = cfg.size;
   switch (cfg.mode) {
     case 'movers_up':
-    case 'movers_down': {
-      const tf = panelCryptoTf(cfg.tf);
-      const coins = crypto.get().coins;
-      const { gainers, losers } = gainersAndLosers(coins, tf, n);
-      const list = cfg.mode === 'movers_up' ? gainers : losers;
-      return {
-        rows: list.map((c) => ({ ref: refFromCoin(c), image: c.image, price: c.price, change: c.ch[tf] ?? null, marketCap: c.marketCap, volume: c.volume })),
-        changeLabel: tf,
-        source: 'CoinGecko',
-        empty: cfg.mode === 'movers_up' ? `No liquid coin is up over ${tf}.` : `No liquid coin is down over ${tf}.`,
-      };
-    }
+    case 'movers_down':
+      return cryptoMoverRows(cfg);
     case 'stocks_up':
     case 'stocks_down': {
       const tf = equityTf(cfg.tf);
@@ -137,24 +200,44 @@ function panelSymbols(cfg: PanelConfig): string[] {
 }
 
 function metric(row: Row, cfg: PanelConfig): string {
+  if (byVolume(cfg)) return `<span class="num">${compact(row.volume)}</span>`;
   if (hasSort(cfg.mode) && cfg.sort === 'mcap') return `<span class="num">${compact(row.marketCap)}</span>`;
   if (hasSort(cfg.mode) && cfg.sort.startsWith('volume') && row.volume != null) return `<span class="num">${compact(row.volume)}</span>`;
   return `<span class="pill ${dir(row.change)} num">${pct(row.change)}</span>`;
 }
 
 function panelHtml(side: Side, cfg: PanelConfig): string {
-  const { rows, changeLabel, source, empty } = panelRows(cfg);
+  const { rows, changeLabel, source, empty, loading: rowsLoading } = panelRows(cfg);
   const loading =
     !rows.length &&
-    ((cfg.mode.startsWith('movers') || cfg.mode === 'filter_crypto') ? crypto.get().status === 'loading' : equities.get().status === 'loading' && cfg.mode !== 'watchlist');
-  const tfBar = hasTfBar(cfg.mode)
-    ? `<div class="seg" role="group" aria-label="Timeframe">${(cfg.mode.startsWith('stocks') ? STOCK_PANEL_TFS : tfOptions('cryptos').map((o) => [o.id, o.label] as [string, string]))
+    (rowsLoading ?? (cfg.mode === 'filter_crypto' ? crypto.get().status === 'loading' : equities.get().status === 'loading' && cfg.mode !== 'watchlist'));
+  const cat = chainTab(cfg.chain).cat;
+  // CoinGecko volume is 24h only, so a top-volume list from it has no timeframe to pick.
+  const showTf = hasTfBar(cfg.mode) && !(byVolume(cfg) && cat !== 'solana');
+  const tfBar = showTf
+    ? `<div class="seg" role="group" aria-label="Timeframe">${(cfg.mode.startsWith('stocks') ? STOCK_PANEL_TFS : tfOptions(cat).map((o) => [o.id, o.label] as [string, string]))
         .map(([id, label]) => {
-          const on = (cfg.mode.startsWith('stocks') ? equityTf(cfg.tf) : panelCryptoTf(cfg.tf)) === id;
+          const on = (cfg.mode.startsWith('stocks') ? equityTf(cfg.tf) : effectiveTf(cat, cfg.tf)) === id;
           return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-tf="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
         })
         .join('')}</div>`
     : '';
+  const panelTools = isCryptoMovers(cfg.mode)
+    ? `<div class="panel-tools"><div class="seg seg-scroll" role="group" aria-label="Chain">${CHAIN_TABS.map(
+        (c) => `<button type="button" class="seg-btn${c.id === cfg.chain ? ' is-on' : ''}" data-panel-chain="${side}:${c.id}" aria-pressed="${c.id === cfg.chain ? 'true' : 'false'}" title="${c.title}">${c.label}</button>`,
+      ).join('')}</div>${
+        cfg.mode === 'movers_up'
+          ? `<div class="seg" role="group" aria-label="Rank by">${([['change', 'Gainers'], ['volume_24h', 'Top volume']] as const)
+              .map(([id, label]) => {
+                const on = (id === 'change') !== byVolume(cfg);
+                return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-rank="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
+              })
+              .join('')}</div>`
+          : ''
+      }</div>`
+    : '';
+  // A gainers panel showing top volume says so, unless its owner named it themselves.
+  const title = byVolume(cfg) && (cfg.title === AUTO_TITLE.movers_up || cfg.title === DEFAULT_PANEL_LEFT.title) ? 'Crypto top volume' : cfg.title;
   const metricLabel = hasSort(cfg.mode) && cfg.sort === 'mcap' ? 'Market cap' : hasSort(cfg.mode) && cfg.sort.startsWith('volume') ? 'Volume' : changeLabel;
   const body = rows.length
     ? rows
@@ -173,11 +256,12 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
       : `<li class="mover-empty">${esc(empty)}</li>`;
   const tone = cfg.mode.endsWith('_up') ? 'up' : cfg.mode.endsWith('_down') ? 'down' : 'brand';
   return html`<div class="card-head">
-      <h2 class="card-title"><span class="panel-dot ${tone}"></span>${cfg.title}</h2>
+      <h2 class="card-title"><span class="panel-dot ${byVolume(cfg) ? 'brand' : tone}"></span>${title}</h2>
       <div class="card-tools">
         ${raw(tfBar)}
         <button type="button" class="icon-btn icon-btn-sm" data-panel-edit="${side}" aria-label="Change what this panel shows" title="Change what this panel shows">${raw(icon.edit(14))}</button>
       </div>
+      ${raw(panelTools)}
     </div>
     <div class="mover-cols"><span>Asset</span><span>Price</span><span>${metricLabel}</span></div>
     <ol class="movers${cfg.size > 10 ? ' is-long scroll' : ''}">${raw(body)}</ol>
@@ -247,6 +331,8 @@ function openPanelEditor(side: Side): void {
     const wasAuto = !typed || Object.values(AUTO_TITLE).includes(typed) || typed === DEFAULT_PANEL_LEFT.title || typed === DEFAULT_PANEL_RIGHT.title || /^Top \d+ (Pumps|Dumps)$/.test(typed);
     draft.title = wasAuto || mode !== prevMode ? (wasAuto ? AUTO_TITLE[mode] : typed) : typed;
     if (mode.startsWith('stocks') && !STOCK_PANEL_TFS.some(([id]) => id === draft.tf)) draft.tf = '24h';
+    // A sort picked for a filter list must not turn a new gainers panel into a top-volume one.
+    if (mode !== prevMode && isCryptoMovers(mode)) draft.sort = 'change';
   };
 
   o.panel.addEventListener('change', (ev) => {
@@ -338,8 +424,19 @@ export function bubbleCount(host: HTMLElement, max = 50): number {
 export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl: HTMLElement, scope: Scope): void {
   /* panels */
   const rowsNow: Record<Side, Row[]> = { left: [], right: [] };
+  const loadPanels = () => {
+    const cfg = panels.get();
+    for (const side of ['left', 'right'] as Side[]) {
+      const c = cfg[side];
+      if (!isCryptoMovers(c.mode)) continue;
+      const tab = chainTab(c.chain);
+      if (tab.cat === 'solana') void loadSolana(c.tf, byVolume(c) ? 'volume' : c.mode === 'movers_up' ? 'up' : 'down');
+      else loadCat(tab.cat, c.tf);
+    }
+  };
   const paintPanels = frame(() => {
     const cfg = panels.get();
+    loadPanels();
     for (const side of ['left', 'right'] as Side[]) {
       const el = side === 'left' ? leftEl : rightEl;
       rowsNow[side] = panelRows(cfg[side]).rows;
@@ -359,6 +456,9 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     crypto.subscribe(paintPanels),
     equities.subscribe(paintPanels),
     quotes.subscribe(paintPanels),
+    eth.subscribe(paintPanels),
+    bnb.subscribe(paintPanels),
+    solana.subscribe(paintPanels),
     data.subscribe(() => {
       want();
       paintPanels();
@@ -372,7 +472,8 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     const openRow = (id: string) => {
       const [side, i] = id.split(':') as [Side, string];
       const row = rowsNow[side][Number(i)];
-      if (row) openAsset(row.ref);
+      if (row?.href) window.open(row.href, '_blank', 'noopener');
+      else if (row) openAsset(row.ref);
     };
     scope.add(
       on(el, 'click', '[data-panel-open]', (_ev, t) => openRow(t.dataset.panelOpen!)),
@@ -388,6 +489,16 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
         const next = { ...cfg, [side]: { ...cfg[side], tf } };
         // Guests can flip the timeframe for this visit; signed-in users have it saved.
         savePanelsSoon(next);
+      }),
+      on(el, 'click', '[data-panel-chain]', (_ev, t) => {
+        const [side, chain] = t.dataset.panelChain!.split(':') as [Side, PanelChain];
+        const cfg = panels.get();
+        savePanelsSoon({ ...cfg, [side]: { ...cfg[side], chain } });
+      }),
+      on(el, 'click', '[data-panel-rank]', (_ev, t) => {
+        const [side, sort] = t.dataset.panelRank!.split(':') as [Side, PanelSort];
+        const cfg = panels.get();
+        savePanelsSoon({ ...cfg, [side]: { ...cfg[side], sort } });
       }),
       on(el, 'click', '[data-panel-edit]', (_ev, t) => {
         if (!user.get()) {
@@ -434,15 +545,14 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     if (!options.some((o) => o.id === tf)) tf = options.some((o) => o.id === '24h') ? '24h' : options[0]!.id;
     render(
       bubbleEl.querySelector('[data-tools]'),
-      `<div class="seg seg-scroll" role="group" aria-label="Market">${MOVER_CATS.map((c) => `<button type="button" class="seg-btn${c.id === cat ? ' is-on' : ''}" data-bubble-cat="${c.id}" aria-pressed="${c.id === cat ? 'true' : 'false'}">${c.label}</button>`).join('')}</div>
+      `<div class="seg seg-scroll" role="group" aria-label="Market">${MOVER_CATS.map((c) => `<button type="button" class="seg-btn${c.id === cat ? ' is-on' : ''}" data-bubble-cat="${c.id}" aria-pressed="${c.id === cat ? 'true' : 'false'}" title="${c.title}">${c.label}</button>`).join('')}</div>
        <div class="seg" role="group" aria-label="Timeframe">${options.map((o) => `<button type="button" class="seg-btn${o.id === tf ? ' is-on' : ''}" data-bubble-tf="${o.id}" aria-pressed="${o.id === tf ? 'true' : 'false'}">${o.label}</button>`).join('')}</div>`,
     );
     render(
       bubbleEl.querySelector('[data-size-tools]'),
       `<div class="seg" role="group" aria-label="Bubble size">${([['move', 'By move'], ['cap', 'By value']] as const).map(([id, label]) => `<button type="button" class="seg-btn${id === sizeBy ? ' is-on' : ''}" data-bubble-size="${id}" aria-pressed="${id === sizeBy ? 'true' : 'false'}">${label}</button>`).join('')}</div>`,
     );
-    if (cat === 'solana') void loadSolana(tf);
-    if (cat === 'ethereum') void loadEth();
+    loadCat(cat, tf);
     const res = biggestMoves(cat, tf, bubbleCount(host));
     current = new Map(res.items.map((m) => [m.key, m]));
     // Only re-pack when what is shown has changed; a price tick alone keeps the layout.
@@ -454,14 +564,15 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
         emptyText: res.status === 'loading' ? 'Loading…' : res.status === 'error' ? 'This data is not available right now.' : 'Nothing moved enough to show here.',
       });
     }
-    const source = cat === 'cryptos' || cat === 'ethereum' ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
+    const source = isCoinCat(cat) ? 'CoinGecko' : cat === 'solana' ? 'Jupiter' : 'Yahoo Finance';
+    const chainName = cat === 'bnb' ? 'BNB Chain' : 'Ethereum';
     const what =
       cat === 'cryptos'
         ? `${res.items.length} biggest moves among liquid top-250 coins`
-        : cat === 'ethereum'
-          ? eth.get().partial
-            ? `${res.items.length} biggest moves among the Ethereum tokens in the top 250 (full list not available right now)`
-            : `${res.items.length} biggest moves among liquid Ethereum tokens`
+        : cat === 'ethereum' || cat === 'bnb'
+          ? coinState(cat).partial
+            ? `${res.items.length} biggest moves among the ${chainName} tokens in the top 250 (full list not available right now)`
+            : `${res.items.length} biggest moves among liquid ${chainName} tokens`
           : cat === 'solana'
           ? `${res.items.length} biggest moves among verified Solana tokens`
           : `${res.items.length} biggest moves in the ${cat === 'stocks' ? 'stock' : 'ETF'} list`;
@@ -473,6 +584,7 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     equities.subscribe(paintBubbles),
     solana.subscribe(paintBubbles),
     eth.subscribe(paintBubbles),
+    bnb.subscribe(paintBubbles),
     on(bubbleEl, 'click', '[data-bubble-cat]', (_ev, t) => {
       setPref('ov.bubbleCat', (cat = t.dataset.bubbleCat as MoverCat));
       paintBubbles();
@@ -487,9 +599,9 @@ export function mountMovers(leftEl: HTMLElement, rightEl: HTMLElement, bubbleEl:
     }),
   );
   scope.interval(() => {
-    if (cat === 'solana') void loadSolana(tf);
-    if (cat === 'ethereum') void loadEth();
+    loadCat(cat, tf);
     paintBubbles();
+    paintPanels();
   }, 60_000);
   paintBubbles();
 }

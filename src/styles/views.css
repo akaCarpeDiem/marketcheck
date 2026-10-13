@@ -1783,3 +1783,13 @@ td .cell-asset .cell-stack {
     max-width: none;
   }
 }
+
+/* Crypto movers panels: chain tabs and gainers / top volume on their own row. */
+.panel-tools {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}

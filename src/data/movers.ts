@@ -1,7 +1,8 @@
 /**
  * Movers for the bubble map, the heat map and the movers panels, cut from the
  * crypto and equity universes already in memory (so changing the timeframe is
- * instant and costs no request). Solana tokens come from /api/bubbles.
+ * instant and costs no request). Solana tokens come from /api/bubbles; the
+ * Ethereum and BNB Chain lists are loaded when their tab is opened.
  */
 import { cryptoTf, isMoverCandidate, type CryptoTf } from '../../functions/_shared/cryptoUniverse';
 import { equityTf, type EquityTf } from '../../functions/_shared/equityUniverse';
@@ -10,17 +11,38 @@ import { esc } from '../lib/dom';
 import { compact, dir, pct, price as fmtPrice } from '../lib/format';
 import { signal } from '../lib/store';
 import { refFromCoin, refFromEquity, stockLogo, type AssetRef } from './assets';
-import { crypto, equities, eth, type Status } from './market';
+import { chains, crypto, equities, loadChain, type Chain, type CryptoState, type Status } from './market';
 
-export type MoverCat = 'cryptos' | 'solana' | 'ethereum' | 'stocks' | 'etfs';
+export type MoverCat = 'cryptos' | 'ethereum' | 'solana' | 'bnb' | 'stocks' | 'etfs';
 
-export const MOVER_CATS: { id: MoverCat; label: string }[] = [
-  { id: 'cryptos', label: 'Crypto' },
-  { id: 'stocks', label: 'Stocks' },
-  { id: 'etfs', label: 'ETFs' },
-  { id: 'solana', label: 'Solana' },
-  { id: 'ethereum', label: 'Ethereum' },
+export const MOVER_CATS: { id: MoverCat; label: string; title: string }[] = [
+  { id: 'cryptos', label: 'All Crypto', title: 'Every coin in the top 250' },
+  { id: 'ethereum', label: 'ETH', title: 'Ethereum' },
+  { id: 'solana', label: 'SOL', title: 'Solana' },
+  { id: 'bnb', label: 'BNB', title: 'BNB Chain (Binance)' },
+  { id: 'stocks', label: 'Stocks', title: 'US stocks' },
+  { id: 'etfs', label: 'ETFs', title: 'ETFs' },
 ];
+
+/** The chain list behind a category, for the ones that have their own. */
+const CAT_CHAIN: Partial<Record<MoverCat, Chain>> = { ethereum: 'eth', bnb: 'bnb' };
+export const catChain = (cat: MoverCat): Chain | undefined => CAT_CHAIN[cat];
+
+/** Categories whose coins come from CoinGecko: the main list or a chain's list. */
+export const isCoinCat = (cat: MoverCat): boolean => cat === 'cryptos' || cat in CAT_CHAIN;
+
+/** The coin list behind a CoinGecko category. */
+export function coinState(cat: MoverCat): CryptoState {
+  const chain = CAT_CHAIN[cat];
+  return chain ? chains[chain].get() : crypto.get();
+}
+
+/** Start loading whatever a category needs that is not on the page yet. */
+export function loadCat(cat: MoverCat, tf: string): void {
+  const chain = CAT_CHAIN[cat];
+  if (chain) void loadChain(chain);
+  if (cat === 'solana') void loadSolana(tf);
+}
 
 export type TfOption = { id: string; label: string };
 
@@ -51,14 +73,13 @@ const SOLANA_TFS: TfOption[] = [
 ];
 
 export function tfOptions(cat: MoverCat): TfOption[] {
-  if (cat === 'cryptos') return cryptoTfs(crypto.get().coins);
-  if (cat === 'ethereum') return cryptoTfs(eth.get().coins);
+  if (isCoinCat(cat)) return cryptoTfs(coinState(cat).coins);
   return cat === 'solana' ? SOLANA_TFS : EQUITY_TFS;
 }
 
 /** The timeframe actually used for a category when asked for `tf`. */
 export function effectiveTf(cat: MoverCat, tf: string): string {
-  if (cat === 'cryptos' || cat === 'ethereum') {
+  if (isCoinCat(cat)) {
     const eff = cryptoTf(tf);
     return tfOptions(cat).some((o) => o.id === eff) ? eff : '24h';
   }
@@ -100,25 +121,35 @@ type SolanaPayload = {
 };
 
 type SolanaState = { items: Mover[]; at: number; status: Status };
-/** Solana movers by timeframe. */
+/** How Solana tokens are ranked: biggest moves, gainers, losers, most traded. */
+export type SolanaRank = 'move' | 'up' | 'down' | 'volume';
+/** Solana movers by timeframe and ranking (see solanaKey). */
 export const solana = signal<Map<string, SolanaState>>(new Map());
 const solanaBusy = new Map<string, Promise<void>>();
+export const solanaKey = (tf: string, rank: SolanaRank = 'move'): string => `${effectiveTf('solana', tf)}|${rank}`;
 
-export function loadSolana(tf: string): Promise<void> {
+/** Solana tokens as held, or a loading state when they are not here yet. */
+export function solanaPool(tf: string, rank: SolanaRank = 'move'): Pool {
+  const s = solana.get().get(solanaKey(tf, rank));
+  return { items: s?.items ?? [], status: s?.status ?? 'loading', at: s?.at ?? 0 };
+}
+
+export function loadSolana(tf: string, rank: SolanaRank = 'move'): Promise<void> {
   const eff = effectiveTf('solana', tf);
-  const have = solana.get().get(eff);
+  const key = solanaKey(tf, rank);
+  const have = solana.get().get(key);
   if (have && have.status !== 'error' && Date.now() - have.at < 120_000) return Promise.resolve();
-  const running = solanaBusy.get(eff);
+  const running = solanaBusy.get(key);
   if (running) return running;
   const put = (s: SolanaState) => {
     const next = new Map(solana.get());
-    next.set(eff, s);
+    next.set(key, s);
     solana.set(next);
   };
   if (!have) put({ items: [], at: 0, status: 'loading' });
   const job = (async () => {
     try {
-      const d = await getJson<SolanaPayload>(`/api/bubbles?category=solana&tf=${eff}&limit=60`, { timeout: 25_000 });
+      const d = await getJson<SolanaPayload>(`/api/bubbles?category=solana&tf=${eff}&limit=60${rank === 'move' ? '' : `&rank=${rank}`}`, { timeout: 25_000 });
       const items: Mover[] = (d.items ?? []).map((t) => ({
         key: t.id,
         ref: null,
@@ -135,10 +166,10 @@ export function loadSolana(tf: string): Promise<void> {
     } catch {
       put(have?.items.length ? { ...have, status: 'stale' } : { items: [], at: Date.now(), status: 'error' });
     } finally {
-      solanaBusy.delete(eff);
+      solanaBusy.delete(key);
     }
   })();
-  solanaBusy.set(eff, job);
+  solanaBusy.set(key, job);
   return job;
 }
 
@@ -146,9 +177,9 @@ export type Pool = { items: Mover[]; status: Status; at: number };
 
 /** Everything in a category that can be ranked, with its change over `tf`. */
 export function moverPool(cat: MoverCat, tf: string): Pool {
-  if (cat === 'cryptos' || cat === 'ethereum') {
+  if (isCoinCat(cat)) {
     const eff = effectiveTf(cat, tf) as CryptoTf;
-    const s = cat === 'ethereum' ? eth.get() : crypto.get();
+    const s = coinState(cat);
     const items: Mover[] = [];
     for (const c of s.coins) {
       const change = c.ch[eff];
@@ -157,10 +188,7 @@ export function moverPool(cat: MoverCat, tf: string): Pool {
     }
     return { items, status: s.status, at: s.at };
   }
-  if (cat === 'solana') {
-    const s = solana.get().get(effectiveTf('solana', tf));
-    return { items: s?.items ?? [], status: s?.status ?? 'loading', at: s?.at ?? 0 };
-  }
+  if (cat === 'solana') return solanaPool(tf);
   const eff = equityTf(tf) as EquityTf;
   const kind = cat === 'stocks' ? 'stock' : 'etf';
   const s = equities.get();

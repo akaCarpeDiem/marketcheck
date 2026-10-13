@@ -112,9 +112,17 @@ export function solanaTf(tf: string): SolanaTf {
 /** Least traded volume (USD) in the window for a token to be ranked. */
 const MIN_VOLUME: Record<SolanaTf, number> = { '1h': 60_000, '6h': 250_000, '24h': 750_000 };
 
+/**
+ * How to rank: `move` biggest change either way (the bubble map), `up` and
+ * `down` the gainers and losers panels, `volume` most traded in the window.
+ */
+export type SolanaRank = 'move' | 'up' | 'down' | 'volume';
+export const SOLANA_RANKS: SolanaRank[] = ['move', 'up', 'down', 'volume'];
+
 export async function getSolanaMovers(
   tf: string,
   limit = 50,
+  rank: SolanaRank = 'move',
 ): Promise<{
   items: SolanaMoverRow[];
   effectiveTf: string;
@@ -133,9 +141,16 @@ export async function getSolanaMovers(
     retryMs: 45_000,
   });
   const key = eff === '1h' ? 'h1' : eff === '6h' ? 'h6' : 'h24';
+  const order: Record<SolanaRank, (a: [number, number], b: [number, number]) => number> = {
+    move: (a, b) => Math.abs(b[0]) - Math.abs(a[0]) || b[1] - a[1],
+    up: (a, b) => b[0] - a[0],
+    down: (a, b) => a[0] - b[0],
+    volume: (a, b) => b[1] - a[1],
+  };
   const rows = hit.data
     .filter((t) => t[key] != null && t[key]![1] >= MIN_VOLUME[eff] && t.p != null)
-    .sort((a, b) => Math.abs(b[key]![0]) - Math.abs(a[key]![0]) || b[key]![1] - a[key]![1])
+    .filter((t) => (rank === 'up' ? t[key]![0] > 0 : rank === 'down' ? t[key]![0] < 0 : true))
+    .sort((a, b) => order[rank](a[key]!, b[key]!))
     .slice(0, limit)
     .map(
       (t): SolanaMoverRow => ({

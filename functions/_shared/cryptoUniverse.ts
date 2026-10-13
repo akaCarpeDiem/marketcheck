@@ -258,28 +258,36 @@ export async function getCryptoUniverse(
   return { coins: hit.data, at: hit.at, stale: hit.stale, source: 'coingecko' };
 }
 
-/** Tokens CoinGecko files under "Ethereum ecosystem", largest first. Same shape as the main list. */
-export const CG_MARKETS_ETH = `${CG_MARKETS}&category=ethereum-ecosystem`;
+/** Chains with a token list of their own: Ethereum and BNB Chain. */
+export type Chain = 'eth' | 'bnb';
+export const CHAINS: Chain[] = ['eth', 'bnb'];
+
+/** Tokens CoinGecko files under each chain's ecosystem category, largest first. Same shape as the main list. */
+export const CG_MARKETS_CHAIN: Record<Chain, string> = {
+  eth: `${CG_MARKETS}&category=ethereum-ecosystem`,
+  bnb: `${CG_MARKETS}&category=binance-smart-chain`,
+};
+export const CG_MARKETS_ETH = CG_MARKETS_CHAIN.eth;
 
 /**
- * The Ethereum list for the "Ethereum" tab. Asked for only when someone opens
+ * The list for a chain's tab ("ETH", "BNB"). Asked for only when someone opens
  * that tab, kept five minutes. 4h and 8h changes are copied from the main list
  * for coins that are in both (the hourly record covers the main list only).
  *
  * The last good list is also written to KV (twice a day at most), so a part of
  * the network that has never fetched it still has an older copy to show when
  * CoinGecko refuses. The browser has two more fallbacks of its own: asking
- * CoinGecko itself, and ethFromMain() below.
+ * CoinGecko itself, and chainFromMain() below.
  */
-export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitUntil): Promise<CryptoUniverse> {
-  const hit = await cached<Coin[]>('crypto-eth:v1', {
+export async function getChainUniverse(chain: Chain, env: DataEnv | undefined, waitUntil?: WaitUntil): Promise<CryptoUniverse> {
+  const hit = await cached<Coin[]>(`crypto-${chain}:v1`, {
     freshMs: 5 * 60_000,
     keepSec: 86_400,
-    load: () => loadFromCoinGecko(CG_MARKETS_ETH, env?.COINGECKO_API_KEY),
+    load: () => loadFromCoinGecko(CG_MARKETS_CHAIN[chain], env?.COINGECKO_API_KEY),
     valid: (coins) => coins.length >= 20,
     waitUntil,
     kv: env?.LAYOUTS ?? null,
-    kvKey: 'cache:crypto-eth:v1',
+    kvKey: `cache:crypto-${chain}:v1`,
     kvEveryMs: 12 * 3_600_000,
     retryMs: 60_000,
   });
@@ -292,6 +300,8 @@ export async function getEthUniverse(env: DataEnv | undefined, waitUntil?: WaitU
   }
   return { coins, at: hit.at, stale: hit.stale, source: 'coingecko' };
 }
+
+export const getEthUniverse = (env: DataEnv | undefined, waitUntil?: WaitUntil): Promise<CryptoUniverse> => getChainUniverse('eth', env, waitUntil);
 
 /**
  * Tokens issued on Ethereum, by CoinGecko id: ether itself, the large DeFi,
@@ -317,13 +327,40 @@ const ETH_KNOWN_IDS = new Set([
 ]);
 
 /**
- * The Ethereum tokens found in the main list. Shown on the Ethereum tab when
+ * Tokens issued on BNB Chain, by CoinGecko id: BNB itself and the large BNB
+ * Chain DeFi, exchange and meme tokens. Like the Ethereum set, only the ones
+ * big enough to turn up in the top 250.
+ */
+const BNB_KNOWN_IDS = new Set([
+  'binancecoin', 'tether', 'usd-coin', 'first-digital-usd', 'usd1-wlfi', 'binance-usd',
+  'pancakeswap-token', 'trust-wallet-token', 'venus', 'aster-2', 'four', 'baby-doge-coin', 'floki', 'safepal',
+  'alpaca-finance', 'biswap', 'coin98', 'alchemy-pay', 'mobox', 'bakerytoken', 'apenft', 'listapie', 'lista',
+  'world-liberty-financial', 'cheems-token', 'broccoli-714', 'mubarak', 'tst-token', 'bnb48-club-token',
+]);
+
+const KNOWN_IDS: Record<Chain, Set<string>> = { eth: ETH_KNOWN_IDS, bnb: BNB_KNOWN_IDS };
+
+/**
+ * A chain's tokens found in the main list. Shown on that chain's tab when
  * the full list cannot be had from anywhere: fewer tokens, but the same live
  * prices as the rest of the site, so the tab is filled whenever the site has
  * coin prices at all.
  */
-export function ethFromMain(main: Coin[]): Coin[] {
-  return main.filter((c) => ETH_KNOWN_IDS.has(c.id));
+export function chainFromMain(chain: Chain, main: Coin[]): Coin[] {
+  return main.filter((c) => KNOWN_IDS[chain].has(c.id));
+}
+
+export const ethFromMain = (main: Coin[]): Coin[] => chainFromMain('eth', main);
+
+/** Least the main list must offer before its share of a chain stands in for the full list. */
+export const CHAIN_FROM_MAIN_MIN: Record<Chain, number> = { eth: 8, bnb: 3 };
+
+/** The coins with the most 24h trading volume (CoinGecko publishes volume for 24h only). */
+export function topByVolume(coins: Coin[], limit: number): Coin[] {
+  return coins
+    .filter((c) => isMoverCandidate(c))
+    .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+    .slice(0, limit);
 }
 
 /** Copies of `coins` carrying the 4h and 8h changes of the same coins in `main`. */

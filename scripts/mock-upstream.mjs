@@ -397,6 +397,10 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       if (q.get('category') === 'ethereum-ecosystem') {
         list = list.filter((c, i) => c.id === 'ethereum' || (i % 3 === 1 && !['bitcoin', 'solana', 'ripple'].includes(c.id)));
       }
+      // And for "BNB Chain ecosystem": BNB plus a different share.
+      if (q.get('category') === 'binance-smart-chain') {
+        list = list.filter((c, i) => c.id === 'binancecoin' || (i % 4 === 2 && !['bitcoin', 'ethereum', 'solana', 'ripple'].includes(c.id)));
+      }
       return json(list.slice(0, per));
     }
 

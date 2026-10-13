@@ -1,5 +1,5 @@
 /**
- * GET /api/bubbles?category=cryptos|solana|stocks|etfs&tf=…&limit=50
+ * GET /api/bubbles?category=cryptos|solana|stocks|etfs&tf=…&limit=50[&rank=move|up|down|volume]
  * The biggest movers in a category over a timeframe, for the bubble map.
  *
  *   cryptos  CoinGecko universe            1h 24h 7d 30d 1y
@@ -9,14 +9,17 @@
  *
  * A timeframe the category cannot answer (kept in some saved layouts) falls
  * back to the nearest one it can; `effectiveTf` says which was used.
+ * `rank` applies to Solana only: biggest moves (default), gainers, losers, or
+ * most traded in the window.
  * The site itself builds crypto / stock / ETF bubbles in the browser from
- * /api/cryptos and /api/equities and only calls this for Solana.
+ * /api/cryptos and /api/equities and only calls this for Solana (bubbles and
+ * the SOL tab of the gainers and losers panels).
  */
 
 import { cryptoTf, getCryptoUniverse, topMovers, type DataEnv } from '../_shared/cryptoUniverse';
 import { jsonResponse, type WaitUntil } from '../_shared/edgeCache';
 import { equityTf, getEquityUniverse } from '../_shared/equityUniverse';
-import { getSolanaMovers } from '../_shared/solanaMovers';
+import { SOLANA_RANKS, getSolanaMovers, type SolanaRank } from '../_shared/solanaMovers';
 
 type Ctx = { request: Request; env?: DataEnv; waitUntil?: WaitUntil };
 
@@ -58,7 +61,9 @@ export async function onRequestGet(context: Ctx): Promise<Response> {
         fetchedAt: new Date(u.at).toISOString(),
       };
     } else if (category === 'solana') {
-      const m = await getSolanaMovers(tf, limit);
+      const asked = url.searchParams.get('rank');
+      const rank = SOLANA_RANKS.includes(asked as SolanaRank) ? (asked as SolanaRank) : 'move';
+      const m = await getSolanaMovers(tf, limit, rank);
       body = { ...m, fetchedAt: new Date().toISOString() };
     } else {
       const eff = equityTf(tf);

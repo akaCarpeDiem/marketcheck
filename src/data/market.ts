@@ -4,7 +4,7 @@
  * index and headlines. Views subscribe to the signals; the refresh loops at
  * the bottom keep them current while the tab is visible.
  */
-import { CG_MARKETS, CG_MARKETS_ETH, coinsFromCoinGecko, ethFromMain, withIntradayFrom, type Coin } from '../../functions/_shared/cryptoUniverse';
+import { CG_MARKETS, CG_MARKETS_CHAIN, CHAIN_FROM_MAIN_MIN, chainFromMain, coinsFromCoinGecko, withIntradayFrom, type Chain, type Coin } from '../../functions/_shared/cryptoUniverse';
 import type { Equity } from '../../functions/_shared/equityUniverse';
 import { marketStatus } from '../../functions/_shared/marketCalendar';
 import { getJson } from '../lib/api';
@@ -12,7 +12,7 @@ import { readJson, writeJson } from '../lib/storage';
 import { poll, type Poller } from '../lib/poll';
 import { signal } from '../lib/store';
 
-export type { Coin, Equity };
+export type { Chain, Coin, Equity };
 
 export type Status = 'loading' | 'ok' | 'stale' | 'error';
 
@@ -23,7 +23,7 @@ export type CryptoState = {
   bySymbol: Map<string, Coin>;
   at: number;
   status: Status;
-  /** Ethereum list only: true when this is the part of it found in the main list, not the full list. */
+  /** Chain lists only: true when this is the part of it found in the main list, not the full list. */
   partial?: boolean;
 };
 
@@ -52,8 +52,12 @@ export type Quote = {
 
 export const crypto = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
 export const equities = signal<EquityState>({ items: [], bySymbol: new Map(), at: 0, status: 'loading' });
-/** Tokens of the Ethereum ecosystem, loaded when the Ethereum tab is opened. */
+/** Tokens of the Ethereum ecosystem, loaded when the ETH tab is opened. */
 export const eth = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
+/** Tokens of the BNB Chain ecosystem, loaded when the BNB tab is opened. */
+export const bnb = signal<CryptoState>({ coins: [], byId: new Map(), bySymbol: new Map(), at: 0, status: 'loading' });
+/** The list held for each chain. */
+export const chains: Record<Chain, typeof eth> = { eth, bnb };
 /** Yahoo quotes for symbols outside the two universes. Replaced on every refresh. */
 export const quotes = signal<Map<string, Quote>>(new Map());
 /** Symbol -> thinned one-year close series. */
@@ -161,44 +165,46 @@ export async function refreshCrypto(): Promise<void> {
   crypto.set({ ...prev, status: prev.coins.length ? 'stale' : 'error' });
 }
 
-/* ── Ethereum tokens (on demand) ────────────────────────────────────────── */
+/* ── Chain tokens: Ethereum, BNB Chain (on demand) ────────────────────── */
 
-let ethBusy: Promise<void> | null = null;
-let ethTriedAt = 0;
+const chainBusy = new Map<Chain, Promise<void>>();
+const chainTriedAt = new Map<Chain, number>();
 /** A copy older than this is not shown as current. */
-const ETH_OLD_MS = 15 * 60_000;
+const CHAIN_OLD_MS = 15 * 60_000;
 
 /**
- * Load the Ethereum list if it is missing or due for a refresh. Three sources,
+ * Load a chain's list if it is missing or due for a refresh. Three sources,
  * in order: our server; CoinGecko asked from this browser (when the server was
- * refused or only has an old copy); and, if neither has it, the Ethereum
+ * refused or only has an old copy); and, if neither has it, the chain's
  * tokens in the main coin list, which is already on the page and has fallbacks
  * of its own. So the tab is only ever empty when the site has no coin prices at all.
  */
-export function loadEth(): Promise<void> {
-  if (ethBusy) return ethBusy;
-  const have = eth.get();
+export function loadChain(chain: Chain): Promise<void> {
+  const busy = chainBusy.get(chain);
+  if (busy) return busy;
+  const target = chains[chain];
+  const have = target.get();
   // Views ask on every repaint: a full, current list is good for two minutes, anything less is retried sooner.
   const wait = have.coins.length && have.status === 'ok' && !have.partial ? 120_000 : 45_000;
-  if (Date.now() - ethTriedAt < wait) return Promise.resolve();
-  ethTriedAt = Date.now();
-  ethBusy = (async () => {
+  if (Date.now() - (chainTriedAt.get(chain) ?? 0) < wait) return Promise.resolve();
+  chainTriedAt.set(chain, Date.now());
+  const job = (async () => {
     let coins: Coin[] = [];
     let at = Date.now();
     let stale = false;
     let partial = false;
     try {
-      const data = await getJson<CryptoPayload>('/api/cryptos?universe=eth', { timeout: 20_000 });
+      const data = await getJson<CryptoPayload>(`/api/cryptos?universe=${chain}`, { timeout: 20_000 });
       coins = Array.isArray(data.items) ? data.items : [];
       if (data.fetchedAt) at = Date.parse(data.fetchedAt) || at;
-      stale = Boolean(data.stale) && Date.now() - at > ETH_OLD_MS;
-      // The server could only offer the Ethereum tokens from its main list.
+      stale = Boolean(data.stale) && Date.now() - at > CHAIN_OLD_MS;
+      // The server could only offer the chain's tokens from its main list.
       partial = Boolean(data.partial) && coins.length > 0;
     } catch {
       coins = [];
     }
     if (!coins.length || stale || partial) {
-      const direct = await coinsDirect(CG_MARKETS_ETH, 20);
+      const direct = await coinsDirect(CG_MARKETS_CHAIN[chain], 20);
       if (direct) {
         // CoinGecko has no 4h or 8h figures; borrow them from the main list for coins in both.
         coins = withIntradayFrom(direct, crypto.get().coins);
@@ -209,10 +215,10 @@ export function loadEth(): Promise<void> {
     }
     if (!coins.length || stale || partial) {
       const main = crypto.get();
-      const known = ethFromMain(main.coins);
+      const known = chainFromMain(chain, main.coins);
       // Current prices for fewer tokens beat old prices for all of them; and of two partial lists, the newer wins.
-      const better = !coins.length || (partial ? main.at >= at : main.at - at > ETH_OLD_MS);
-      if (known.length >= 8 && better) {
+      const better = !coins.length || (partial ? main.at >= at : main.at - at > CHAIN_OLD_MS);
+      if (known.length >= CHAIN_FROM_MAIN_MIN[chain] && better) {
         coins = known;
         at = main.at;
         stale = main.status !== 'ok';
@@ -220,15 +226,18 @@ export function loadEth(): Promise<void> {
       }
     }
     if (coins.length) {
-      setCoins(coins, at, stale ? 'stale' : 'ok', eth, partial);
+      setCoins(coins, at, stale ? 'stale' : 'ok', target, partial);
     } else {
-      eth.set({ ...eth.get(), at: Date.now(), status: eth.get().coins.length ? 'stale' : 'error' });
+      target.set({ ...target.get(), at: Date.now(), status: target.get().coins.length ? 'stale' : 'error' });
     }
   })().finally(() => {
-    ethBusy = null;
+    chainBusy.delete(chain);
   });
-  return ethBusy;
+  chainBusy.set(chain, job);
+  return job;
 }
+
+export const loadEth = (): Promise<void> => loadChain('eth');
 
 /* ── Stocks and ETFs ───────────────────────────────────────────────────── */
 

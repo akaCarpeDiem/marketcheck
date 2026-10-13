@@ -7,7 +7,7 @@ import type { HeroAssetDef } from '../../functions/_shared/heroCatalog';
 import type { AssetKind, AssetRef } from '../../functions/_shared/userData';
 import { esc } from '../lib/dom';
 import { level, price as fmtPrice } from '../lib/format';
-import { crypto, equities, quotes, type Coin, type Equity, eth } from './market';
+import { crypto, equities, quotes, type Coin, type Equity, bnb, eth } from './market';
 
 export type { AssetKind, AssetRef };
 
@@ -153,9 +153,11 @@ export function lookup(ref: AssetRef): Priced {
   if (ref.cg) {
     const c = cs.byId.get(ref.cg);
     if (c) return fromCoin(ref, c, cs.status !== 'ok');
-    // Smaller Ethereum tokens are outside the main list but in the Ethereum one.
-    const e = eth.get().byId.get(ref.cg);
-    if (e) return fromCoin(ref, e, eth.get().status !== 'ok');
+    // Smaller chain tokens are outside the main list but in their chain's one.
+    for (const list of [eth, bnb]) {
+      const e = list.get().byId.get(ref.cg);
+      if (e) return fromCoin(ref, e, list.get().status !== 'ok');
+    }
     return { ref, price: null, change: null, prevClose: null, marketCap: null, image: null, ok: false, stale: false, source: 'CoinGecko' };
   }
   const y = ref.yahoo ?? '';
