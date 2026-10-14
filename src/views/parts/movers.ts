@@ -234,7 +234,7 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
   const tfRow = hasTfBar(cfg.mode) ? `<div class="panel-tools">${tfBar || '<span class="panel-note">Ranked by 24h trading volume</span>'}</div>` : '';
   const rankBar =
     cfg.mode === 'movers_up'
-      ? `<div class="seg seg-sm" role="group" aria-label="Rank by">${([['change', 'Gainers'], ['volume_24h', '<span class="rank-long">Top volume</span><span class="rank-short">Volume</span>']] as const)
+      ? `<div class="seg seg-sm" role="group" aria-label="Rank by">${([['change', '%'], ['volume_24h', 'Volume']] as const)
           .map(([id, label]) => {
             const on = (id === 'change') !== byVolume(cfg);
             return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-rank="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
