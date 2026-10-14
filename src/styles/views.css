@@ -1793,3 +1793,60 @@ td .cell-asset .cell-stack {
   gap: 8px;
   min-width: 0;
 }
+/* Stands in for the timeframe bar when there is none, at the same height. */
+.panel-note {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+/* Movers panels: the title row is as tall as a control, with or without the gainers / top volume switch. */
+.panel .card-title {
+  min-height: 30px;
+  flex: 1 1 0;
+}
+.panel .card-tools {
+  flex-wrap: nowrap;
+}
+.panel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seg-sm {
+  padding: 2px;
+}
+.seg-sm .seg-btn {
+  height: 24px;
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 12px;
+}
+/* On a narrow panel the chain tabs scroll instead of pushing the edit button to a row of its own,
+   and "Top volume" shortens to "Volume" so the title still fits. */
+.panel {
+  container-type: inline-size;
+}
+.panel .panel-tools {
+  flex-wrap: nowrap;
+}
+.panel .panel-tools .seg-scroll {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.rank-short {
+  display: none;
+}
+@container (max-width: 330px) {
+  .rank-long {
+    display: none;
+  }
+  .rank-short {
+    display: inline;
+  }
+  .panel .panel-tools .seg-btn {
+    padding: 0 8px;
+  }
+}
