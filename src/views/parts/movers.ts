@@ -222,22 +222,25 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
         })
         .join('')}</div>`
     : '';
-  const panelTools = isCryptoMovers(cfg.mode)
+  const editBtn = `<button type="button" class="icon-btn icon-btn-sm" data-panel-edit="${side}" aria-label="Change what this panel shows" title="Change what this panel shows">${icon.edit(14)}</button>`;
+  // Crypto movers: the edit button rides on the chain row, so the title row has room for the gainers / top volume switch.
+  const chainBar = isCryptoMovers(cfg.mode)
     ? `<div class="panel-tools"><div class="seg seg-scroll" role="group" aria-label="Chain">${CHAIN_TABS.map(
         (c) => `<button type="button" class="seg-btn${c.id === cfg.chain ? ' is-on' : ''}" data-panel-chain="${side}:${c.id}" aria-pressed="${c.id === cfg.chain ? 'true' : 'false'}" title="${c.title}">${c.label}</button>`,
-      ).join('')}</div>${
-        cfg.mode === 'movers_up'
-          ? `<div class="seg" role="group" aria-label="Rank by">${([['change', 'Gainers'], ['volume_24h', 'Top volume']] as const)
-              .map(([id, label]) => {
-                const on = (id === 'change') !== byVolume(cfg);
-                return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-rank="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
-              })
-              .join('')}</div>`
-          : ''
-      }</div>`
+      ).join('')}</div><span class="grow"></span>${editBtn}</div>`
     : '';
-  // A gainers panel showing top volume says so, unless its owner named it themselves.
-  const title = byVolume(cfg) && (cfg.title === AUTO_TITLE.movers_up || cfg.title === DEFAULT_PANEL_LEFT.title) ? 'Crypto top volume' : cfg.title;
+  // The timeframe row sits right above the columns. When there is no timeframe to pick it keeps
+  // its height, so a gainers and a losers panel side by side always line up.
+  const tfRow = hasTfBar(cfg.mode) ? `<div class="panel-tools">${tfBar || '<span class="panel-note">Ranked by 24h trading volume</span>'}</div>` : '';
+  const rankBar =
+    cfg.mode === 'movers_up'
+      ? `<div class="seg seg-sm" role="group" aria-label="Rank by">${([['change', 'Gainers'], ['volume_24h', '<span class="rank-long">Top volume</span><span class="rank-short">Volume</span>']] as const)
+          .map(([id, label]) => {
+            const on = (id === 'change') !== byVolume(cfg);
+            return `<button type="button" class="seg-btn${on ? ' is-on' : ''}" data-panel-rank="${side}:${id}" aria-pressed="${on ? 'true' : 'false'}">${label}</button>`;
+          })
+          .join('')}</div>`
+      : '';
   const metricLabel = hasSort(cfg.mode) && cfg.sort === 'mcap' ? 'Market cap' : hasSort(cfg.mode) && cfg.sort.startsWith('volume') ? 'Volume' : changeLabel;
   const body = rows.length
     ? rows
@@ -256,12 +259,13 @@ function panelHtml(side: Side, cfg: PanelConfig): string {
       : `<li class="mover-empty">${esc(empty)}</li>`;
   const tone = cfg.mode.endsWith('_up') ? 'up' : cfg.mode.endsWith('_down') ? 'down' : 'brand';
   return html`<div class="card-head">
-      <h2 class="card-title"><span class="panel-dot ${byVolume(cfg) ? 'brand' : tone}"></span>${title}</h2>
+      <h2 class="card-title"><span class="panel-dot ${byVolume(cfg) ? 'brand' : tone}"></span><span class="panel-name" title="${cfg.title}">${cfg.title}</span></h2>
       <div class="card-tools">
-        ${raw(tfBar)}
-        <button type="button" class="icon-btn icon-btn-sm" data-panel-edit="${side}" aria-label="Change what this panel shows" title="Change what this panel shows">${raw(icon.edit(14))}</button>
+        ${raw(rankBar)}
+        ${raw(chainBar ? '' : editBtn)}
       </div>
-      ${raw(panelTools)}
+      ${raw(chainBar)}
+      ${raw(tfRow)}
     </div>
     <div class="mover-cols"><span>Asset</span><span>Price</span><span>${metricLabel}</span></div>
     <ol class="movers${cfg.size > 10 ? ' is-long scroll' : ''}">${raw(body)}</ol>
