@@ -39,7 +39,7 @@ const APP_PAGES: Page[] = [
     view: 'overview',
     title: 'Market Check — Live crypto, stocks, commodities & headlines',
     description:
-      'Market Check is a free dashboard of live crypto, stock, ETF, index and commodity prices with the headlines that move them. Track a watchlist and portfolio. Not financial advice.',
+      'Market Check: free live crypto, stock, ETF, index and commodity prices with headlines that move them. Track a watchlist and portfolio. Not financial advice.',
     body: intro('Market Check', [
       'A free dashboard of live market prices and the headlines that move them: crypto, US stocks and ETFs, indexes, gold, silver and oil, on one page.',
       'See what is moving right now, follow your own watchlist and portfolio, and pick the tiles you care about. Data comes from public third-party sources and may be delayed. Not financial advice.',
