@@ -49,7 +49,7 @@ Sign-in is not expected to work on a preview address: the Google and Microsoft s
 
 ## What the hosting files do
 
-- `public/_routes.json` keeps requests for scripts, styles, fonts and images away from Functions, so they do not count against the daily Functions allowance. Pages and `/api/*` still go through `functions/_middleware.ts`.
+- `public/_routes.json` sends only `/api/*` and `/quote/*` to Functions (`functions/_middleware.ts` runs only there). Every other page is served as a static file and does not count against the daily Functions allowance. www → marketcheck.money for pages is a Cloudflare zone redirect rule; pages.dev copies get `X-Robots-Tag: noindex` from `public/_headers`.
 - `public/_headers` sets caching. Files under `/assets/` have a hash in their name and are cached for a year.
 - `dist/404.html` is written by the build. Its presence tells Pages to answer unknown addresses with a real 404 instead of the home page.
 - `dist/sitemap.xml` is written by the build from the page list in `src/site/pages.ts`.

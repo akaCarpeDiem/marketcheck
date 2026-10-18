@@ -29,3 +29,12 @@
 /ads.txt
   Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=300, must-revalidate
+
+# pages.dev copies (production alias and preview branches) are served without a function now,
+# so keep them out of search here. www and *.pages.dev → marketcheck.money redirects for /api and
+# /quote still run in functions/_middleware.ts; www for pages is a zone redirect rule.
+https://market-check.pages.dev/*
+  X-Robots-Tag: noindex, nofollow
+
+https://:alias.market-check.pages.dev/*
+  X-Robots-Tag: noindex, nofollow
