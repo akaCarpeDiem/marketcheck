@@ -5,7 +5,7 @@
  * Prefers “big stories”: major outlets, YT view floors, cross-feed title consensus.
  */
 
-import { makeCache, mapPool } from './cache';
+import { makeCache, mapPool, sleep } from './cache';
 import { PODCAST_SHOWS, TOPIC_IDS, type ContentType, type PodcastShow, type TopicId } from './newsTopics';
 
 /** News is organised by the ten topics in newsTopics.ts. (The name "category" is kept from the older code.) */
@@ -1686,41 +1686,79 @@ export const ALL_HEADLINE_CATEGORIES: HeadlineCategory[] = TOPIC_IDS;
 export type PodcastEpisode = HeadlineItem & { show: string };
 
 export type PodcastsResult = {
-  /** Shows that answered, in directory order, each with its latest episodes. */
-  shows: Array<PodcastShow & { url: string; episodes: PodcastEpisode[] }>;
+  /** Shows in directory order, each with its latest episodes. */
+  shows: Array<PodcastShow & { url: string; episodes: PodcastEpisode[]; updatedAt: string }>;
   /** The newest episodes across all shows. */
   latest: PodcastEpisode[];
-  /** Shows whose feed could not be read this time. */
+  /** Shows whose feed could not be read this time (their last good episodes may still be listed). */
   failed: string[];
+  /** How many show feeds answered this time. */
+  answered: number;
   fetchedAt: string;
 };
 
 /**
- * The podcast hub: every show in PODCAST_SHOWS with its recent episodes, read
- * from the show's YouTube channel feed (small and keyless). One request per
- * show and no fallback requests, so the whole directory fits in one invocation.
+ * Extra feed requests one podcasts load may make after first tries fail. One request per
+ * show plus this budget stays under the 50 outside requests a Functions invocation may make.
  */
-export async function getPodcasts(): Promise<PodcastsResult> {
+const PODCAST_RETRY_BUDGET = 15;
+/** How long a show's last good episodes may stand in while its feed is not answering. */
+const PODCAST_KEEP_MS = 7 * 86_400_000;
+
+/** The same channel's uploads as a playlist feed; UULF lists normal videos (no Shorts or lives). */
+function ytUploads(channelId: string): string {
+  return `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(2)}`;
+}
+
+/**
+ * The podcast hub: every show in PODCAST_SHOWS with its recent episodes, read
+ * from the show's YouTube channel feed (small and keyless).
+ *
+ * YouTube's feed endpoint drops out for hours most days, answering 404 or 500 for
+ * valid channels. So a failed show gets one retry on its uploads-playlist feed
+ * (within a fixed budget), and a show that still does not answer keeps its last
+ * good episodes from `prev` for up to a week instead of vanishing from the hub.
+ */
+export async function getPodcasts(prev?: PodcastsResult | null): Promise<PodcastsResult> {
+  let retries = PODCAST_RETRY_BUDGET;
   const results = await mapPool(PODCAST_SHOWS, 6, async (show) => {
     const feed: FeedDef = { name: show.name, ...ytMeta(show.channel, show.name), trustedTopic: true };
-    const { items, ok } = await fetchAtomFeed(feed);
-    return { show, items, ok };
+    let res = await fetchAtomFeed(feed);
+    if (!res.ok && retries > 0) {
+      retries--;
+      await sleep(250);
+      res = await fetchAtomFeed({ ...feed, url: ytUploads(show.channel) });
+    }
+    return { show, items: res.items, ok: res.ok };
   });
+  const now = Date.now();
+  const fetchedAt = new Date(now).toISOString();
+  const prevById = new Map((prev?.shows ?? []).map((s) => [s.id, s]));
   const shows: PodcastsResult['shows'] = [];
   const failed: string[] = [];
   const all: PodcastEpisode[] = [];
+  let answered = 0;
   for (const { show, items, ok } of results) {
     const episodes: PodcastEpisode[] = (ok ? items : [])
       .filter((it) => !!it.image && !/\/shorts\//i.test(it.link))
       .sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0))
       .slice(0, 6)
       .map((it) => ({ ...it, source: show.name, topic: show.topic, type: 'podcast' as const, show: show.id }));
-    if (!episodes.length) {
-      failed.push(show.name);
+    if (ok) answered++;
+    else failed.push(show.name);
+    const url = `https://www.youtube.com/channel/${show.channel}`;
+    if (episodes.length) {
+      shows.push({ ...show, url, episodes: episodes.slice(0, 4), updatedAt: fetchedAt });
+      all.push(...episodes);
       continue;
     }
-    shows.push({ ...show, url: `https://www.youtube.com/channel/${show.channel}`, episodes: episodes.slice(0, 4) });
-    all.push(...episodes);
+    // Not answering (or nothing usable): keep the last good episodes for a while.
+    const old = prevById.get(show.id);
+    const oldAt = old?.updatedAt ? Date.parse(old.updatedAt) : NaN;
+    if (old?.episodes?.length && Number.isFinite(oldAt) && now - oldAt < PODCAST_KEEP_MS) {
+      shows.push({ ...show, url, episodes: old.episodes, updatedAt: old.updatedAt });
+      all.push(...old.episodes);
+    }
   }
   // Newest first, but no more than two in a row from one show at the top of the list.
   all.sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0));
@@ -1730,5 +1768,5 @@ export async function getPodcasts(): Promise<PodcastsResult> {
     perShow.set(e.show, n);
     return n <= 3;
   });
-  return { shows, latest: latest.slice(0, 36), failed, fetchedAt: new Date().toISOString() };
+  return { shows, latest: latest.slice(0, 36), failed, answered, fetchedAt };
 }
