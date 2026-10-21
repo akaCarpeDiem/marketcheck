@@ -1710,6 +1710,15 @@ function ytUploads(channelId: string): string {
   return `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(2)}`;
 }
 
+function podcastThumb(url: string): string {
+  return url.replace(/^https:\/\/i\d?\.ytimg\.com\/vi\/([\w-]+)\/\w+\.jpg(\?.*)?$/i, 'https://i.ytimg.com/vi/$1/hqdefault.jpg');
+}
+
+/** An episode the hub can show: has a picture and is not a Short. */
+function usableEpisode(it: HeadlineItem): boolean {
+  return !!it.image && !/\/shorts\//i.test(it.link);
+}
+
 /**
  * The podcast hub: every show in PODCAST_SHOWS with its recent episodes, read
  * from the show's YouTube channel feed (small and keyless).
@@ -1718,16 +1727,20 @@ function ytUploads(channelId: string): string {
  * valid channels. So a failed show gets one retry on its uploads-playlist feed
  * (within a fixed budget), and a show that still does not answer keeps its last
  * good episodes from `prev` for up to a week instead of vanishing from the hub.
+ * A channel whose recent uploads are all Shorts is read from the same playlist.
  */
 export async function getPodcasts(prev?: PodcastsResult | null): Promise<PodcastsResult> {
   let retries = PODCAST_RETRY_BUDGET;
   const results = await mapPool(PODCAST_SHOWS, 6, async (show) => {
     const feed: FeedDef = { name: show.name, ...ytMeta(show.channel, show.name), trustedTopic: true };
     let res = await fetchAtomFeed(feed);
-    if (!res.ok && retries > 0) {
+    // Also when the channel feed answered with only Shorts (its last 15 uploads): the uploads
+    // playlist lists full videos only.
+    if ((!res.ok || !res.items.some(usableEpisode)) && retries > 0) {
       retries--;
-      await sleep(250);
-      res = await fetchAtomFeed({ ...feed, url: ytUploads(show.channel) });
+      if (!res.ok) await sleep(250);
+      const alt = await fetchAtomFeed({ ...feed, url: ytUploads(show.channel) });
+      if (alt.ok && (!res.ok || alt.items.some(usableEpisode))) res = alt;
     }
     return { show, items: res.items, ok: res.ok };
   });
@@ -1740,10 +1753,12 @@ export async function getPodcasts(prev?: PodcastsResult | null): Promise<Podcast
   let answered = 0;
   for (const { show, items, ok } of results) {
     const episodes: PodcastEpisode[] = (ok ? items : [])
-      .filter((it) => !!it.image && !/\/shorts\//i.test(it.link))
+      .filter(usableEpisode)
       .sort((a, b) => (b.publishedMs ?? 0) - (a.publishedMs ?? 0))
       .slice(0, 6)
-      .map((it) => ({ ...it, source: show.name, topic: show.topic, type: 'podcast' as const, show: show.id }));
+      // hq720 is missing for many audio-first uploads (a 404 and a broken card); hqdefault always exists,
+      // and the 16:9 card crops its letterbox bars.
+      .map((it) => ({ ...it, image: podcastThumb(it.image!), source: show.name, topic: show.topic, type: 'podcast' as const, show: show.id }));
     if (ok) answered++;
     else failed.push(show.name);
     const url = `https://www.youtube.com/channel/${show.channel}`;

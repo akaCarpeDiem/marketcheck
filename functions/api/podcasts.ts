@@ -13,7 +13,7 @@ import { cacheGet, cached, jsonResponse, type WaitUntil } from '../_shared/edgeC
 import { PODCAST_SHOWS, TOPICS } from '../_shared/newsTopics';
 import { getPodcasts, type PodcastsResult } from '../_shared/rssHeadlines';
 
-const KEY = 'podcasts:v2';
+const KEY = 'podcasts:v3';
 
 export async function onRequestGet(context: { request: Request; waitUntil?: WaitUntil }): Promise<Response> {
   try {
@@ -38,6 +38,7 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
         // Topics that have at least one show, in the site's order, for the filter.
         topics: TOPICS.filter((t) => used.has(t.id)).map((t) => ({ id: t.id, label: t.label, short: t.short })),
         failed: hit.data.failed,
+        answered: hit.data.answered,
         stale: hit.stale,
         fetchedAt: hit.data.fetchedAt,
       },
