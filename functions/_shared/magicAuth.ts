@@ -16,7 +16,16 @@ type ChallengeRecord = {
   token: string;
   exp: number;
   attempts: number;
+  /** Set on records made since links carry their record's key (see createChallenge). */
+  email?: string;
 };
+
+/**
+ * Sign-in links are "<email hash>.<random>": the callback finds the challenge record from the link itself.
+ * Older links (no dot) were looked up through a separate `magictok:` entry; those still work until they expire.
+ * Saves one KV write and one KV delete per sign-in (the free plan allows 1,000 KV writes+deletes a day).
+ */
+const LINK_SEP = '.';
 
 type RateRecord = { count: number; exp: number };
 
@@ -121,17 +130,14 @@ export async function createChallenge(
   if (!allowed) return { ok: false, reason: 'rate_limited' };
 
   const code = randomDigits(6);
-  const linkToken = randomToken();
+  const linkToken = `${eHash}${LINK_SEP}${randomToken()}`;
   const codeHash = await hashCode(code, env.SESSION_SECRET);
   const exp = Math.floor(Date.now() / 1000) + CHALLENGE_TTL;
-  const record: ChallengeRecord = { codeHash, token: linkToken, exp, attempts: 0 };
+  const record: ChallengeRecord = { codeHash, token: linkToken, exp, attempts: 0, email };
 
   try {
+    // One write: the link names this record, so no reverse-lookup entry is needed.
     await env.LAYOUTS.put(`magic:${eHash}`, JSON.stringify(record), {
-      expirationTtl: CHALLENGE_TTL,
-    });
-    // Reverse lookup for magic-link callback
-    await env.LAYOUTS.put(`magictok:${linkToken}`, email, {
       expirationTtl: CHALLENGE_TTL,
     });
   } catch (e) {
@@ -190,9 +196,9 @@ export async function verifyCode(
     return { ok: false, reason: 'invalid' };
   }
 
-  // Consume challenge + reverse token (best-effort; both also expire via TTL)
+  // Consume challenge (+ the reverse entry older links had); best-effort, both also expire via TTL
   await safeDelete(env.LAYOUTS, key);
-  await safeDelete(env.LAYOUTS, `magictok:${rec.token}`);
+  if (!rec.token.includes(LINK_SEP)) await safeDelete(env.LAYOUTS, `magictok:${rec.token}`);
 
   return { ok: true, session: sessionFields(email) };
 }
@@ -202,15 +208,22 @@ export async function verifyLinkToken(
   token: string,
 ): Promise<string | null> {
   if (!env.LAYOUTS || !token || token.length < 16) return null;
+  const sep = token.indexOf(LINK_SEP);
+  const legacy = sep < 0;
   let email: string | null = null;
-  try {
-    email = await env.LAYOUTS.get(`magictok:${token}`);
-  } catch {
-    return null;
+  let eHash: string;
+  if (legacy) {
+    try {
+      email = await env.LAYOUTS.get(`magictok:${token}`);
+    } catch {
+      return null;
+    }
+    if (!email) return null;
+    eHash = await emailHash(email);
+  } else {
+    eHash = token.slice(0, sep);
+    if (!/^[0-9a-f]{64}$/.test(eHash)) return null;
   }
-  if (!email) return null;
-
-  const eHash = await emailHash(email);
   const key = `magic:${eHash}`;
   let rec: ChallengeRecord | null = null;
   try {
@@ -218,16 +231,18 @@ export async function verifyLinkToken(
   } catch {
     return null;
   }
-  if (!rec || rec.token !== token) return null;
+  if (!rec || !timingSafeEqual(rec.token, token)) return null;
+  if (!legacy) email = rec.email ?? null;
+  if (!email) return null;
   const now = Math.floor(Date.now() / 1000);
   if (rec.exp < now) {
     await safeDelete(env.LAYOUTS, key);
-    await safeDelete(env.LAYOUTS, `magictok:${token}`);
+    if (legacy) await safeDelete(env.LAYOUTS, `magictok:${token}`);
     return null;
   }
 
   await safeDelete(env.LAYOUTS, key);
-  await safeDelete(env.LAYOUTS, `magictok:${token}`);
+  if (legacy) await safeDelete(env.LAYOUTS, `magictok:${token}`);
   return email;
 }
 

@@ -6,7 +6,7 @@
  */
 import { CG_MARKETS, CG_MARKETS_CHAIN, CHAIN_FROM_MAIN_MIN, chainCoins, chainFromMain, coinsFromCoinGecko, withIntradayFrom, type Chain, type Coin } from '../../functions/_shared/cryptoUniverse';
 import type { Equity } from '../../functions/_shared/equityUniverse';
-import { marketStatus } from '../../functions/_shared/marketCalendar';
+import { etParts, marketStatus } from '../../functions/_shared/marketCalendar';
 import { getJson } from '../lib/api';
 import { readJson, writeJson } from '../lib/storage';
 import { poll, type Poller } from '../lib/poll';
@@ -466,15 +466,25 @@ export async function refreshMood(): Promise<void> {
 
 const override = Number(import.meta.env.VITE_REFRESH_MS) || 0;
 
+/** Futures and FX stop from Friday 5 pm to Sunday 6 pm New York time. */
+function futuresWeekend(at: number = Date.now()): boolean {
+  const p = etParts(at);
+  return p.dow === 6 || (p.dow === 5 && p.minutes >= 17 * 60) || (p.dow === 0 && p.minutes < 18 * 60);
+}
+
 /** How often to refresh, by how much can be changing right now. */
 const pace = {
   crypto: () => override || 60_000,
   equities: () => {
-    const s = marketStatus().state;
-    return s === 'open' ? override || 60_000 : s === 'pre' || s === 'post' ? 5 * 60_000 : 10 * 60_000;
+    const st = marketStatus();
+    if (st.state === 'open') return override || 60_000;
+    if (st.state === 'pre' || st.state === 'post') return 5 * 60_000;
+    // Closed (overnight, weekends, holidays): no stock trades until the next session starts, so check
+    // again then, and at least every 30 minutes in case of a late correction.
+    return Math.max(60_000, Math.min(30 * 60_000, (st.nextChange ?? 0) - Date.now() + 5_000));
   },
-  // Futures and FX trade nearly round the clock, so these keep a steady pace.
-  quotes: () => override || (marketStatus().open ? 30_000 : 60_000),
+  // Futures and FX trade nearly round the clock, so these keep a steady pace, except over their weekend break.
+  quotes: () => override || (marketStatus().open ? 30_000 : futuresWeekend() ? 10 * 60_000 : 60_000),
 };
 
 let pollers: Poller[] = [];

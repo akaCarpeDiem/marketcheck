@@ -14,13 +14,18 @@ type Job = {
 };
 
 const jobs = new Set<Job>();
+const ALIGN_MS = 5_000;
 
 function schedule(job: Job): void {
   if (job.stopped) return;
   clearTimeout(job.timer);
   if (document.hidden) return;
   const every = typeof job.every === 'function' ? job.every() : job.every;
-  const wait = Math.max(0, job.last + every - Date.now());
+  let due = job.last + every;
+  // Refreshes that fall due within a few seconds of each other run together (on a shared 5 s grid), so the
+  // browser sends them as one /api/batch request. Rounding to the nearest slot keeps the average pace the same.
+  if (every >= 20_000 && job.last > 0) due = Math.round(due / ALIGN_MS) * ALIGN_MS;
+  const wait = Math.max(0, due - Date.now());
   job.timer = setTimeout(() => void tick(job), wait);
 }
 
