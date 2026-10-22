@@ -265,10 +265,8 @@ export function startShell(): void {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  // Headlines for the ticker: one category now, the others a little later.
-  void loadNews('markets');
-  setTimeout(() => void loadNews('crypto'), 2500);
-  setTimeout(() => void loadNews('business'), 6000);
+  // Headlines for the ticker: all three categories at once, so they travel in the page's first /api/batch request.
+  for (const c of TICKER_CATS) void loadNews(c);
   setInterval(() => {
     if (document.hidden) return;
     for (const c of TICKER_CATS) void loadNews(c);
