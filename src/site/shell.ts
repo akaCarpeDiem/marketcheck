@@ -19,6 +19,8 @@ export const NAV: { id: NavId; href: string; label: string; short: string; icon:
 
 export const FOOT_LINKS: { href: string; label: string }[] = [
   { href: '/podcasts/', label: 'Podcasts' },
+  { href: '/learn/', label: 'Learn' },
+  { href: '/faq/', label: 'FAQ' },
   { href: '/about/', label: 'About' },
   { href: '/sources/', label: 'Sources & methods' },
   { href: '/privacy/', label: 'Privacy' },

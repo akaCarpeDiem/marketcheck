@@ -59,6 +59,9 @@ function show(view: ViewId, restoreScroll: number | null): void {
     document.getElementById('app')?.setAttribute('data-view', view);
     currentView.set(view);
     document.title = TITLES[view];
+    // The written guide under the view belongs to the page that was loaded; hide it on other views.
+    const guide = document.getElementById('page-guide');
+    if (guide) guide.hidden = guide.dataset.for !== view;
     document
       .querySelector('link[rel="canonical"]')
       ?.setAttribute('href', `https://marketcheck.money${pathForView(view)}`);

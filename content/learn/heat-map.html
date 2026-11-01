@@ -1,0 +1,51 @@
+<h1>How to read a heat map and a bubble map</h1>
+<p class="meta">A guide to the <a href="/heatmap/">heat map</a> page. About a five-minute read.</p>
+
+<p>A table of 250 coins or 100 stocks is accurate but hard to take in. A heat map trades a little precision for speed: it turns every asset into a shape, so you can see in a second or two whether the market is broadly up, broadly down, or split. This guide explains what the shapes and colours mean on Market Check, and what a heat map can and cannot tell you.</p>
+
+<h2>Two encodings: size and colour</h2>
+<p>Every tile or bubble carries two pieces of information.</p>
+<ul>
+  <li><strong>Colour shows direction and strength.</strong> Green means the price is up over the window you picked, red means it is down. The deeper the colour, the bigger the move. A tile close to neutral moved very little.</li>
+  <li><strong>Size shows weight.</strong> You choose what size means. Sized by <em>market value</em>, a tile is as big as the company, coin or fund is valuable, so the giants dominate. Sized by <em>move</em>, a tile is as big as its percentage change, so the biggest movers dominate regardless of how large they are.</li>
+</ul>
+<p>The two settings answer different questions. Sizing by market value asks "what happened to the money in this market?". Sizing by move asks "where was the action?". It is worth flipping between them: a day can look calm by value, because the largest names barely moved, and busy by move, because a handful of smaller names jumped.</p>
+
+<h2>Tiles versus bubbles</h2>
+<p>The heat map (rectangles) packs every tile edge to edge, so the whole box is used and areas compare easily side by side. The bubble map draws circles. Circles are easier to label and to pick out individually, but harder to compare precisely, because people tend to underestimate how much bigger one circle is than another. On Market Check bubble <em>areas</em> are proportional to the value they show, with a minimum size so the smallest assets stay readable. That minimum means very small bubbles are slightly larger than strict proportion would make them.</p>
+
+<h2>A worked example</h2>
+<p>Suppose a stock heat map sized by market value shows one very large green tile, several medium red tiles and a scattering of small red tiles. Reading it:</p>
+<ol>
+  <li>Most tiles are red, so <strong>most companies fell</strong>.</li>
+  <li>The largest tile is green, so the single most valuable company rose.</li>
+  <li>An index weighted by market value, such as the S&amp;P 500, could still finish flat or even higher, because that one company counts for far more than the small ones.</li>
+</ol>
+<p>This is called weak <em>breadth</em>: the average looks fine, but most members are falling. Sizing the same map by move, or counting green against red, makes the difference obvious. A table sorted by change cannot show you this at a glance; a heat map can.</p>
+
+<h2>What decides which assets appear</h2>
+<p>A heat map is only as useful as its list. On Market Check:</p>
+<ul>
+  <li>Crypto maps draw from the 250 largest coins by market cap. Stablecoins, wrapped copies of other coins and tokenized funds are left out, because their price is designed not to move and they would only fill space.</li>
+  <li>Stock and fund maps draw from the fixed lists on the <a href="/markets/">markets page</a>: more than 100 large US-listed companies and 50 major funds.</li>
+  <li>Solana tokens must clear a minimum market cap and trading volume. Very thinly traded tokens can show enormous percentage moves on almost no money, and including them would make every map look like a casino.</li>
+</ul>
+<p>The full rules are on the <a href="/sources/">sources and methods</a> page.</p>
+
+<h2>What a heat map cannot tell you</h2>
+<ul>
+  <li><strong>Why something moved.</strong> Colour shows that a price changed, not the reason. Check the <a href="/news/">headlines</a>, but be careful about assuming the nearest headline is the cause (see <a href="/learn/reading-market-news/">reading market news</a>).</li>
+  <li><strong>Whether a move will continue.</strong> A deep green tile today says nothing reliable about tomorrow.</li>
+  <li><strong>Volume and liquidity.</strong> Two tiles of the same colour can rest on very different amounts of trading.</li>
+  <li><strong>Anything outside the window.</strong> A stock that is red on the day can be deep green on the year. Change the window before drawing conclusions.</li>
+</ul>
+
+<h2>Quick checklist</h2>
+<ol>
+  <li>Check the window (1h, 24h, 1D, 1W and so on) first.</li>
+  <li>Check what size means: value or move.</li>
+  <li>Look at the overall balance of green and red before looking at any single tile.</li>
+  <li>Click a tile to open the asset and see its chart before reading much into one move.</li>
+</ol>
+<p>Prices on the heat map come from public third-party sources and can be delayed. Nothing on this page is a recommendation to buy or sell anything.</p>
+<p>Related: <a href="/learn/market-cap/">Market cap, explained</a> · <a href="/learn/price-changes/">How price changes are measured</a> · <a href="/learn/">All guides</a></p>

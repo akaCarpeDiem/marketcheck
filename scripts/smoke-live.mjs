@@ -61,6 +61,8 @@ for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'],
 results.push(await check('/privacy/', { expectStatus: 200, expectIncludes: ['Privacy'] }));
 results.push(await check('/terms/', { expectStatus: 200, expectIncludes: ['Terms'] }));
 results.push(await check('/about/', { expectStatus: 200, expectIncludes: ['About'] }));
+results.push(await check('/learn/', { expectStatus: 200, expectIncludes: ['Learn'] }));
+results.push(await check('/faq/', { expectStatus: 200, expectIncludes: ['Frequently asked questions'] }));
 results.push(await check('/contact/', { expectStatus: 200, expectIncludes: ['Contact'] }));
 results.push(await check('/robots.txt', { expectIncludes: ['Sitemap: https://marketcheck.money/sitemap.xml'] }));
 results.push(await check('/sitemap.xml', { expectXml: true, expectIncludes: ['https://marketcheck.money/'] }));
