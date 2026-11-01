@@ -106,6 +106,15 @@ export async function build({ dev = process.argv.includes('--dev') } = {}) {
     for (const f of await readdir(contentDir)) {
       if (f.endsWith('.html')) content[f.replace(/\.html$/, '')] = await readFile(path.join(contentDir, f), 'utf8');
     }
+    // content/learn/*.html → /learn/<name>/ (index.html → /learn/).
+    const learnDir = path.join(contentDir, 'learn');
+    if (existsSync(learnDir)) {
+      for (const f of await readdir(learnDir)) {
+        if (!f.endsWith('.html')) continue;
+        const name = f.replace(/\.html$/, '');
+        content[name === 'index' ? 'learn' : `learn/${name}`] = await readFile(path.join(learnDir, f), 'utf8');
+      }
+    }
   }
 
   const today = new Date().toISOString().slice(0, 10);

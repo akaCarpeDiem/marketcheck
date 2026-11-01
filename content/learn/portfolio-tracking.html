@@ -1,0 +1,47 @@
+<h1>Tracking a portfolio: value, day change and profit or loss</h1>
+<p class="meta">The arithmetic behind the <a href="/portfolio/">portfolio page</a>, and what a simple tracker deliberately leaves out.</p>
+
+<p>The portfolio page turns a list of holdings you type in into a few totals: what it is worth now, how much that changed today, and how far ahead or behind you are. None of these needs a connection to a broker. They are worked out in your browser from your numbers and the latest public prices. Knowing exactly how makes it easier to trust them, and to spot when they are off.</p>
+
+<h2>What you enter</h2>
+<ul>
+  <li><strong>Units</strong>: how many shares, fund units or coins you hold. Fractions are fine.</li>
+  <li><strong>Average cost</strong> (optional): the average price you paid per unit. If you bought at different prices, this is the total you paid divided by the total units.</li>
+</ul>
+<p>Market Check never asks for account numbers, never connects to a brokerage, bank or wallet, and cannot trade. Without an account the list stays in your browser; with an account it is saved so it follows you between devices. See the <a href="/privacy/">privacy policy</a>.</p>
+
+<h2>The four numbers</h2>
+<div class="panel">
+  <p><strong>Value</strong> = units × latest price</p>
+  <p><strong>Today</strong> = units × (latest price − previous close). For coins, "previous close" is the price 24 hours ago.</p>
+  <p><strong>Gain</strong> = value − (units × average cost)</p>
+  <p><strong>Weight</strong> = this holding's value ÷ the value of everything priced</p>
+</div>
+<p><strong>Worked example.</strong> You hold 10 shares bought at an average of $180. Yesterday they closed at $195; now they are at $198.</p>
+<ul>
+  <li>Value: 10 × $198 = $1,980</li>
+  <li>Today: 10 × ($198 − $195) = +$30, which is about +1.5% on yesterday's $1,950</li>
+  <li>Gain: $1,980 − (10 × $180) = +$180, which is +10% on the $1,800 you paid</li>
+</ul>
+<p>Holdings without an average cost still count towards value and today's change, but are left out of the gain figure, and the page tells you how many were counted.</p>
+
+<h2>Cost basis and why it matters</h2>
+<p>Your average cost is often called your <em>cost basis</em>. It is what turns a price into a gain or loss for you personally. Two people holding the same stock can be well ahead and well behind at the same moment, because they bought at different times. Keep it up to date when you buy more: buying 10 more shares at $210 raises the average cost of the 20 shares to $195.</p>
+<p>A gain here is <strong>unrealised</strong>: it exists only on paper until you sell. It can shrink or disappear before then.</p>
+
+<h2>What a simple tracker leaves out</h2>
+<ul>
+  <li><strong>Dividends and interest.</strong> Payments you received are not added back, so for income-paying stocks and funds the true return is higher than shown.</li>
+  <li><strong>Fees and taxes.</strong> Commissions, fund fees and tax are not deducted unless you included them in your average cost.</li>
+  <li><strong>Cash.</strong> Money waiting in your account is not part of the total.</li>
+  <li><strong>Currency.</strong> Prices are shown in the currency each asset is quoted in.</li>
+  <li><strong>Timing of deposits.</strong> The gain figure does not account for when you added money, so it is not the same as the "time-weighted" or "money-weighted" returns a broker or fund reports.</li>
+</ul>
+<p>For tax, accounting or anything official, use your broker's statements. Market Check's figures are estimates built from third-party data that can be delayed or wrong.</p>
+
+<h2>Watchlist versus portfolio</h2>
+<p>The watchlist is simply a list of things you want to keep an eye on, with no quantities. It is the better choice for assets you are curious about but do not hold, and it keeps the portfolio totals honest.</p>
+
+<h2>Using weight to see concentration</h2>
+<p>The weight column is one of the most useful and least looked-at numbers. If one holding is 60% of the total, that one asset largely decides how the whole portfolio does. That is not necessarily wrong, but it is worth knowing. Nothing here is financial advice.</p>
+<p>Related: <a href="/learn/price-changes/">How price changes are measured</a> · <a href="/learn/market-cap/">Market cap, explained</a> · <a href="/learn/">All guides</a></p>

@@ -1,0 +1,38 @@
+<h1>Price changes: 1h, 24h, 1D, 1W, YTD and the rest</h1>
+<p class="meta">How every percentage on Market Check is measured, and why two sites can show different numbers for the same asset.</p>
+
+<p>"Up 3%" sounds like a simple fact. It is really an answer to two hidden questions: up 3% <em>compared with what price</em>, and <em>measured from when</em>? Different sites answer them differently, which is the most common reason a figure here does not match your broker's app. This guide sets out the arithmetic and the conventions.</p>
+
+<h2>The arithmetic</h2>
+<p>A percentage change is the new price minus the old price, divided by the old price:</p>
+<div class="panel"><p><strong>change % = (latest price − reference price) ÷ reference price × 100</strong></p></div>
+<p>If a stock closed yesterday at $200 and trades now at $206, it is up (206 − 200) ÷ 200 = 3%. If it falls back to $200 tomorrow, that is a fall of 6 ÷ 206, about 2.9%, not 3%, because the reference price is now higher.</p>
+<p>That asymmetry matters more as moves get larger. A fall of 50% needs a rise of 100% to get back to where it started. A fall of 90% needs a rise of 900%. This is why a coin that is "up 80% this month" after a long slide can still be far below where it was a year ago.</p>
+
+<h2>Crypto windows are rolling</h2>
+<p>Crypto trades around the clock, every day of the year, so there is no "close". For coins, Market Check shows <strong>1h, 24h, 7d, 30d and 1y</strong> as rolling windows that end now, as reported by CoinGecko. "24h" at 3 p.m. means "since 3 p.m. yesterday". It is not "today" in any calendar sense, and it changes every minute even if the price stands still, because the starting point keeps sliding forward.</p>
+
+<h2>Stock windows are anchored to closes</h2>
+<p>Stocks, funds, indexes and commodities trade in sessions, so their windows are anchored to official closing prices:</p>
+<ul>
+  <li><strong>1D</strong> compares the latest price with the previous session's official close. Before the open and at weekends, it shows the last full session's change.</li>
+  <li><strong>1W</strong> and <strong>1M</strong> compare with the close 7 and 30 calendar days earlier, using the nearest trading day on or before that date.</li>
+  <li><strong>YTD</strong> (year to date) compares with the last close of the previous year.</li>
+  <li><strong>1Y</strong> compares with the close one year ago.</li>
+</ul>
+<p>So "1D" for a stock and "24h" for a coin are not the same measurement, even if they are shown side by side. On a Monday morning, a stock's 1D still describes Friday's session, while a coin's 24h covers Sunday into Monday.</p>
+
+<h2>Why your broker may show something different</h2>
+<ul>
+  <li><strong>Delay.</strong> Free public data, including what Market Check uses, can run behind the exchange. Your broker's live quote is the one to trust.</li>
+  <li><strong>Extended hours.</strong> Some apps include pre-market and after-hours trades in the day's change; others freeze at the 4:00 p.m. close until the next session.</li>
+  <li><strong>Reference price.</strong> One app may use the previous official close, another the last trade of the previous day including after-hours.</li>
+  <li><strong>Different venues.</strong> A coin trades on many exchanges at slightly different prices. CoinGecko publishes an aggregate; a single exchange shows its own.</li>
+  <li><strong>Dividends.</strong> Market Check's changes are price changes only. A "total return" figure that adds back dividends will be higher for income-paying stocks and funds.</li>
+</ul>
+<p>Differences of a few hundredths of a percent are normal. A large gap usually means one of the two prices is stale; check the "updated" time at the top of the page.</p>
+
+<h2>Putting a change in context</h2>
+<p>A percentage on its own does not tell you whether a move is large <em>for that asset</em>. A 2% day is unusual for a broad index fund and routine for a small cryptocurrency. Before treating a number as news, compare it with the same asset over longer windows, or open its chart. The <a href="/markets/">markets tables</a> show day, week, month and year side by side for exactly this reason.</p>
+<p>Full details of every window, source and refresh interval are on the <a href="/sources/">sources and methods</a> page. Nothing here is financial advice.</p>
+<p>Related: <a href="/learn/market-hours/">Market hours and holidays</a> · <a href="/learn/heat-map/">Reading a heat map</a> · <a href="/learn/">All guides</a></p>

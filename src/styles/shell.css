@@ -797,3 +797,20 @@ kbd {
     gap: 6px;
   }
 }
+
+/* Written guide under an app page (static text, outside the live view). */
+.page-guide {
+  padding: 0 var(--pad) 24px;
+  border-top: 1px solid var(--line);
+}
+.page-guide[hidden] {
+  display: none;
+}
+.page-guide .prose {
+  padding-top: 24px;
+  padding-bottom: 8px;
+  font-size: 15px;
+}
+.page-guide .prose h2 {
+  margin-top: 0;
+}

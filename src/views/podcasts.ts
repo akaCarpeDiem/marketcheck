@@ -10,7 +10,6 @@ import { ago } from '../lib/format';
 import { icon } from '../lib/icons';
 import { Scope } from '../lib/store';
 import type { View } from '../router';
-import { adSlot, pushAds } from '../ui/ads';
 import { storyCard } from './parts/headlines';
 
 type Filter = 'all' | 'general' | TopicId;
@@ -51,7 +50,6 @@ export const podcastsView: View = {
         <div class="section-title"><h2 id="pod-shows-h">Shows</h2><p data-count></p></div>
         <div class="shows" data-shows></div>
       </section>
-      ${adSlot('podcasts-mid')}
       <section aria-labelledby="pod-latest-h">
         <div class="section-title"><h2 id="pod-latest-h">Newest episodes</h2><p data-latest-note></p></div>
         <div class="stories" data-latest></div>
@@ -114,7 +112,6 @@ export const podcastsView: View = {
     }, 20 * 60_000);
     void loadPodcasts();
     paint();
-    pushAds(el);
     return () => scope.dispose();
   },
 };
