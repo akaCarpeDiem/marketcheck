@@ -19,10 +19,25 @@ export function adSlot(name: string): string {
   </aside>`;
 }
 
+/**
+ * News and podcast pages ship without the AdSense loader. When a visitor starts
+ * there and moves to a page with slots, add the loader once.
+ */
+function ensureLoader(): void {
+  if (document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')) return;
+  const s = document.createElement('script');
+  s.async = true;
+  s.crossOrigin = 'anonymous';
+  s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`;
+  document.head.appendChild(s);
+}
+
 /** Ask AdSense to fill any slot it has not seen yet. Safe to call after every render. */
 export function pushAds(root: ParentNode = document): void {
   if (!adsEnabled()) return;
   try {
+    if (!root.querySelector('ins.adsbygoogle')) return;
+    ensureLoader();
     const w = window as Window & { adsbygoogle?: unknown[] };
     w.adsbygoogle = w.adsbygoogle || [];
     for (const ins of root.querySelectorAll<HTMLElement>('ins.adsbygoogle:not([data-adsbygoogle-status]):not([data-mc-pushed])')) {

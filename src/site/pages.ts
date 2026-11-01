@@ -27,6 +27,11 @@ export type Page = {
    * when the visitor moves to a different app page without a reload.
    */
   guide?: string;
+  /**
+   * false leaves the AdSense loader off this page. Headline and podcast listings
+   * are mostly third-party links, so they carry no ads.
+   */
+  ads?: boolean;
 };
 
 const esc = (s: string): string =>
@@ -142,6 +147,7 @@ const APP_PAGES: Page[] = [
   },
   {
     path: '/news/',
+    ads: false,
     file: 'news/index.html',
     view: 'news',
     title: 'Money news by topic: markets, investing, crypto and more · Market Check',
@@ -162,6 +168,7 @@ const APP_PAGES: Page[] = [
   },
   {
     path: '/podcasts/',
+    ads: false,
     file: 'podcasts/index.html',
     view: 'podcasts',
     title: 'Finance and business podcasts to browse · Market Check',
@@ -295,7 +302,7 @@ export function documentHtml(
   const nav: NavId | null = page.view === 'static' || page.view === 'notfound' ? null : page.view;
   const title = esc(page.title);
   const desc = esc(page.description);
-  const adsense = /^ca-pub-\d+$/.test(assets.adsenseClient)
+  const adsense = page.ads !== false && /^ca-pub-\d+$/.test(assets.adsenseClient)
     ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${assets.adsenseClient}" crossorigin="anonymous"></script>`
     : '';
   return `<!DOCTYPE html>
