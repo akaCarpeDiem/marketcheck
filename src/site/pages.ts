@@ -29,7 +29,8 @@ export type Page = {
   guide?: string;
   /**
    * false leaves the AdSense loader off this page. Headline and podcast listings
-   * are mostly third-party links, so they carry no ads.
+   * are mostly third-party links, so they carry no ads. The 404 page skips the
+   * loader too: no ad slots, and ad code on an error page is thin inventory.
    */
   ads?: boolean;
 };
@@ -286,6 +287,7 @@ export function sitePages(opts: { content: Record<string, string> }): Page[] {
     title: 'Page not found · Market Check',
     description: 'That page does not exist.',
     index: false,
+    ads: false,
     body: `<section class="page-intro notfound"><p class="eyebrow">404</p><h1>That page isn’t here</h1><p>The address may be mistyped, or the page may have moved.</p><p><a class="btn btn-primary" href="/">Go to the dashboard</a></p></section>`,
   });
   return pages;
