@@ -688,7 +688,7 @@ export function candidateEntry(c: Candidate, prev: AccStory | undefined, rank: n
     title: lead.title,
     link: lead.link,
     source: lead.source,
-    image: isHttp(lead.image) || (typeof lead.image === 'string' && lead.image.startsWith('/')) ? lead.image : prev?.image ?? null,
+    image: safeImage(lead.image) ?? prev?.image ?? null,
     summary: lead.summary ?? '',
     publishedAt: c.publishedMs != null ? iso(c.publishedMs) : (lead.publishedAt ?? null),
     outlets: mergeOutlets(c.cluster.outlets.slice(0, LIMITS.accOutlets), prev?.outlets ?? []),

@@ -24,7 +24,7 @@ const TITLES: Record<ViewId, string> = {
   markets: 'Markets: crypto, stocks and ETFs by market cap · Market Check',
   heatmap: 'Heat map and bubble map: what is moving · Market Check',
   portfolio: 'Portfolio and watchlist · Market Check',
-  news: 'Money news by topic: markets, investing, crypto and more · Market Check',
+  news: 'News Leaderboard: the biggest money stories, ranked · Market Check',
   podcasts: 'Finance and business podcasts to browse · Market Check',
 };
 

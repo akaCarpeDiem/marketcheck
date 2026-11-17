@@ -1046,15 +1046,6 @@ function tagText(block: string, tag: string): string | null {
   return stripHtml(raw) || null;
 }
 
-function tagAttr(block: string, tag: string, attr: string): string | null {
-  const re = new RegExp(`<${tag}\\b([^>]*)\\/?>`, 'i');
-  const m = block.match(re);
-  if (!m) return null;
-  const attrs = m[1] ?? '';
-  const am = attrs.match(new RegExp(`${attr}\\s*=\\s*["']([^"']+)["']`, 'i'));
-  return am ? decodeEntities(am[1]!.trim()) : null;
-}
-
 /** Atom: <link href="..." /> or rel=alternate */
 function atomLink(block: string): string | null {
   const links = block.match(/<link\b[^>]*>/gi) ?? [];
