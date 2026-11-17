@@ -45,6 +45,12 @@ export type HeadlinesResult = {
   note: string | null;
   stale: boolean;
   fetchedAt: string;
+  /**
+   * The deduped, age-filtered written stories behind `items` (up to 120, newest
+   * first, each tagged with its topic). The news board counts how many outlets
+   * cover the same story from this. /api/headlines leaves it out unless asked.
+   */
+  pool?: HeadlineItem[];
 };
 
 type FeedDef = {
@@ -984,6 +990,8 @@ function storyScore(item: HeadlineItem, consensus: number): number {
 const CACHE_TTL_MS = 7 * 60_000; // ~7 min
 const FETCH_TIMEOUT_MS = 10_000;
 const TARGET_COUNT = 18;
+/** Most written stories handed to the news board in `pool`. */
+const POOL_MAX = 120;
 const THIN_THRESHOLD = 4;
 const VIDEO_CAP = 7; // default max YouTube videos mixed into each category
 const VIDEO_CAP_BY_CAT: Partial<Record<HeadlineCategory, number>> = {
@@ -1646,9 +1654,15 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
     note = `Limited coverage for this category (${items.length} stories). Sources may be thin today.`;
   }
 
+  const pool: HeadlineItem[] = big
+    .filter((it) => it.mediaType !== 'video' && !SHOW_BY_FEED.has(it.source))
+    .slice(0, POOL_MAX)
+    .map((it) => ({ ...it, topic: category, type: 'article' as const }));
+
   const result: HeadlinesResult = {
     category,
     items,
+    pool,
     feedsUsed,
     feedsFailed,
     feedsQuiet,

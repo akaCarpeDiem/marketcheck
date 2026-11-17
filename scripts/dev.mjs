@@ -327,7 +327,9 @@ async function handle(request) {
         // News comes from dozens of RSS feeds that cannot be stood in for one by one; mock the answers instead.
         if (useMock && key === '/api/headlines') {
           const asked = url.searchParams.get('topic') || url.searchParams.get('category') || 'markets';
-          return new Response(JSON.stringify(mock.headlines(asked)), { headers: { 'Content-Type': 'application/json' } });
+          const body = mock.headlines(asked);
+          if (url.searchParams.get('pool') !== '1') delete body.pool;
+          return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
         }
         if (useMock && key === '/api/podcasts') {
           return new Response(JSON.stringify(mock.podcasts(shared.topics.PODCAST_SHOWS, shared.topics.TOPICS)), {

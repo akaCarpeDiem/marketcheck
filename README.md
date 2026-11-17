@@ -105,3 +105,23 @@ Cloudflare Workers limit subrequests per invocation, so quote requests are split
 ## Disclaimer
 
 Not financial advice. Market data may be delayed or unavailable.
+
+## News leaderboard (`/api/newsboard`)
+
+Ranks news stories per topic (the ten in `functions/_shared/newsTopics.ts`) by popularity instead of recency.
+
+`GET /api/newsboard?topic=<id>&board=live|today|yesterday|day&date=YYYY-MM-DD&sweep=1`
+
+- **live**: stories from the last 24 hours, older ones fade (half-life 18 h).
+- **today**: stories released today (New York time). Provisional until the noon check, then locked (`status: final`).
+- **yesterday**: the final top 10 of the previous day. **day** returns the stored final for `date` plus `days`, the dates available.
+- Day boundaries and noon use America/New_York.
+
+**Signals** (scoring constants sit at the top of `functions/_shared/newsBoard.ts`): outlet coverage, Hacker News (one Algolia request shared by all topics), Reddit (one `top.json` request per topic; often refused from cloud addresses, then the signal shows as not ok), and Google Trends daily trending searches (five countries, one request each). Each is cached 20 to 30 minutes; a failed signal never fails the board.
+
+The stories come from `/api/headlines?topic=<id>&pool=1`, fetched as one subrequest so the board stays well under the 50-subrequest limit. A board request makes at most 8 fetches (headlines, Hacker News, Reddit, five Trends geos) plus a few KV reads.
+
+**KV** (`LAYOUTS`, keys `newsboard:v1:`, 14-day expiry): `acc:<ETdate>:<topic>` (stories seen that day with their best signals, written at most once an hour per topic), `noon:<ETdate>:<topic>`, `final:<ETdate>:<topic>`, `days:<topic>` (index of finals). Without KV (local dev) an in-memory map is used.
+
+**Sweeps**: `.github/workflows/newsboard-sweep.yml` calls `board=live&sweep=1` for every topic around New York midnight and noon (and twice more), so snapshots are written even on quiet days. `sweep=1` skips the response cache. Local data: `npm run dev:mock`.
+

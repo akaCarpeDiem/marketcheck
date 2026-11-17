@@ -425,9 +425,166 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       });
     }
 
+    if (host === 'hn.algolia.com') return json(hnAnswer(Date.now()));
+    if (host === 'www.reddit.com' && url.pathname.startsWith('/r/')) return json(redditAnswer(decodeURIComponent(url.pathname.split('/')[2] ?? ''), Date.now()));
+    if (host === 'trends.google.com') {
+      return new Response(trendsAnswer(q.get('geo') ?? 'US', Date.now()), { status: 200, headers: { 'Content-Type': 'application/rss+xml' } });
+    }
     if (host === 'lite-api.jup.ag') return json(jupiter());
     if (host === 'api.alternative.me') return json(fng());
     return null;
+  }
+
+
+  /* ── News board: stories covered by several outlets, plus Hacker News, Reddit and Google Trends ── */
+  const STORY_SUBJECTS = {
+    markets: ['Wall Street', 'Treasury yields', 'S&P 500', 'Dollar index', 'Nasdaq', 'Federal Reserve', 'Dow futures', 'Euro zone'],
+    investing: ['Index funds', 'Berkshire', 'Dividend stocks', 'Vanguard', 'Small caps', 'Bond ETFs', 'Nvidia', 'Value investors'],
+    'personal-finance': ['Savings accounts', 'Credit cards', 'Student loans', 'Social Security', 'Roth IRAs', 'Car insurance', 'Tax refunds', 'Retirees'],
+    crypto: ['Bitcoin', 'Ethereum', 'Solana', 'Coinbase', 'Stablecoins', 'Binance', 'Ripple', 'Dogecoin'],
+    'real-estate': ['Mortgage rates', 'Home prices', 'Zillow', 'Landlords', 'Office towers', 'Homebuilders', 'Renters', 'Redfin'],
+    technology: ['OpenAI', 'Apple', 'Nvidia chips', 'Microsoft', 'Tesla robots', 'Google', 'Meta', 'Data centers'],
+    policy: ['Senate', 'White House', 'SEC', 'Tariffs', 'Supreme Court', 'Treasury', 'Congress', 'Brussels'],
+    business: ['Boeing', 'Walmart', 'Disney', 'Starbucks', 'Ford', 'Amazon', 'Nike', 'Pfizer'],
+    commodities: ['Crude oil', 'Gold', 'Copper', 'Natural gas', 'Wheat', 'Lithium', 'Brent', 'Silver'],
+    healthcare: ['Drugmakers', 'Hospitals', 'Medicare', 'Moderna', 'Insurers', 'Eli Lilly', 'Longevity labs', 'Pharmacies'],
+  };
+  const STORY_EVENTS = [
+    'jumps after surprise earnings beat', 'faces probe over disclosure failures', 'announces sweeping restructuring plan', 'hits record as demand surges',
+    'slumps amid supply disruption fears', 'wins landmark court ruling', 'unveils long-awaited product roadmap', 'plans major hiring spree',
+    'warns about looming shortage', 'agrees takeover worth billions', 'braces for regulatory crackdown', 'posts unexpected quarterly loss',
+    'launches pilot programme nationwide', 'delays flagship launch indefinitely', 'raises forecast following strong quarter', 'cuts guidance citing weak spending',
+    'secures fresh funding round', 'pledges sharper cost discipline', 'settles lawsuit following mediation', 'expands partnership across continents',
+    'tests new pricing structure', 'reveals data breach affecting customers', 'rallies on upgraded analyst outlook', 'stalls negotiations over licensing',
+  ];
+  // How many outlets run each story (index = story number).
+  const STORY_OUTLETS = [5, 3, 2, 1, 6, 2, 1, 3, 1, 4, 2, 1, 4, 1, 2, 3, 1, 5, 2, 1, 3, 1, 2, 1];
+  const STORY_OUTLET_NAMES = ['BBC Business', 'CNBC Markets', 'WSJ Markets', 'NYT Business', 'Guardian Business', 'CoinDesk', 'Reuters', 'Bloomberg'];
+  const WORDING = [(t) => t, (t) => `${t}, analysts say`, (t) => `${t} - what to know`, (t) => `Why ${t}`, (t) => `${t} as investors react`, (t) => `Report: ${t}`];
+  const REDDIT_TOPIC = { economics: 'markets', investing: 'investing', personalfinance: 'personal-finance', cryptocurrency: 'crypto', realestate: 'real-estate', technology: 'technology', politics: 'policy', business: 'business', energy: 'commodities', health: 'healthcare' };
+  const ETF = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  /** Milliseconds since midnight in New York. */
+  function sinceEtMidnight(now) {
+    const p = Object.fromEntries(ETF.formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+    return ((Number(p.hour) % 24) * 3600 + Number(p.minute) * 60 + Number(p.second)) * 1000;
+  }
+
+  /**
+   * 24 stories per topic: twelve released today (New York time), twelve yesterday
+   * evening. Each is run by 1 to 6 outlets in slightly different words.
+   */
+  function newsStories(topic, now = Date.now()) {
+    const since = Math.max(sinceEtMidnight(now), 40 * 60_000);
+    const midnight = now - sinceEtMidnight(now);
+    const subjects = STORY_SUBJECTS[topic] ?? STORY_SUBJECTS.markets;
+    const off = hash(topic) % STORY_EVENTS.length;
+    const stories = [];
+    for (let i = 0; i < 24; i++) {
+      const title = `${subjects[i % subjects.length]} ${STORY_EVENTS[(i * 7 + off) % STORY_EVENTS.length]}`;
+      const first = i < 12 ? now - (since * (i + 0.4)) / 12 : midnight - ((i - 12) * 47 + 25) * 60_000;
+      const k = STORY_OUTLETS[(i + off) % STORY_OUTLETS.length];
+      const variants = [];
+      for (let n = 0; n < k; n++) {
+        const source = STORY_OUTLET_NAMES[(i + hash(topic) + n) % STORY_OUTLET_NAMES.length];
+        variants.push({
+          source,
+          title: WORDING[n % WORDING.length](title),
+          link: n === 0 ? `https://example.com/${topic}/${i}` : `https://${source.split(' ')[0].toLowerCase()}.example.com/${topic}/${i}-${n}`,
+          publishedMs: Math.round(first + n * 9 * 60_000),
+        });
+      }
+      stories.push({ i, topic, title, variants, publishedMs: Math.round(first) });
+    }
+    return stories;
+  }
+
+  /** The pool /api/headlines?pool=1 returns: every variant of every story, newest first. */
+  function newsPool(topic, now = Date.now()) {
+    return newsStories(topic, now)
+      .flatMap((s) =>
+        s.variants.map((v) => ({
+          id: `${topic}-${s.i}-${v.source}`,
+          title: v.title,
+          link: v.link,
+          summary: 'A short summary of the story appears here so the card has two or three lines of supporting text to show.',
+          image: s.i % 5 === 4 ? null : `/__dev/img?i=${hash(topic) % 9 + s.i}`,
+          source: v.source,
+          publishedAt: new Date(v.publishedMs).toISOString(),
+          publishedMs: v.publishedMs,
+          mediaType: 'article',
+          topic,
+          type: 'article',
+        })),
+      )
+      .sort((a, b) => b.publishedMs - a.publishedMs);
+  }
+
+  const allTopicStories = (now) => Object.keys(STORY_SUBJECTS).flatMap((t) => newsStories(t, now));
+
+  function hnAnswer(now) {
+    const hits = [];
+    for (const s of allTopicStories(now)) {
+      const h = hash(`hn${s.topic}${s.i}`);
+      if (s.i % 3 !== 0 && s.i % 7 !== 2) continue;
+      const v = s.variants[h % s.variants.length];
+      hits.push({
+        objectID: String(40_000_000 + (h % 900_000)),
+        title: v.title,
+        url: h % 2 ? s.variants[0].link : v.link,
+        points: 40 + (h % 900),
+        num_comments: h % 320,
+        created_at_i: Math.floor(s.publishedMs / 1000) + 1800,
+      });
+    }
+    hits.push({ objectID: '40999001', title: 'Show HN: A tiny database written in a weekend', url: 'https://example.org/tinydb', points: 212, num_comments: 64, created_at_i: Math.floor(now / 1000) - 7200 });
+    return { hits, nbHits: hits.length };
+  }
+
+  function redditAnswer(subs, now) {
+    const first = (subs.split('+')[0] ?? '').toLowerCase();
+    const topic = REDDIT_TOPIC[first];
+    const sub = subs.split('+')[0];
+    const children = [];
+    for (const s of topic ? newsStories(topic, now) : []) {
+      const h = hash(`rd${s.topic}${s.i}`);
+      if (s.i % 2 !== 0 && s.i % 5 !== 1) continue;
+      const v = s.variants[(h >>> 3) % s.variants.length];
+      children.push({
+        kind: 't3',
+        data: {
+          title: s.i % 4 === 0 ? v.title : `Discussion: ${v.title}`,
+          url: s.i % 3 === 0 ? s.variants[s.variants.length - 1].link : 'https://i.redd.it/mock.png',
+          score: 120 + (h % 14_000),
+          num_comments: 15 + (h % 1800),
+          permalink: `/r/${sub}/comments/${(h % 1e6).toString(36)}/${s.i}/`,
+          subreddit: sub,
+          stickied: false,
+        },
+      });
+    }
+    children.push({ kind: 't3', data: { title: 'Weekly discussion thread: ask anything', url: 'https://www.reddit.com/r/mock/weekly', score: 55, num_comments: 410, permalink: `/r/${sub}/comments/weekly/thread/`, subreddit: sub } });
+    return { kind: 'Listing', data: { children } };
+  }
+
+  function trendsAnswer(geo, now) {
+    const traffic = ['20K+', '50K+', '100K+', '200K+', '500K+', '1M+', '2M+'];
+    const geoIdx = ['US', 'GB', 'IN', 'CA', 'AU'].indexOf(geo);
+    const items = [];
+    for (const s of allTopicStories(now)) {
+      if (s.i % 4 !== 1) continue;
+      const h = hash(`tr${s.topic}${s.i}`);
+      if ((h + geoIdx) % 3 === 0) continue;
+      const query = `${s.title.split(' ').slice(0, 3).join(' ')}`;
+      const url = h % 2 ? s.variants[0].link : s.variants[s.variants.length - 1].link;
+      items.push(
+        `<item><title>${query.replace(/&/g, '&amp;')}</title><ht:approx_traffic>${traffic[(h + geoIdx) % traffic.length]}</ht:approx_traffic>` +
+          `<pubDate>${new Date(now).toUTCString()}</pubDate>` +
+          `<ht:news_item><ht:news_item_title>${s.variants[0].title.replace(/&/g, '&amp;')}</ht:news_item_title><ht:news_item_url>${url}</ht:news_item_url><ht:news_item_source>Mock News</ht:news_item_source></ht:news_item></item>`,
+      );
+    }
+    items.push('<item><title>weather tomorrow</title><ht:approx_traffic>1,000,000+</ht:approx_traffic></item>');
+    return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:ht="https://trends.google.com/trending/rss"><channel><title>Daily Search Trends</title>${items.join('')}</channel></rss>`;
   }
 
   /** Headlines in the shape /api/headlines returns (the real one reads dozens of RSS feeds). */
@@ -466,6 +623,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       category,
       topic: category,
       items,
+      pool: newsPool(category, now),
       feedsUsed: sources.slice(0, 4),
       feedsFailed: [],
       feedsQuiet: [],
