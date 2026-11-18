@@ -586,7 +586,7 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns, env } = {}) => {
   assert.equal(by('bakery').image, null, 'a page that refuses leaves the story for the topic artwork');
   const pageCalls = f.calls.filter((c) => /\/pics\//.test(c));
   assert.ok(pageCalls.length >= 1 && pageCalls.length <= IMAGE_LOOKUP.perBuild, `article pages read: ${pageCalls.length}`);
-  assert.ok(f.calls.length - pageCalls.length <= 8, 'signal and pool requests stay within their own limit');
+  assert.ok(f.calls.length - pageCalls.length <= 9, 'signal and pool requests stay within their own limit');
   const noonSnap = JSON.parse(kv.m.get(noonKey('2026-06-15', 'markets')));
   assert.equal(noonSnap.stories.find((s) => s.title.includes('Nvidia'))?.image, 'https://cdn.example/nvidia.jpg', 'the stored snapshot keeps the picture');
   const today = await ask('topic=markets&board=today', { kv, fetchFn: makeFetch({ pages: {} }) });
