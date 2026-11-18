@@ -5,7 +5,7 @@
  * Prefers “big stories”: major outlets, YT view floors, cross-feed title consensus.
  */
 
-import { makeCache, mapPool, sleep } from './cache';
+import { makeCache, mapPool } from './cache';
 import { TOPIC_IDS, type ContentType, type TopicId } from './newsTopics';
 
 /** News is organised by the ten topics in newsTopics.ts. (The name "category" is kept from the older code.) */
@@ -43,6 +43,12 @@ export type HeadlinesResult = {
   note: string | null;
   stale: boolean;
   fetchedAt: string;
+  /**
+   * The deduped, age-filtered written stories behind `items` (up to 120, newest
+   * first, each tagged with its topic). The news board counts how many outlets
+   * cover the same story from this. /api/headlines leaves it out unless asked.
+   */
+  pool?: HeadlineItem[];
 };
 
 type FeedDef = {
@@ -969,6 +975,8 @@ function storyScore(item: HeadlineItem, consensus: number): number {
 const CACHE_TTL_MS = 7 * 60_000; // ~7 min
 const FETCH_TIMEOUT_MS = 10_000;
 const TARGET_COUNT = 18;
+/** Most written stories handed to the news board in `pool`. */
+const POOL_MAX = 120;
 const THIN_THRESHOLD = 4;
 const VIDEO_CAP = 7; // default max YouTube videos mixed into each category
 const VIDEO_CAP_BY_CAT: Partial<Record<HeadlineCategory, number>> = {
@@ -1021,15 +1029,6 @@ function tagText(block: string, tag: string): string | null {
   if (!m) return null;
   const raw = decodeEntities(m[1]!.trim());
   return stripHtml(raw) || null;
-}
-
-function tagAttr(block: string, tag: string, attr: string): string | null {
-  const re = new RegExp(`<${tag}\\b([^>]*)\\/?>`, 'i');
-  const m = block.match(re);
-  if (!m) return null;
-  const attrs = m[1] ?? '';
-  const am = attrs.match(new RegExp(`${attr}\\s*=\\s*["']([^"']+)["']`, 'i'));
-  return am ? decodeEntities(am[1]!.trim()) : null;
 }
 
 /** Atom: <link href="..." /> or rel=alternate */
@@ -1629,9 +1628,15 @@ export async function getHeadlines(category: HeadlineCategory): Promise<Headline
     note = `Limited coverage for this category (${items.length} stories). Sources may be thin today.`;
   }
 
+  const pool: HeadlineItem[] = big
+    .filter((it) => it.mediaType !== 'video')
+    .slice(0, POOL_MAX)
+    .map((it) => ({ ...it, topic: category, type: 'article' as const }));
+
   const result: HeadlinesResult = {
     category,
     items,
+    pool,
     feedsUsed,
     feedsFailed,
     feedsQuiet,

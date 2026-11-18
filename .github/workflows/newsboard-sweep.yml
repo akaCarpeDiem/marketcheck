@@ -1,0 +1,31 @@
+name: News board sweep
+
+# Asks /api/newsboard for each topic so the day's accumulator, the noon snapshot
+# and yesterday's final are written even when nobody visits. UTC times: ET
+# midnight (05:05) and noon (16:05 EDT, 17:05 EST), plus two daytime sweeps.
+# No secrets: the endpoint is public.
+on:
+  schedule:
+    - cron: '5 5 * * *'
+    - cron: '5 16 * * *'
+    - cron: '5 17 * * *'
+    - cron: '5 11,23 * * *'
+  workflow_dispatch:
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Sweep every topic
+        run: |
+          topics="markets investing personal-finance crypto real-estate technology policy business commodities healthcare"
+          for t in $topics; do
+            if curl -sS -f --max-time 30 -o /dev/null -w "$t: %{http_code} in %{time_total}s\n" \
+              "https://marketcheck.money/api/newsboard?topic=$t&board=live&sweep=1"; then
+              :
+            else
+              echo "::warning::sweep failed for $t"
+            fi
+          done
+          exit 0

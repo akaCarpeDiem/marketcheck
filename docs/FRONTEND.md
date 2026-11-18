@@ -60,6 +60,8 @@ Refresh times follow the market: faster while New York is open, slower when it i
 
 `data/news.ts` loads headlines per topic from `/api/headlines`, and the scrolling ticker at the top of every page uses the same source. Topics and content types are defined once, in `functions/_shared/newsTopics.ts`, and imported by both sides. Every item carries a topic and a type (article or video), and the news page filters by either.
 
+The news page (`views/news.ts`) is the News Leaderboard. `data/newsboard.ts` loads ranked stories from `/api/newsboard` (one cache entry per topic, board and date; live boards refresh every five minutes while the tab is visible, the others when their next update is due) and keeps the "caught up" record: story ids read, per New York date, in this browser (`mc-news-read-v1`, three days kept). The pure parts (movement arrows, hot flag, number formatting, read-log pruning) are in `lib/leaderboard.ts` and tested in `scripts/test/leaderboard.test.mjs`. When a live board refreshes, rows slide to their new places (FLIP: measure before and after `render()`), unless the reader prefers reduced motion. The plain headline feed (`views/parts/headlines.ts`) still exists as the "Latest headlines" section at the bottom of the page, or `?view=latest`. The address keeps `?topic=` (a topic id or `all`) and `?board=` (`live`, `today`, `yesterday`).
+
 ## Daily call
 
 `data/game.ts` places calls and reads results; the rules are in `functions/_shared/game.ts`, shared with the server. For signed-in players the server's copy of the game wins after every save, because it decides which calls count for the leaderboard (`ui/board.ts`, `data/board.ts`).

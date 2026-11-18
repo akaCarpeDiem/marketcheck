@@ -9,6 +9,8 @@
  * old site (tradfi, housing, ai, web3nfts and so on) are mapped to the topic
  * that replaced them, so old links and open tabs keep working.
  *
+ * `pool=1` adds `pool`: the wider list of written stories the news board clusters.
+ *
  * Each item carries `topic` and `type` (article or video).
  *
  * Results are shared for about six minutes through the edge cache, so a busy
@@ -36,7 +38,7 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
     }
     let data: HeadlinesResult;
     try {
-      const hit = await cached(`headlines:v3:${topic}`, {
+      const hit = await cached(`headlines:v4:${topic}`, {
         freshMs: 6 * 60_000,
         keepSec: 12 * 3600,
         retryMs: 60_000,
@@ -55,6 +57,7 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
         topic,
         label: topicLabel(topic),
         items: data.items,
+        ...(url.searchParams.get('pool') === '1' ? { pool: data.pool ?? [] } : {}),
         feedsUsed: data.feedsUsed,
         feedsFailed: data.feedsFailed,
         feedsQuiet: data.feedsQuiet ?? [],

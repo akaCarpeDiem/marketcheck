@@ -173,19 +173,19 @@ const APP_PAGES: Page[] = [
     ads: false,
     file: 'news/index.html',
     view: 'news',
-    title: 'Money news by topic: markets, investing, crypto and more · Market Check',
+    title: 'News Leaderboard: the biggest money stories, ranked · Market Check',
     description:
-      'Recent headlines in ten topics: markets and the economy, investing, personal finance, crypto, real estate, technology, policy, business, commodities and healthcare. From major publishers, with source and time.',
-    body: intro('Headlines', [
-      'Money news from major publishers, sorted into ten topics. Each story links to the original.',
+      'The money stories getting the most coverage and engagement, ranked live in ten topics. Ranked by how many publishers ran each story, Hacker News and Reddit activity, and Google search trends. Every link goes to the original publisher.',
+    body: intro('News Leaderboard', [
+      'The stories getting the most coverage and engagement right now, ranked. Pick a topic to see its top 10, or open the front page for the biggest story in each. Every story links to the original publisher.',
       `<span class="topic-list">${TOPICS.map((t) => `<a href="/news/?topic=${t.id}">${t.label.replace(/&/g, '&amp;')}</a>`).join(' · ')}</span>`,
     ]),
     guide: guide(
-      'About these headlines',
-      `<p>This page gathers recent headlines from the public feeds of major publishers and sorts them into ten topics, so you can scan a whole day of money news in one place. Each item links to the original story on the publisher's site. Market Check does not write, rewrite or summarise articles, and is not affiliated with these publishers.</p>
-      <p><strong>How stories are sorted.</strong> A story is placed in a topic by the feed it came from and by the words in its headline. No single publisher fills a topic: each is limited to a few stories at a time, the same story is shown once, and stories marked as for paying subscribers only are left out where the feed says so. You can also filter by type: articles or video.</p>
-      <p><strong>Reading headlines well.</strong> A headline compresses a lot into a few words. Before reacting, open the story and check the actual numbers against the <a href="/markets/">prices</a>. Be wary of single-cause explanations ("stocks fell because…"), which are often written after the move. If the whole market moved, the <a href="/heatmap/">heat map</a> will show it. More tips in <a href="/learn/reading-market-news/">Reading market news</a>.</p>
-      <p>A headline appearing here is not an endorsement and nothing on this page is financial advice.</p>`,
+      'About the News Leaderboard',
+      `<p>Instead of a list of random recent headlines, this page ranks the stories that are getting the most attention, in ten topics, like a leaderboard. There are three boards: <strong>Live now</strong> (the last 24 hours, refreshed every few minutes), <strong>Released today</strong> (an early look that locks at the noon check, New York time) and <strong>Yesterday's top 10</strong> (a final ranking, with earlier days to browse). Each story links to the original story on the publisher's site. Market Check does not write, rewrite or summarise articles, and is not affiliated with these publishers.</p>
+      <p><strong>How stories are ranked.</strong> Real click counts are not public, so the ranking combines signals that are: how many different publishers ran the story, how much it is being upvoted and discussed on Hacker News and Reddit, and how much people are searching for it on Google in the US, UK, India, Canada and Australia. A story that shows up in several of these rises; the heat bar compares it with the top story on the same board. If one source cannot be reached, the ranking uses the others, and the "How ranking works" button says which are working.</p>
+      <p><strong>Keeping up.</strong> Tick a story as read, or just open it, and the page tracks how far you are through each topic. That record stays in your browser and is never sent anywhere. Prefer a plain list? The latest headlines are one click away at the bottom of the page.</p>
+      <p><strong>Reading the news well.</strong> A big story is not the same as an important or true one. Before reacting, open the story and check the actual numbers against the <a href="/markets/">prices</a>. More tips in <a href="/learn/reading-market-news/">Reading market news</a>. A story appearing here is not an endorsement and nothing on this page is financial advice.</p>`,
     ),
   },
 ];

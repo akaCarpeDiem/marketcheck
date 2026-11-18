@@ -25,7 +25,7 @@ const TITLES: Record<ViewId, string> = {
   heatmap: 'Heat map and bubble map: what is moving · Market Check',
   compare: 'Compare stocks, crypto, funds and gold side by side · Market Check',
   portfolio: 'Portfolio and watchlist · Market Check',
-  news: 'Money news by topic: markets, investing, crypto and more · Market Check',
+  news: 'News Leaderboard: the biggest money stories, ranked · Market Check',
 };
 
 export const currentView = signal<ViewId | null>(null);
