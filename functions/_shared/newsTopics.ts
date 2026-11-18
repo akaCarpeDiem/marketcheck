@@ -4,12 +4,7 @@
  *
  * Every item carries two independent tags:
  * - a topic: one of the ten below;
- * - a type: article, video or podcast.
- * So a podcast episode about bitcoin is both "Crypto & Digital Assets" and
- * "Podcast": it shows under the crypto topic and in the podcast hub.
- *
- * Podcasts are not an eleventh topic. They have their own section
- * (/podcasts/), a directory of shows to browse, each filed under a topic.
+ * - a type: article or video.
  */
 
 export type TopicId =
@@ -24,7 +19,7 @@ export type TopicId =
   | 'commodities'
   | 'healthcare';
 
-export type ContentType = 'article' | 'video' | 'podcast';
+export type ContentType = 'article' | 'video';
 
 export type Topic = {
   id: TopicId;
@@ -80,47 +75,4 @@ export const topicLabel = (id: string | null | undefined): string => TOPICS.find
 export const CONTENT_TYPES: { id: ContentType; label: string; plural: string }[] = [
   { id: 'article', label: 'Article', plural: 'Articles' },
   { id: 'video', label: 'Video', plural: 'Video' },
-  { id: 'podcast', label: 'Podcast', plural: 'Podcasts' },
-];
-
-/* ── Podcast directory ─────────────────────────────────────────────────── */
-
-export type PodcastShow = {
-  /** Stable id, used in links. */
-  id: string;
-  name: string;
-  /** Who makes it and what it is, in a line. */
-  about: string;
-  /** Topic it is filed under; null for general-interest shows. */
-  topic: TopicId | null;
-  /** YouTube channel the episodes are read from. */
-  channel: string;
-};
-
-export const PODCAST_SHOWS: PodcastShow[] = [
-  { id: 'the-compound', name: 'The Compound and Friends', about: 'Josh Brown, Michael Batnick and guests on markets and investing, plus Animal Spirits.', topic: 'investing', channel: 'UCBRpqrzuuqE8TZcWw75JSdw' },
-  { id: 'real-vision', name: 'Real Vision', about: 'Long-form interviews with investors and macro thinkers.', topic: 'investing', channel: 'UCGXWKlq1Oxr3ddEtmKhAkPg' },
-  { id: 'forward-guidance', name: 'Forward Guidance', about: 'Macro, the Fed and liquidity, from Blockworks.', topic: 'markets', channel: 'UCkrwgzhIBKccuDsi_SvZtnQ' },
-  { id: 'marketplace', name: 'Marketplace', about: 'The daily economy explained, from American Public Media.', topic: 'markets', channel: 'UCORB0siyf3n_FS22MSLrjZA' },
-  { id: 'planet-money', name: 'Planet Money', about: "NPR's stories about how the economy really works.", topic: 'markets', channel: 'UCwlvY6_2iza-QkE5CIWpIFA' },
-  { id: 'ramsey-show', name: 'The Ramsey Show', about: 'Callers, debt and plain advice on getting out of it.', topic: 'personal-finance', channel: 'UC7eBNeDW1GQf2NJQ6G6gAxw' },
-  { id: 'money-guy', name: 'The Money Guy Show', about: 'Two financial planners on saving, investing and retiring well.', topic: 'personal-finance', channel: 'UC9vUu4vlIlMC0dHQCTvQPbg' },
-  { id: 'caleb-hammer', name: 'Financial Audit', about: "Caleb Hammer goes through real people's budgets, line by line.", topic: 'personal-finance', channel: 'UCLe_q9axMaeTbjN0hy1Z9xA' },
-  { id: 'bankless', name: 'Bankless', about: 'Ethereum, DeFi and the crypto economy.', topic: 'crypto', channel: 'UCAl9Ld79qaZxp9JzEOwd3aA' },
-  { id: 'unchained', name: 'Unchained', about: 'Laura Shin interviews the people building and regulating crypto.', topic: 'crypto', channel: 'UCWiiMnsnw5Isc2PP1to9nNw' },
-  { id: 'the-defiant', name: 'The Defiant', about: 'DeFi news and interviews.', topic: 'crypto', channel: 'UCL0J4MLEdLP0-UyLu0hCktg' },
-  { id: 'coin-bureau', name: 'Coin Bureau', about: 'Research-heavy explainers on coins, markets and regulation.', topic: 'crypto', channel: 'UCqK_GSMbpiV8spgD3ZGloSw' },
-  { id: 'biggerpockets', name: 'BiggerPockets', about: 'Real estate investing: rentals, financing and the housing market.', topic: 'real-estate', channel: 'UCVWDbXqQ8cupuVpotWNt2eg' },
-  { id: 'a16z', name: 'a16z', about: 'Andreessen Horowitz on technology, startups and where they are going.', topic: 'technology', channel: 'UC9cn0TuPq4dnbTY-CBsm8XA' },
-  { id: 'lex-fridman', name: 'Lex Fridman Podcast', about: 'Long conversations on AI, science and technology.', topic: 'technology', channel: 'UCSHZKyawb77ixDdsGog4iWA' },
-  { id: 'dwarkesh', name: 'Dwarkesh Podcast', about: 'Deep interviews on AI and progress.', topic: 'technology', channel: 'UCXl4i9dYBrFOabk0xGmbkRA' },
-  { id: 'all-in', name: 'All-In', about: 'Four investors on markets, technology and politics.', topic: 'business', channel: 'UCESLZhusAkFfsNsApnjF_Cg' },
-  { id: 'acquired', name: 'Acquired', about: 'The stories and strategies behind great companies.', topic: 'business', channel: 'UCyFqFYfTW2VoIQKylJ04Rtw' },
-  { id: 'diary-of-a-ceo', name: 'The Diary Of A CEO', about: 'Steven Bartlett interviews founders, executives and experts.', topic: 'business', channel: 'UCGq-a57w-aPwyi3pW7XLiHw' },
-  { id: 'prof-g', name: 'The Prof G Pod', about: 'Scott Galloway on business, markets and tech.', topic: 'business', channel: 'UC1E1SVcVyU3ntWMSQEp38Yw' },
-  { id: 'kitco', name: 'Kitco News', about: 'Gold, silver, mining and commodity markets.', topic: 'commodities', channel: 'UC9ijza42jVR3T6b8bColgvg' },
-  { id: 'peter-attia', name: 'The Peter Attia Drive', about: 'A physician on longevity, health and performance.', topic: 'healthcare', channel: 'UC8kGsMa0LygSX9nkBcBH1Sg' },
-  { id: 'huberman-lab', name: 'Huberman Lab', about: 'A Stanford neuroscientist on health and the science behind it.', topic: 'healthcare', channel: 'UC2D2CMWXMOVWx7giW1n3LIg' },
-  { id: 'joe-rogan', name: 'The Joe Rogan Experience', about: 'Long-form conversations with guests from every field.', topic: null, channel: 'UCzQUP1qoWDoEbmsQxvdjxgQ' },
-  { id: 'theo-von', name: 'This Past Weekend', about: 'Theo Von in conversation.', topic: null, channel: 'UC5AQEUAwCh1sGDvkQtkDWUQ' },
 ];

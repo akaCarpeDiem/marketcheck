@@ -18,6 +18,7 @@ import { onRequestGet as sparklines } from './sparklines';
 import { onRequestGet as mood } from './mood';
 import { onRequestGet as headlines } from './headlines';
 import { onRequestGet as board } from './game/board';
+import { onRequestGet as yesterday } from './yesterday';
 import type { WaitUntil } from '../_shared/edgeCache';
 
 type Handler = (context: { request: Request; env: any; waitUntil?: WaitUntil }) => Promise<Response>;
@@ -32,6 +33,7 @@ const ROUTES: Record<string, Handler> = {
   '/api/mood': mood as Handler,
   '/api/headlines': headlines as Handler,
   '/api/game/board': board as Handler,
+  '/api/yesterday': yesterday as Handler,
 };
 export const BATCH_MAX = 16;
 const EDGE_MAX_SEC = 60;

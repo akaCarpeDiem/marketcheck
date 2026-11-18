@@ -2,12 +2,14 @@
  * GET /api/chart?symbol=BTC-USD&range=1y&interval=1d
  * A price series for one symbol from Yahoo Finance, plus the quote details
  * Yahoo returns with it (previous close, day range, 52-week range, volume).
+ * `opens`, `highs` and `lows` line up with `closes` when Yahoo sent them
+ * (for candlestick charts); otherwise they are empty.
  */
 
 import { cacheGet, cachePut, jsonResponse, type WaitUntil } from '../_shared/edgeCache';
 import { fetchChart, type Series } from '../_shared/yahoo';
 
-const RANGES = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'ytd', 'max']);
+const RANGES = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']);
 const INTERVALS = new Set(['1m', '2m', '5m', '15m', '30m', '60m', '1h', '1d', '1wk', '1mo']);
 
 /** How long a series stays fresh, by bar size. */
@@ -51,6 +53,9 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
       closes: series?.c ?? [],
       timestamps: series?.t ?? [],
       volumes: series?.v ?? [],
+      opens: series?.o ?? [],
+      highs: series?.h ?? [],
+      lows: series?.l ?? [],
       meta: series
         ? {
             symbol: series.symbol,

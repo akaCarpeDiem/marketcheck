@@ -35,7 +35,7 @@ export type GetOpts = { timeout?: number; signal?: AbortSignal };
  * one each. Each caller still gets exactly the body (or the HTTP error) the endpoint itself returns, as soon
  * as its own part is ready, and keeps its own time limit.
  */
-const BATCHABLE = /^\/api\/(?:bootstrap|cryptos|equities|markets|sparklines|mood|headlines|game\/board)(?:\?|$)/;
+const BATCHABLE = /^\/api\/(?:bootstrap|cryptos|equities|markets|sparklines|mood|headlines|game\/board|yesterday)(?:\?|$)/;
 const BATCH_WINDOW_MS = 25;
 const BATCH_MAX = 16;
 

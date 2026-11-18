@@ -15,6 +15,7 @@ import { flash } from '../ui/flash';
 import { openHoldingForm } from '../ui/holding';
 import { openSearch } from '../ui/search';
 import { toast } from '../ui/toast';
+import { mountPortfolioHistory } from './parts/pfhistory';
 import { assetCell, rowAttrs } from './parts/rows';
 
 const PALETTE = ['var(--brand)', '#8b7cf6', 'var(--warn)', '#f472b6', 'var(--up)', '#60a5fa', '#fb923c', 'var(--flat)'];
@@ -69,6 +70,7 @@ export const portfolioView: View = {
         <div class="card" data-holdings></div>
         <div class="card pf-alloc" data-alloc></div>
       </div>
+      <section class="card pf-history" data-history aria-label="How your holdings did"></section>
       <div class="card" data-watch></div>`;
 
     const refs = new Map<string, AssetRef>();
@@ -195,11 +197,15 @@ export const portfolioView: View = {
       );
     };
 
+    const historyChanged = mountPortfolioHistory(el.querySelector<HTMLElement>('[data-history]')!, scope);
     scope.add(
       data.subscribe(() => {
         want();
         paint();
+        historyChanged();
       }),
+      crypto.subscribe(historyChanged),
+      equities.subscribe(historyChanged),
       crypto.subscribe(paint),
       equities.subscribe(paint),
       quotes.subscribe(paint),

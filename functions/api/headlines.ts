@@ -8,10 +8,8 @@
  * `category=` is accepted as another name for `topic=`, and the ids of the
  * old site (tradfi, housing, ai, web3nfts and so on) are mapped to the topic
  * that replaced them, so old links and open tabs keep working.
- * `topic=podcasts` answers with the newest podcast episodes; the podcast hub
- * itself is /api/podcasts.
  *
- * Each item carries `topic` and `type` (article, video or podcast).
+ * Each item carries `topic` and `type` (article or video).
  *
  * Results are shared for about six minutes through the edge cache, so a busy
  * minute does not turn into hundreds of feed requests. If the feeds fail, the
@@ -20,7 +18,7 @@
 
 import { cached, type WaitUntil } from '../_shared/edgeCache';
 import { DEFAULT_TOPIC, TOPIC_IDS, topicFrom, topicLabel } from '../_shared/newsTopics';
-import { getHeadlines, getPodcasts, type HeadlinesResult } from '../_shared/rssHeadlines';
+import { getHeadlines, type HeadlinesResult } from '../_shared/rssHeadlines';
 
 const json = (body: unknown, status: number, cacheControl: string): Response =>
   new Response(JSON.stringify(body), {
@@ -32,21 +30,6 @@ export async function onRequestGet(context: { request: Request; waitUntil?: Wait
   const url = new URL(context.request.url);
   const asked = (url.searchParams.get('topic') ?? url.searchParams.get('category') ?? DEFAULT_TOPIC).trim().toLowerCase();
   try {
-    if (asked === 'podcasts') {
-      const hit = await cached('podcasts:v1', {
-        freshMs: 20 * 60_000,
-        keepSec: 24 * 3600,
-        retryMs: 2 * 60_000,
-        load: getPodcasts,
-        valid: (d) => d.shows.length > 0,
-        waitUntil: context.waitUntil,
-      });
-      return json(
-        { category: 'podcasts', topic: 'podcasts', label: 'Podcasts', items: hit.data.latest.slice(0, 18), stale: hit.stale, source: 'public-rss', fetchedAt: hit.data.fetchedAt },
-        200,
-        'public, max-age=300',
-      );
-    }
     const topic = topicFrom(asked);
     if (!topic) {
       return json({ error: `unknown topic; use ${TOPIC_IDS.join('|')}` }, 400, 'public, max-age=60');

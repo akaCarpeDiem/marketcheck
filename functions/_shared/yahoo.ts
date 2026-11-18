@@ -58,6 +58,7 @@ type RawBlock = {
     quote?: Array<{
       close?: Array<number | null>;
       volume?: Array<number | null>;
+      open?: Array<number | null>;
       high?: Array<number | null>;
       low?: Array<number | null>;
     }>;
@@ -88,6 +89,10 @@ export type Series = {
   c: number[];
   /** Bar volumes aligned with `t` when Yahoo sent them. */
   v?: number[];
+  /** Bar opens, highs and lows aligned with `t` when Yahoo sent them. */
+  o?: number[];
+  h?: number[];
+  l?: number[];
   ok: boolean;
 };
 
@@ -121,9 +126,16 @@ function toSeries(requested: string, block: RawBlock | undefined, range: string,
   const q = block?.indicators?.quote?.[0];
   const rawC = q?.close ?? [];
   const rawV = q?.volume ?? [];
+  const rawO = q?.open ?? [];
+  const rawH = q?.high ?? [];
+  const rawL = q?.low ?? [];
+  const hasOhlc = rawO.length === rawC.length && rawH.length === rawC.length && rawL.length === rawC.length;
   const t: number[] = [];
   const c: number[] = [];
   const v: number[] = [];
+  const o: number[] = [];
+  const h: number[] = [];
+  const l: number[] = [];
   const hasT = rawT.length === rawC.length && rawT.length > 0;
   for (let i = 0; i < rawC.length; i++) {
     const close = rawC[i];
@@ -134,6 +146,16 @@ function toSeries(requested: string, block: RawBlock | undefined, range: string,
     t.push(fin(ts) ? ts : 0);
     const vol = rawV[i];
     v.push(fin(vol) ? vol : 0);
+    if (hasOhlc) {
+      const rawOpen = rawO[i];
+      const rawHigh = rawH[i];
+      const rawLow = rawL[i];
+      const op = fin(rawOpen) ? rawOpen : close;
+      // A bar's high and low always contain its open and close, whatever the feed says.
+      h.push(Math.max(fin(rawHigh) ? rawHigh : close, op, close));
+      l.push(Math.min(fin(rawLow) ? rawLow : close, op, close));
+      o.push(op);
+    }
   }
 
   const price = fin(meta.regularMarketPrice) ? meta.regularMarketPrice : null;
@@ -180,6 +202,7 @@ function toSeries(requested: string, block: RawBlock | undefined, range: string,
     t: hasT ? t : [],
     c,
     v: rawV.length ? v : undefined,
+    ...(hasOhlc ? { o, h, l } : {}),
     ok: price != null,
   };
 }

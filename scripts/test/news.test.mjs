@@ -1,7 +1,7 @@
-// Checks the news structure: ten topics, where each old category went, the podcast directory,
+// Checks the news structure: ten topics, where each old category went,
 // and that no topic asks for more feeds than one request is allowed to make.
 import assert from 'node:assert/strict';
-import { CONTENT_TYPES, LEGACY_TOPIC, PODCAST_SHOWS, TOPICS, TOPIC_IDS, topicFrom, topicLabel } from '../../functions/_shared/newsTopics.ts';
+import { CONTENT_TYPES, LEGACY_TOPIC, TOPICS, TOPIC_IDS, topicFrom, topicLabel } from '../../functions/_shared/newsTopics.ts';
 import { ALL_HEADLINE_CATEGORIES, dedupeSort, getHeadlines, listFeeds, outletOf, parseFeedXml, spreadBySource } from '../../functions/_shared/rssHeadlines.ts';
 
 /* ── the ten topics, in order ── */
@@ -21,7 +21,7 @@ assert.deepEqual(
   ],
 );
 assert.equal(new Set(TOPIC_IDS).size, 10);
-assert.ok(!TOPIC_IDS.includes('podcasts'), 'podcasts are a section of their own, not a topic');
+assert.ok(!TOPIC_IDS.includes('podcasts'), 'podcasts is not a news topic');
 assert.deepEqual(ALL_HEADLINE_CATEGORIES, TOPIC_IDS);
 for (const t of TOPICS) assert.ok(t.short && t.about && /^[a-z-]+$/.test(t.id), `${t.id} is complete`);
 
@@ -49,7 +49,7 @@ assert.equal(topicFrom(undefined), null);
 assert.equal(topicLabel('commodities'), 'Commodities & Energy');
 
 /* ── two independent tags: topic and type ── */
-assert.deepEqual(CONTENT_TYPES.map((t) => t.id), ['article', 'video', 'podcast']);
+assert.deepEqual(CONTENT_TYPES.map((t) => t.id), ['article', 'video']);
 
 /* ── feeds ── */
 for (const id of TOPIC_IDS) {
@@ -226,23 +226,5 @@ assert.notEqual(outletOf('CNBC Markets'), outletOf('YT CNBC'), 'written stories 
     globalThis.fetch = realFetch;
   }
 }
-
-/* ── the podcast directory ── */
-assert.ok(PODCAST_SHOWS.length >= 20);
-assert.equal(new Set(PODCAST_SHOWS.map((s) => s.id)).size, PODCAST_SHOWS.length);
-assert.equal(new Set(PODCAST_SHOWS.map((s) => s.channel)).size, PODCAST_SHOWS.length);
-for (const s of PODCAST_SHOWS) {
-  assert.ok(s.topic === null || TOPIC_IDS.includes(s.topic), `${s.name} is filed under a real topic`);
-  assert.ok(/^UC[\w-]{22}$/.test(s.channel), `${s.name} has a channel id`);
-  assert.ok(s.about.length > 15 && s.about.length < 140);
-}
-// One request per show, in one invocation.
-assert.ok(PODCAST_SHOWS.length <= 40);
-// The shows the old "Podcasts & video" tab carried are all still here.
-for (const old of ['UCzQUP1qoWDoEbmsQxvdjxgQ', 'UCGq-a57w-aPwyi3pW7XLiHw', 'UC5AQEUAwCh1sGDvkQtkDWUQ', 'UCLe_q9axMaeTbjN0hy1Z9xA', 'UC9cn0TuPq4dnbTY-CBsm8XA']) {
-  assert.ok(PODCAST_SHOWS.some((s) => s.channel === old), `show ${old} was kept`);
-}
-const covered = new Set(PODCAST_SHOWS.map((s) => s.topic).filter(Boolean));
-assert.ok(covered.size >= 8, `shows cover ${covered.size} topics`);
 
 console.log(`news: all checks passed (${TOPIC_IDS.map((id) => `${id} ${listFeeds(id).length}`).join(', ')})`);

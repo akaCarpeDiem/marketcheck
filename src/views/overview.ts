@@ -2,9 +2,9 @@
 import { Scope } from '../lib/store';
 import type { View } from '../router';
 import { adSlot, pushAds } from '../ui/ads';
+import { mountBestBuys } from './parts/bestbuys';
 import { mountBrief } from './parts/brief';
 import { mountGame } from './parts/game';
-import { mountHeadlines } from './parts/headlines';
 import { mountMovers } from './parts/movers';
 import { mountPulse } from './parts/pulse';
 import { mountTables } from './parts/tables';
@@ -25,9 +25,9 @@ export const overviewView: View = {
         <div class="tiles tiles-hero" id="ov-hero"></div>
       </section>
 
-      <section class="pulse" id="ov-pulse" aria-label="Market pulse"></section>
+      <section class="card best" id="ov-best" aria-label="Yesterday’s best buys"></section>
 
-      <section class="card call" id="ov-call" aria-label="Daily call"></section>
+      <section class="pulse" id="ov-pulse" aria-label="Market pulse"></section>
 
       <section class="ov-tables">
         <div class="card" id="ov-crypto"></div>
@@ -39,6 +39,8 @@ export const overviewView: View = {
         <div class="tiles tiles-index" id="ov-index"></div>
       </section>
 
+      <section class="card call" id="ov-call" aria-label="Daily call"></section>
+
       <section class="ov-movers">
         <div class="card panel" id="ov-left"></div>
         <div class="card panel" id="ov-right"></div>
@@ -47,18 +49,16 @@ export const overviewView: View = {
 
       ${adSlot('overview-mid')}
 
-      <section id="ov-news"></section>
-
       ${adSlot('overview-foot')}
     `;
     const $ = (id: string) => el.querySelector<HTMLElement>(`#${id}`)!;
     mountBrief($('ov-brief'), $('ov-day'), scope);
     mountTiles($('ov-hero'), $('ov-index'), scope);
+    mountBestBuys($('ov-best'), scope);
     mountPulse($('ov-pulse'), scope);
-    mountGame($('ov-call'), scope);
     mountTables($('ov-crypto'), $('ov-equity'), scope);
+    mountGame($('ov-call'), scope);
     mountMovers($('ov-left'), $('ov-right'), $('ov-bubbles'), scope);
-    mountHeadlines($('ov-news'), scope, { limit: 8, more: true, prefKey: 'ov.news' });
     pushAds(el);
     return () => scope.dispose();
   },

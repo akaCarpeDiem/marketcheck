@@ -57,7 +57,7 @@ Sign-in is not expected to work on a preview address: the Google and Microsoft s
 ## After a deploy
 
 1. Open https://marketcheck.money/ and check that prices load and the time in the footer is recent.
-2. Open `/markets/`, `/heatmap/`, `/portfolio/`, `/news/`, `/podcasts/` and one text page.
+2. Open `/markets/`, `/heatmap/`, `/portfolio/`, `/news/` and one text page.
 3. `https://marketcheck.money/ads.txt` and `/robots.txt` still answer.
 4. Sign in and check that your tiles and lists are there.
 

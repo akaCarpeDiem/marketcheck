@@ -14,18 +14,18 @@ const ROUTES: Record<string, ViewId> = {
   '/': 'overview',
   '/markets/': 'markets',
   '/heatmap/': 'heatmap',
+  '/compare/': 'compare',
   '/portfolio/': 'portfolio',
   '/news/': 'news',
-  '/podcasts/': 'podcasts',
 };
 
 const TITLES: Record<ViewId, string> = {
   overview: 'Market Check — Live crypto, stocks, commodities & headlines',
   markets: 'Markets: crypto, stocks and ETFs by market cap · Market Check',
   heatmap: 'Heat map and bubble map: what is moving · Market Check',
+  compare: 'Compare stocks, crypto, funds and gold side by side · Market Check',
   portfolio: 'Portfolio and watchlist · Market Check',
   news: 'Money news by topic: markets, investing, crypto and more · Market Check',
-  podcasts: 'Finance and business podcasts to browse · Market Check',
 };
 
 export const currentView = signal<ViewId | null>(null);

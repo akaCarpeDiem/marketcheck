@@ -11,12 +11,12 @@ import type { Scope } from '../../lib/store';
   if (img.naturalWidth > 0 && img.naturalWidth <= 160) img.closest('.story')?.classList.add('no-image');
 };
 
-const TYPE_TAG: Record<ContentType, string> = { article: '', video: 'Video', podcast: 'Podcast' };
+const TYPE_TAG: Record<ContentType, string> = { article: '', video: 'Video' };
 
 export function storyCard(h: Headline, lead = false, extraTag = ''): string {
   const type = typeOf(h);
   const media = h.image
-    ? `<div class="story-media"><img src="${h.image.replace(/"/g, '&quot;')}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('.story').classList.add('no-image')" onload="window.__mcImg&&window.__mcImg(this)" />${type !== 'article' ? `<span class="story-play">${type === 'podcast' ? icon.mic(14) : icon.play(14)}</span>` : ''}</div>`
+    ? `<div class="story-media"><img src="${h.image.replace(/"/g, '&quot;')}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('.story').classList.add('no-image')" onload="window.__mcImg&&window.__mcImg(this)" />${type !== 'article' ? `<span class="story-play">${icon.play(14)}</span>` : ''}</div>`
     : '';
   const tags = [TYPE_TAG[type], extraTag].filter(Boolean).map((t) => html`<span class="tag">${t}</span>`).join('');
   return html`<a class="story card${lead ? ' story-lead' : ''}${h.image ? '' : ' no-image'}" href="${h.link}" target="_blank" rel="noopener noreferrer">
@@ -34,13 +34,12 @@ const TYPE_FILTERS: { id: TypeFilter; label: string }[] = [
   { id: 'all', label: 'Everything' },
   { id: 'article', label: 'Articles' },
   { id: 'video', label: 'Video' },
-  { id: 'podcast', label: 'Podcasts' },
 ];
 
 export function mountHeadlines(
   el: HTMLElement,
   scope: Scope,
-  opts: { limit: number; more?: boolean; prefKey: string; /** Show the article / video / podcast filter. */ types?: boolean; /** Keep the topic in the address bar. */ url?: boolean },
+  opts: { limit: number; more?: boolean; prefKey: string; /** Show the article / video filter. */ types?: boolean; /** Keep the topic in the address bar. */ url?: boolean },
 ): void {
   const fromUrl = opts.url ? topicFrom(new URL(location.href).searchParams.get('topic')) : null;
   // A choice saved under the old category names is carried over to the topic that replaced it.
@@ -50,7 +49,7 @@ export function mountHeadlines(
   el.innerHTML = `<div class="section-title">
       <h2>Headlines</h2>
       <p data-note></p>
-      ${opts.more ? `<div class="card-tools"><a class="btn btn-ghost btn-sm" href="/podcasts/">${icon.mic(14)} Podcasts</a><a class="btn btn-ghost btn-sm" href="/news/">All headlines ${icon.chevronRight(13)}</a></div>` : ''}
+      ${opts.more ? `<div class="card-tools"><a class="btn btn-ghost btn-sm" href="/news/">All headlines ${icon.chevronRight(13)}</a></div>` : ''}
     </div>
     <div class="seg seg-scroll news-tabs" role="tablist" aria-label="Topic"></div>
     ${opts.types ? '<div class="news-sub"><p class="news-about" data-about></p><div class="seg news-types" role="group" aria-label="Type of content" data-types></div></div>' : ''}

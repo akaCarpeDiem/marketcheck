@@ -21,137 +21,134 @@ import {
 } from '../data/assets';
 import { crypto, equities, quotes, wantQuotes } from '../data/market';
 import { profileFor } from '../data/profiles';
-import { data, isWatched, toggleWatch } from '../data/user';
-import { getJson } from '../lib/api';
+import { coinGeckoBars, coinGeckoCandles, coinOf, rangeStart, verifiedPair, yahooBars, type ChartMeta, type DailyRange } from '../data/history';
+import { data, isWatched, pref, setPref, toggleWatch } from '../data/user';
 import { esc, frame, html, raw, render } from '../lib/dom';
 import { compact, dir, money, pct, price as fmtPrice, quantity, signedMoney } from '../lib/format';
 import { icon } from '../lib/icons';
 import { rangeBar } from '../lib/spark';
 import { Scope } from '../lib/store';
 import { setQuery } from '../router';
-import { createChart, type Chart, type ChartPoint } from './chart';
+import { createChart, type Chart, type ChartLine, type ChartPoint } from './chart';
 import { openHoldingForm } from './holding';
 import { openOverlay, type Overlay } from './overlay';
 import { toast } from './toast';
 
 type RangeId = '1D' | '5D' | '7D' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y';
 
-const YAHOO_RANGES: { id: RangeId; range: string; interval: string }[] = [
-  { id: '1D', range: '1d', interval: '5m' },
-  { id: '5D', range: '5d', interval: '15m' },
-  { id: '1M', range: '1mo', interval: '60m' },
-  { id: '6M', range: '6mo', interval: '1d' },
-  { id: 'YTD', range: 'ytd', interval: '1d' },
-  { id: '1Y', range: '1y', interval: '1d' },
-  { id: '5Y', range: '5y', interval: '1wk' },
+/**
+ * A chart range. `lookback` fetches a longer series so moving averages can start on the left edge;
+ * the chart then shows only the bars from `start`. `bar` names one bar for the average labels.
+ */
+type Spec = { id: RangeId; range: string; interval: string; bar: string; lookback?: string; start?: DailyRange; days?: number };
+
+const YAHOO_RANGES: Spec[] = [
+  { id: '1D', range: '1d', interval: '5m', bar: '5-min' },
+  { id: '5D', range: '5d', interval: '15m', bar: '15-min' },
+  { id: '1M', range: '1mo', interval: '60m', bar: 'hour' },
+  { id: '6M', range: '6mo', interval: '1d', bar: 'day', lookback: '2y', start: '6M' },
+  { id: 'YTD', range: 'ytd', interval: '1d', bar: 'day', lookback: '2y', start: 'YTD' },
+  { id: '1Y', range: '1y', interval: '1d', bar: 'day', lookback: '2y', start: '1Y' },
+  { id: '5Y', range: '5y', interval: '1wk', bar: 'week', lookback: '10y', start: '5Y' },
 ];
 
-const COIN_RANGES: { id: RangeId; days: number; range: string; interval: string }[] = [
-  { id: '1D', days: 1, range: '1d', interval: '15m' },
-  { id: '7D', days: 7, range: '5d', interval: '60m' },
-  { id: '1M', days: 30, range: '1mo', interval: '60m' },
-  { id: '3M', days: 90, range: '3mo', interval: '1d' },
-  { id: '1Y', days: 365, range: '1y', interval: '1d' },
+const COIN_RANGES: Spec[] = [
+  { id: '1D', days: 1, range: '1d', interval: '15m', bar: '15-min' },
+  { id: '7D', days: 7, range: '5d', interval: '60m', bar: 'hour' },
+  { id: '1M', days: 30, range: '1mo', interval: '60m', bar: 'hour' },
+  { id: '3M', days: 90, range: '3mo', interval: '1d', bar: 'day', lookback: '2y', start: '3M' },
+  { id: '1Y', days: 365, range: '1y', interval: '1d', bar: 'day', lookback: '2y', start: '1Y' },
 ];
 
-type ChartMeta = {
-  prevClose: number | null;
-  dayHigh: number | null;
-  dayLow: number | null;
-  volume: number | null;
-  high52: number | null;
-  low52: number | null;
-  exchange: string | null;
-  name: string | null;
-  price: number | null;
-};
+/** Benchmarks a chart can be compared against (Yahoo symbols). */
+const BENCHMARKS: [string, string][] = [
+  ['^GSPC', 'S&P 500'],
+  ['^IXIC', 'Nasdaq'],
+  ['BTC-USD', 'Bitcoin'],
+  ['ETH-USD', 'Ether'],
+  ['GC=F', 'Gold'],
+];
+const COMPARE_COLOUR = '#a78bfa';
+/** Moving averages for daily and weekly bars. */
+const AVERAGES = [50, 200];
 
-type SeriesResult = { points: ChartPoint[]; meta: ChartMeta | null; source: string } | { error: string };
+type Tools = { mode: 'line' | 'candle'; vol: boolean; avg: boolean; cmp: string };
 
-type ChartPayload = {
-  ok?: boolean;
-  closes?: number[];
-  timestamps?: number[];
-  meta?: ChartMeta | null;
-};
+type SeriesResult = { points: ChartPoint[]; history?: ChartPoint[]; meta: ChartMeta | null; source: string } | { error: string };
 
-const seriesCache = new Map<string, { at: number; value: SeriesResult }>();
+const daily = (spec: Spec) => spec.bar === 'day' || spec.bar === 'week';
 
-async function yahooSeries(symbol: string, range: string, interval: string): Promise<SeriesResult> {
-  const d = await getJson<ChartPayload>(
-    `/api/chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`,
-    { timeout: 20_000 },
-  );
-  const closes = d.closes ?? [];
-  const stamps = d.timestamps ?? [];
-  if (!d.ok || closes.length < 2 || stamps.length !== closes.length) return { error: 'No chart is available for this symbol.' };
-  return {
-    points: closes.map((v, i) => ({ t: stamps[i]! * 1000, v })),
-    meta: d.meta ?? null,
-    source: 'Yahoo Finance',
-  };
+/** A Yahoo series for a range, with the lead-in for averages when the range has one. */
+async function yahooSeries(symbol: string, spec: Spec): Promise<SeriesResult> {
+  const y = await yahooBars(symbol, spec.lookback ?? spec.range, spec.interval);
+  if (!y) return { error: 'No chart is available for this symbol.' };
+  if (!spec.lookback || !spec.start) return { points: y.bars, meta: y.meta, source: 'Yahoo Finance' };
+  const from = rangeStart(spec.start);
+  const shown = y.bars.filter((b) => b.t >= from);
+  return shown.length >= 2
+    ? { points: shown, history: y.bars, meta: y.meta, source: 'Yahoo Finance' }
+    : { points: y.bars, meta: y.meta, source: 'Yahoo Finance' };
 }
 
-/** CoinGecko's public chart endpoint, called from the browser. */
-async function coinGeckoSeries(id: string, days: number): Promise<SeriesResult> {
-  const d = await getJson<{ prices?: [number, number][] }>(
-    `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${days}`,
-    { timeout: 9000 },
-  );
-  const rows = (d.prices ?? []).filter((r) => Array.isArray(r) && Number.isFinite(r[0]) && Number.isFinite(r[1]));
-  if (rows.length < 2) return { error: 'No chart is available for this coin.' };
-  // Thin very long series; a few hundred points is plenty for the width.
-  const step = Math.max(1, Math.floor(rows.length / 360));
-  const points: ChartPoint[] = [];
-  for (let i = 0; i < rows.length; i += step) points.push({ t: rows[i]![0], v: rows[i]![1] });
-  const last = rows[rows.length - 1]!;
-  if (points[points.length - 1]!.t !== last[0]) points.push({ t: last[0], v: last[1] });
-  return { points, meta: null, source: 'CoinGecko' };
-}
-
-async function loadSeries(ref: AssetRef, rangeId: RangeId): Promise<SeriesResult> {
-  const key = `${ref.key}|${rangeId}`;
-  const hit = seriesCache.get(key);
-  const maxAge = rangeId === '1D' ? 60_000 : 5 * 60_000;
-  if (hit && Date.now() - hit.at < maxAge) return hit.value;
-
-  let value: SeriesResult;
-  const coin = ref.cg ? crypto.get().byId.get(ref.cg) : ref.kind === 'crypto' && ref.yahoo ? coinForPair(ref.yahoo) : null;
+async function loadSeries(ref: AssetRef, spec: Spec, tools: Tools): Promise<SeriesResult> {
+  const coin = coinOf(ref);
   if (coin) {
-    const spec = COIN_RANGES.find((r) => r.id === rangeId) ?? COIN_RANGES[0]!;
-    try {
-      value = await coinGeckoSeries(coin.id, spec.days);
-    } catch {
-      value = { error: 'unavailable' };
-    }
-    if ('error' in value) {
-      // Fall back to Yahoo's pair for this ticker, but only if it is clearly the same coin.
-      try {
-        const y = await yahooSeries(ref.yahoo ?? `${coin.symbol}-USD`, spec.range, spec.interval);
-        const lastPrice = 'points' in y ? y.points[y.points.length - 1]!.v : null;
-        if ('points' in y && coin.price != null && lastPrice != null && Math.abs(lastPrice / coin.price - 1) < 0.05) {
-          const since = Date.now() - spec.days * 86_400_000;
-          const cut = y.points.filter((p) => p.t >= since);
-          value = { ...y, points: cut.length >= 2 ? cut : y.points };
-        } else {
-          value = { error: 'A chart for this coin is not available right now.' };
+    const days = spec.days ?? 1;
+    // Candles, volume and averages over a long lead-in come from the coin's Yahoo pair when it is the same coin.
+    if (tools.mode === 'candle' || tools.vol || (tools.avg && daily(spec))) {
+      const pair = await verifiedPair(ref);
+      if (pair) {
+        try {
+          const y = await yahooSeries(pair, spec);
+          if ('points' in y) {
+            const since = Date.now() - days * 86_400_000;
+            if (spec.lookback) return y;
+            const cut = y.points.filter((p) => p.t >= since);
+            return { ...y, points: cut.length >= 2 ? cut : y.points };
+          }
+        } catch {
+          /* CoinGecko below */
         }
-      } catch {
-        value = { error: 'A chart for this coin is not available right now.' };
+      }
+      if (tools.mode === 'candle') {
+        try {
+          const candles = await coinGeckoCandles(coin.id, days);
+          if (candles) return { points: candles, meta: null, source: 'CoinGecko' };
+        } catch {
+          /* the line below */
+        }
       }
     }
-  } else if (ref.yahoo) {
-    const spec = YAHOO_RANGES.find((r) => r.id === rangeId) ?? YAHOO_RANGES[0]!;
     try {
-      value = await yahooSeries(ref.yahoo, spec.range, spec.interval);
+      const pts = await coinGeckoBars(coin.id, days);
+      if (pts) return { points: pts, meta: null, source: 'CoinGecko' };
     } catch {
-      value = { error: 'The chart could not be loaded. Try again in a moment.' };
+      /* Yahoo's pair below */
     }
-  } else {
-    value = { error: 'No chart is available for this asset.' };
+    // Fall back to Yahoo's pair for this ticker, but only if it is clearly the same coin.
+    try {
+      const pair = await verifiedPair(ref);
+      if (pair) {
+        const y = await yahooSeries(pair, spec);
+        if ('points' in y) {
+          const since = Date.now() - days * 86_400_000;
+          const cut = y.points.filter((p) => p.t >= since);
+          return { ...y, points: cut.length >= 2 ? cut : y.points };
+        }
+      }
+    } catch {
+      /* nothing left */
+    }
+    return { error: 'A chart for this coin is not available right now.' };
   }
-  if ('points' in value) seriesCache.set(key, { at: Date.now(), value });
-  return value;
+  if (ref.yahoo) {
+    try {
+      return await yahooSeries(ref.yahoo, spec);
+    } catch {
+      return { error: 'The chart could not be loaded. Try again in a moment.' };
+    }
+  }
+  return { error: 'No chart is available for this asset.' };
 }
 
 const fmtShort = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -173,6 +170,12 @@ let scope: Scope | null = null;
 let chart: Chart | null = null;
 let current: AssetRef | null = null;
 let rangeId: RangeId = '1D';
+let tools: Tools = {
+  mode: pref('chart.mode', 'line') === 'candle' ? 'candle' : 'line',
+  vol: pref('chart.vol', true),
+  avg: pref('chart.avg', false),
+  cmp: '',
+};
 let meta: ChartMeta | null = null;
 let chartSource = '';
 let loadToken = 0;
@@ -210,6 +213,7 @@ function headHtml(ref: AssetRef, p: Priced): string {
       </div>
       <div class="sheet-actions">
         <button type="button" class="icon-btn${watched ? ' is-on' : ''}" data-sheet="watch" aria-pressed="${watched ? 'true' : 'false'}" title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}" aria-label="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${raw(watched ? icon.starFill(17) : icon.star(17))}</button>
+        <a class="icon-btn" href="/compare/?s=${encodeURIComponent(assetQuery(ref))},%5EGSPC" data-sheet-compare title="Compare with other assets" aria-label="Compare with other assets">${raw(icon.chart(17))}</a>
         <button type="button" class="icon-btn" data-sheet="share" title="Copy a link to this" aria-label="Copy a link to this">${raw(icon.link(17))}</button>
         <button type="button" class="icon-btn" data-close title="Close" aria-label="Close">${raw(icon.close(17))}</button>
       </div>
@@ -321,9 +325,39 @@ function paint(): void {
   );
 }
 
-function rangesFor(ref: AssetRef): RangeId[] {
+function specsFor(ref: AssetRef): Spec[] {
   const isCoin = !!ref.cg || (ref.kind === 'crypto' && !!ref.yahoo && !!coinForPair(ref.yahoo));
-  return (isCoin ? COIN_RANGES : YAHOO_RANGES).map((r) => r.id);
+  return isCoin ? COIN_RANGES : YAHOO_RANGES;
+}
+const rangesFor = (ref: AssetRef): RangeId[] => specsFor(ref).map((r) => r.id);
+const specFor = (ref: AssetRef): Spec => specsFor(ref).find((r) => r.id === rangeId) ?? specsFor(ref)[0]!;
+
+/** The benchmarks offered for an asset: never the asset itself. */
+function benchmarksFor(ref: AssetRef): [string, string][] {
+  const coin = coinOf(ref);
+  const own = (ref.yahoo ?? (coin ? `${coin.symbol}-USD` : '')).toUpperCase();
+  return BENCHMARKS.filter(([sym]) => sym !== own);
+}
+
+function paintTools(): void {
+  if (!overlay || !current) return;
+  const spec = specFor(current);
+  const cmp = tools.cmp;
+  const btn = (tool: string, on: boolean, label: string, title: string, disabled = false) =>
+    `<button type="button" class="chip-btn${on ? ' is-on' : ''}" data-tool="${tool}" aria-pressed="${on}" title="${esc(title)}"${disabled ? ' disabled' : ''}>${label}</button>`;
+  const options = benchmarksFor(current)
+    .map(([sym, label]) => `<option value="${esc(sym)}"${sym === cmp ? ' selected' : ''}>${esc(label)}</option>`)
+    .join('');
+  render(
+    overlay.panel.querySelector('.chart-tools'),
+    `<div class="seg" role="group" aria-label="Chart type">
+      <button type="button" class="seg-btn${tools.mode === 'line' ? ' is-on' : ''}" data-tool="mode" data-value="line" aria-pressed="${tools.mode === 'line'}" title="Line chart">${icon.chart(14)}<span>Line</span></button>
+      <button type="button" class="seg-btn${tools.mode === 'candle' ? ' is-on' : ''}" data-tool="mode" data-value="candle" aria-pressed="${tools.mode === 'candle'}"${cmp ? ' disabled' : ''} title="Candlestick chart: each bar shows open, high, low and close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 1v12M10.5 2v10" stroke="currentColor" stroke-width="1.4"/><rect x="1.8" y="4" width="3.4" height="5.5" rx="1" fill="currentColor"/><rect x="8.8" y="3.5" width="3.4" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><span>Candles</span></button>
+    </div>
+    ${btn('vol', tools.vol && !cmp, 'Volume', cmp ? 'Not shown while comparing' : 'Show traded volume under the price', !!cmp)}
+    ${btn('avg', tools.avg && daily(spec), `${AVERAGES.join('/')} ${spec.bar === 'week' ? 'week' : 'day'} avg`, daily(spec) ? 'Moving averages: the average closing price over the last 50 and 200 bars' : 'Averages need daily bars: pick 3M or longer', !daily(spec) || !!cmp)}
+    <label class="chip-select${cmp ? ' is-on' : ''}" title="Compare the move with a benchmark"><span>vs</span><select data-tool="cmp" aria-label="Compare with"><option value="">Compare…</option>${options}</select></label>`,
+  );
 }
 
 function paintRanges(): void {
@@ -346,9 +380,15 @@ async function loadChart(): Promise<void> {
   const token = (loadToken += 1);
   const ids = rangesFor(ref);
   if (!ids.includes(rangeId)) rangeId = ids[0]!;
+  const spec = specFor(ref);
   paintRanges();
+  paintTools();
   overlay?.panel.querySelector('.sheet-chart')?.classList.add('is-loading');
-  const res = await loadSeries(ref, rangeId);
+  const cmpSym = tools.cmp;
+  const [res, cmp] = await Promise.all([
+    loadSeries(ref, spec, tools),
+    cmpSym ? yahooBars(cmpSym, spec.range, spec.interval).catch(() => null) : Promise.resolve(null),
+  ]);
   if (token !== loadToken || !chart || current !== ref) return;
   overlay?.panel.querySelector('.sheet-chart')?.classList.remove('is-loading');
   if ('error' in res) {
@@ -358,15 +398,33 @@ async function loadChart(): Promise<void> {
     if (res.meta) meta = res.meta;
     chartSource = res.source;
     const p = lookup(ref);
-    const points = res.points.slice();
-    // End the line on the live price so the chart and the headline number agree.
-    if (p.price != null && points.length) points[points.length - 1] = { t: points[points.length - 1]!.t, v: p.price };
+    const points = res.points.map((x) => ({ ...x }));
+    // End the line on the live price so the chart and the headline number agree (if they are the same thing).
+    const last = points[points.length - 1];
+    if (p.price != null && last && Math.abs(p.price / last.v - 1) < 0.15) {
+      last.v = p.price;
+      if (last.h != null) last.h = Math.max(last.h, p.price);
+      if (last.l != null) last.l = Math.min(last.l, p.price);
+    }
+    const compare: ChartLine[] = [];
+    if (cmpSym && cmp && cmp.bars.length > 1) {
+      const label = BENCHMARKS.find(([s]) => s === cmpSym)?.[1] ?? cmpSym;
+      compare.push({ label, colour: COMPARE_COLOUR, points: cmp.bars });
+    }
     chart.set(points, {
       baseline: rangeId === '1D' && !p.coin ? (p.prevClose ?? res.meta?.prevClose ?? null) : null,
       formatValue: (v) => priceText(ref, v),
       formatTime: tipTime,
       formatAxisTime: axisTime,
+      mode: tools.mode,
+      volume: tools.vol,
+      averages: tools.avg && daily(spec) ? AVERAGES : [],
+      barName: spec.bar,
+      history: res.history,
+      compare,
+      label: ref.sym,
     });
+    if (cmpSym && !compare.length) toast('That comparison is not available right now.', 'bad');
   }
   paint();
 }
@@ -406,6 +464,7 @@ export function openAsset(ref: AssetRef, opts: { updateUrl?: boolean } = {}): vo
     current = ref;
     meta = null;
     chartSource = '';
+    tools.cmp = '';
     if (ref.yahoo && !ref.cg) wantQuotes('sheet', [ref.yahoo]);
     paint();
     paintExtra();
@@ -417,6 +476,7 @@ export function openAsset(ref: AssetRef, opts: { updateUrl?: boolean } = {}): vo
   meta = null;
   chartSource = '';
   rangeId = '1D';
+  tools.cmp = '';
   scope = new Scope();
   overlay = openOverlay({
     kind: 'sheet',
@@ -438,8 +498,12 @@ export function openAsset(ref: AssetRef, opts: { updateUrl?: boolean } = {}): vo
     <div class="sheet-body scroll">
       <div class="sheet-chips"></div>
       <div class="sheet-chart-wrap">
-        <div class="seg sheet-ranges" role="group" aria-label="Chart range"></div>
+        <div class="sheet-chart-bar">
+          <div class="seg sheet-ranges" role="group" aria-label="Chart range"></div>
+          <div class="chart-tools"></div>
+        </div>
         <div class="sheet-chart"></div>
+        <p class="chart-hint faint">Press and drag across the chart to measure a move.</p>
       </div>
       <dl class="sheet-stats"></dl>
       <div class="sheet-position"></div>
@@ -453,6 +517,29 @@ export function openAsset(ref: AssetRef, opts: { updateUrl?: boolean } = {}): vo
     const range = t.closest<HTMLElement>('[data-range]');
     if (range && current) {
       rangeId = range.dataset.range as RangeId;
+      void loadChart();
+      return;
+    }
+    // The compare link leaves for another page: close the sheet and let the router follow the link.
+    if (t.closest('[data-sheet-compare]')) {
+      overlay?.close();
+      return;
+    }
+    const tool = t.closest<HTMLElement>('button[data-tool]');
+    if (tool && current && !tool.hasAttribute('disabled')) {
+      const which = tool.dataset.tool;
+      if (which === 'mode') {
+        tools.mode = tool.dataset.value === 'candle' ? 'candle' : 'line';
+        setPref('chart.mode', tools.mode);
+        if (tools.mode === 'candle') tools.cmp = '';
+      } else if (which === 'vol') {
+        tools.vol = !tools.vol;
+        setPref('chart.vol', tools.vol);
+      } else if (which === 'avg') {
+        tools.avg = !tools.avg;
+        setPref('chart.avg', tools.avg);
+        if (tools.avg) tools.cmp = '';
+      }
       void loadChart();
       return;
     }
@@ -470,6 +557,15 @@ export function openAsset(ref: AssetRef, opts: { updateUrl?: boolean } = {}): vo
     } else if (act === 'hold') {
       openHoldingForm(current);
     }
+  });
+
+  panel.addEventListener('change', (ev) => {
+    const sel = (ev.target as Element).closest<HTMLSelectElement>('select[data-tool="cmp"]');
+    if (!sel) return;
+    tools.cmp = sel.value;
+    // A comparison is a line in percent: candles and averages step aside while it is on.
+    if (tools.cmp) tools.mode = 'line';
+    void loadChart();
   });
 
   if (ref.yahoo && !ref.cg) wantQuotes('sheet', [ref.yahoo]);

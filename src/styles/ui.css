@@ -1229,3 +1229,135 @@ th.is-sorted {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* ── Chart toolbar, legend and measuring (asset sheet, compare page) ── */
+.sheet-chart-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chart-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chart-tools .seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0 9px;
+}
+.chip-btn,
+.chip-select {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-2);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chip-btn:hover:not([disabled]),
+.chip-select:hover {
+  color: var(--text);
+  border-color: var(--line-3);
+}
+.chip-btn.is-on,
+.chip-select.is-on {
+  color: var(--brand);
+  border-color: var(--brand-line);
+  background: var(--brand-soft);
+}
+.chip-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.chip-select {
+  position: relative;
+  padding-right: 6px;
+  cursor: pointer;
+}
+.chip-select span {
+  color: var(--text-3);
+}
+.chip-select select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0 14px 0 0;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 5px center, right 1px center;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
+.chip-select select option {
+  color: var(--text);
+  background: var(--card);
+}
+.chart-legend {
+  position: absolute;
+  top: 32px;
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: calc(100% - 80px);
+  pointer-events: none;
+  z-index: 1;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.chart-legend:empty {
+  display: none;
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter: blur(4px);
+}
+.chart-legend i {
+  width: 9px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c);
+}
+.chart-legend b {
+  color: var(--text);
+  font-weight: 600;
+}
+.chart-tip .tip-ohlc,
+.chart-tip .tip-vol {
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.chart-tip .tip-ohlc i {
+  font-style: normal;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.chart-hint {
+  margin: -4px 0 0;
+  font-size: 11.5px;
+}
+
+.seg-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

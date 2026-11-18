@@ -3,7 +3,7 @@
  * scripts/build.mjs at build time; nothing here runs in the browser.
  */
 import { footerHtml, tabbarHtml, topbarHtml, type NavId } from './shell';
-import { PODCAST_SHOWS, TOPICS } from '../../functions/_shared/newsTopics';
+import { TOPICS } from '../../functions/_shared/newsTopics';
 
 const SITE = 'https://marketcheck.money';
 const GA_ID = 'G-EN7YS4P0XE';
@@ -28,8 +28,8 @@ export type Page = {
    */
   guide?: string;
   /**
-   * false leaves the AdSense loader off this page. Headline and podcast listings
-   * are mostly third-party links, so they carry no ads. The 404 page skips the
+   * false leaves the AdSense loader off this page. The headlines listing is
+   * mostly third-party links, so it carries no ads. The 404 page skips the
    * loader too: no ad slots, and ad code on an error page is thin inventory.
    */
   ads?: boolean;
@@ -122,6 +122,28 @@ const APP_PAGES: Page[] = [
     ),
   },
   {
+    path: '/compare/',
+    file: 'compare/index.html',
+    view: 'compare',
+    title: 'Compare stocks, crypto, funds and gold side by side · Market Check',
+    description:
+      'Compare up to five stocks, ETFs, coins, indexes or commodities: performance from any start date, volatility, worst drop, best and worst days, and how closely they move together.',
+    body: intro('Compare', [
+      'Put up to five stocks, funds, coins, indexes or commodities on one chart and see how far each moved over a month, a year or five years, how bumpy the ride was, and whether they tend to rise and fall together.',
+    ]),
+    guide: guide(
+      'How to read a comparison',
+      `<p>Every line starts at 0% on the first day of the range, so assets with very different prices can share one chart. A line at +25% means that asset is worth a quarter more than when the range began.</p>
+      <ul>
+        <li><strong>Return</strong> is the change from the first close in the range to the latest price.</li>
+        <li><strong>Volatility</strong> is how widely the daily moves swing, scaled to a year (the standard deviation of daily returns × √252 for stocks, × √365 for crypto, which trades every day). Two assets can end at the same return with very different volatility: one got there smoothly, the other with big swings.</li>
+        <li><strong>Worst drop</strong> (maximum drawdown) is the deepest fall from a high to a later low inside the range. It answers “how much could I have been down at the worst moment?” The <em>Below the high</em> chart shows the same thing day by day.</li>
+        <li><strong>Correlation</strong> compares daily moves on the days both assets traded. Near +1 they rise and fall together, near 0 they are unrelated, below 0 they tend to move in opposite directions. Mixing assets that are not closely correlated is the idea behind diversification, but correlations can jump suddenly when markets panic.</li>
+      </ul>
+      <p><strong>Example.</strong> Over a year the S&amp;P 500 might return +12% with 15% volatility while bitcoin returns +12% with 55% volatility: the same destination, a much rougher road. Past moves say nothing certain about future ones, and none of this is advice. More in <a href="/learn/price-changes/">How each change is measured</a>.</p>`,
+    ),
+  },
+  {
     path: '/portfolio/',
     file: 'portfolio/index.html',
     view: 'portfolio',
@@ -157,34 +179,13 @@ const APP_PAGES: Page[] = [
     body: intro('Headlines', [
       'Money news from major publishers, sorted into ten topics. Each story links to the original.',
       `<span class="topic-list">${TOPICS.map((t) => `<a href="/news/?topic=${t.id}">${t.label.replace(/&/g, '&amp;')}</a>`).join(' · ')}</span>`,
-      'Looking for something to listen to? The <a href="/podcasts/">podcast hub</a> has shows for every one of these topics.',
     ]),
     guide: guide(
       'About these headlines',
       `<p>This page gathers recent headlines from the public feeds of major publishers and sorts them into ten topics, so you can scan a whole day of money news in one place. Each item links to the original story on the publisher's site. Market Check does not write, rewrite or summarise articles, and is not affiliated with these publishers.</p>
-      <p><strong>How stories are sorted.</strong> A story is placed in a topic by the feed it came from and by the words in its headline. No single publisher fills a topic: each is limited to a few stories at a time, the same story is shown once, and stories marked as for paying subscribers only are left out where the feed says so. You can also filter by type: articles, video or podcast episodes.</p>
+      <p><strong>How stories are sorted.</strong> A story is placed in a topic by the feed it came from and by the words in its headline. No single publisher fills a topic: each is limited to a few stories at a time, the same story is shown once, and stories marked as for paying subscribers only are left out where the feed says so. You can also filter by type: articles or video.</p>
       <p><strong>Reading headlines well.</strong> A headline compresses a lot into a few words. Before reacting, open the story and check the actual numbers against the <a href="/markets/">prices</a>. Be wary of single-cause explanations ("stocks fell because…"), which are often written after the move. If the whole market moved, the <a href="/heatmap/">heat map</a> will show it. More tips in <a href="/learn/reading-market-news/">Reading market news</a>.</p>
       <p>A headline appearing here is not an endorsement and nothing on this page is financial advice.</p>`,
-    ),
-  },
-  {
-    path: '/podcasts/',
-    ads: false,
-    file: 'podcasts/index.html',
-    view: 'podcasts',
-    title: 'Finance and business podcasts to browse · Market Check',
-    description:
-      'A hand-picked directory of podcasts on markets, investing, personal finance, crypto, real estate, technology, business, commodities and health, with the newest episode of each.',
-    body: intro('Podcasts', [
-      'A hand-picked directory of shows on markets, investing, personal finance, crypto, real estate, technology, business, commodities and health. Browse by topic and see the newest episode of each.',
-      `Shows include ${PODCAST_SHOWS.filter((s) => s.topic).slice(0, 12).map((s) => s.name).join(', ')} and more.`,
-    ]),
-    guide: guide(
-      'How the podcast directory works',
-      `<p>Every show here was chosen by hand and filed under one of the same ten topics as the <a href="/news/">news page</a>, from markets and investing to real estate, technology and health. The aim is a short list of shows worth trying in each area rather than an exhaustive catalogue.</p>
-      <p><strong>Newest episodes.</strong> Each show's recent episodes are read from its public channel feed about every twenty minutes and open on YouTube. If a feed is temporarily unavailable, the last episodes we saw are kept for a while rather than leaving a gap.</p>
-      <p><strong>Choosing what to listen to.</strong> Headlines tell you what happened; long conversations are better for understanding why it might matter. Shows range from daily market wraps to long interviews and personal finance call-ins, so the topic filter is the quickest way to narrow things down.</p>
-      <p>Being listed is not an endorsement of what is said in a show, and hosts' views are their own. Nothing here is financial advice. Want a show added? Email <a href="mailto:support@marketcheck.money">support@marketcheck.money</a>.</p>`,
     ),
   },
 ];

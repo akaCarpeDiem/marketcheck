@@ -16,6 +16,7 @@
 import { cssVar, theme } from '../data/theme';
 import { debounce, reducedMotion } from '../lib/dom';
 import { MIN_REL, WALL, hashUnit, packBubbles } from '../lib/pack';
+import { createPhysics, type Physics } from './physics';
 
 export type Bubble = {
   /** Stable id; a bubble with the same key keeps its place between updates. */
@@ -40,6 +41,10 @@ export type BubbleMapOpts = {
 
 export type BubbleMap = {
   set(items: Bubble[], opts?: { exponent?: number; emptyText?: string }): void;
+  /** Let the bubbles float, collide and be thrown (Matter.js), or pack them again. */
+  setPhysics(on: boolean): void;
+  /** In physics mode, throw every bubble in a random direction. */
+  shake(): void;
   destroy(): void;
 };
 
@@ -87,6 +92,11 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
   let animating = false;
   let colourMax = 5;
   let destroyed = false;
+  let physicsOn = false;
+  let physics: Physics | null = null;
+  /** A bubble being dragged in physics mode, and whether the pointer moved enough to count as a throw. */
+  let grabbed: { key: string; x0: number; y0: number; moved: boolean } | null = null;
+  let swallowClick = false;
 
   function measure(): boolean {
     const rect = host.getBoundingClientRect();
@@ -263,6 +273,19 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
   function play(): void {
     cancelAnimationFrame(raf);
     raf = 0;
+    if (physicsOn) {
+      // Keep each bubble where the engine has it, at its new size; new ones start at their packed place.
+      for (const n of nodes) {
+        n.r = n.r1;
+        if (n.r0 === 0) {
+          n.x = n.x1;
+          n.y = n.y1;
+        }
+      }
+      physics?.sync(nodes, w, h);
+      draw();
+      return;
+    }
     // A hidden tab gets no animation frames, so draw the end state at once.
     if (reducedMotion() || document.hidden) {
       finish();
@@ -312,11 +335,43 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
     tip.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
   }
 
+  const local = (ev: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  };
+  const onDown = (ev: PointerEvent) => {
+    if (!physics || ev.button > 0) return;
+    const n = at(ev.clientX, ev.clientY);
+    if (!n) return;
+    const p = local(ev);
+    grabbed = { key: n.key, x0: p.x, y0: p.y, moved: false };
+    physics.grab(n.key, p.x, p.y);
+    showTip(null);
+    canvas.style.cursor = 'grabbing';
+    try {
+      canvas.setPointerCapture(ev.pointerId);
+    } catch {
+      /* dragging still works while the pointer is over the map */
+    }
+  };
+  const onUp = () => {
+    if (!grabbed) return;
+    swallowClick = grabbed.moved;
+    grabbed = null;
+    physics?.release();
+    canvas.style.cursor = hover ? 'grab' : '';
+  };
   const onMove = (ev: PointerEvent) => {
+    if (grabbed && physics) {
+      const p = local(ev);
+      if (Math.hypot(p.x - grabbed.x0, p.y - grabbed.y0) > 5) grabbed.moved = true;
+      physics.drag(p.x, p.y);
+      return;
+    }
     const n = at(ev.clientX, ev.clientY);
     if (n !== hover) {
       hover = n;
-      canvas.style.cursor = n ? 'pointer' : '';
+      canvas.style.cursor = n ? (physics ? 'grab' : 'pointer') : '';
       showTip(ev.pointerType === 'touch' ? null : n);
       schedule();
     }
@@ -329,9 +384,17 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
     schedule();
   };
   const onClick = (ev: MouseEvent) => {
+    if (swallowClick) {
+      // That press was a throw, not a click.
+      swallowClick = false;
+      return;
+    }
     const n = at(ev.clientX, ev.clientY);
     if (n) opts.onPick(n.key);
   };
+  canvas.addEventListener('pointerdown', onDown);
+  canvas.addEventListener('pointerup', onUp);
+  canvas.addEventListener('pointercancel', onUp);
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerleave', onLeave);
   canvas.addEventListener('click', onClick);
@@ -347,7 +410,8 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
     const oldH = h;
     if (!measure()) return;
     layout(lastItems, oldW, oldH);
-    finish();
+    if (physicsOn) play();
+    else finish();
   }, 90);
   const ro = new ResizeObserver(() => relayout());
   ro.observe(host);
@@ -373,8 +437,51 @@ export function createBubbleMap(host: HTMLElement, opts: BubbleMapOpts): BubbleM
       paintList();
       play();
     },
+    setPhysics(on) {
+      if (on === physicsOn) return;
+      physicsOn = on;
+      canvas.classList.toggle('is-physics', on);
+      if (on) {
+        for (const n of nodes) {
+          n.x = n.x1;
+          n.y = n.y1;
+          n.r = n.r1;
+        }
+        cancelAnimationFrame(raf);
+        raf = 0;
+        animating = false;
+        void createPhysics(() => nodes, draw).then(
+          (p) => {
+            if (!physicsOn || destroyed) return p.stop();
+            physics = p;
+            p.sync(nodes, w, h);
+            p.shake();
+          },
+          () => {
+            physicsOn = false;
+            canvas.classList.remove('is-physics');
+          },
+        );
+      } else {
+        physics?.stop();
+        physics = null;
+        grabbed = null;
+        // Glide from wherever the bubbles floated back to the packed layout.
+        for (const n of nodes) {
+          n.x1 = n.x;
+          n.y1 = n.y;
+        }
+        layout(lastItems, w, h);
+        play();
+      }
+    },
+    shake() {
+      physics?.shake();
+    },
     destroy() {
       destroyed = true;
+      physics?.stop();
+      physics = null;
       cancelAnimationFrame(raf);
       ro.disconnect();
       stopTheme();

@@ -174,7 +174,18 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
         longName: NAMES[sym] ?? names[sym] ?? `${sym} Incorporated`,
       },
       timestamp: series.t,
-      indicators: { quote: [{ close: series.c, volume: series.c.map(() => Math.round(1e5 + r() * 4e6)) }] },
+      indicators: {
+        quote: [
+          {
+            close: series.c,
+            volume: series.c.map(() => Math.round(1e5 + r() * 4e6)),
+            // Each bar opens near the previous close, and its range covers both ends.
+            open: series.c.map((c, i) => (i ? series.c[i - 1] : c) * (1 + (r() - 0.5) * 0.004)),
+            high: series.c.map((c, i) => Math.max(c, i ? series.c[i - 1] : c) * (1 + r() * 0.006)),
+            low: series.c.map((c, i) => Math.min(c, i ? series.c[i - 1] : c) * (1 - r() * 0.006)),
+          },
+        ],
+      },
     };
   }
 
@@ -270,36 +281,6 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     return list;
   }
 
-  /** The podcast hub in the shape /api/podcasts returns. `shows` is the real directory. */
-  function podcasts(shows, topics) {
-    const now = Date.now();
-    const titles = ['What the Fed does next', 'A listener asks: pay off the mortgage or invest?', 'The deal that changed an industry', 'Bull case, bear case', 'Inside a record quarter', 'Three charts everyone is arguing about'];
-    const list = shows.map((show, i) => ({
-      ...show,
-      url: `https://www.youtube.com/channel/${show.channel}`,
-      episodes: [0, 1, 2].map((n) => {
-        const at = now - ((i * 5 + n * 31 + 2) % 140) * 3_600_000;
-        return {
-          id: `${show.id}-${n}`,
-          title: `${titles[(i + n) % titles.length]} | ${show.name}`,
-          link: `https://example.com/podcasts/${show.id}/${n}`,
-          summary: '',
-          image: `/__dev/img?i=${(i + n) % 9}`,
-          source: show.name,
-          publishedAt: new Date(at).toISOString(),
-          publishedMs: at,
-          mediaType: 'video',
-          topic: show.topic,
-          type: 'podcast',
-          show: show.id,
-        };
-      }),
-    }));
-    const latest = list.flatMap((s) => s.episodes).sort((a, b) => b.publishedMs - a.publishedMs).slice(0, 36);
-    const used = new Set(list.map((s) => s.topic));
-    return { ok: true, shows: list, latest, topics: topics.filter((t) => used.has(t.id)).map((t) => ({ id: t.id, label: t.label, short: t.short })), failed: [], stale: false, fetchedAt: new Date(now).toISOString() };
-  }
-
   function jupiter() {
     const out = [];
     for (let i = 0; i < 260; i++) {
@@ -343,18 +324,344 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
   const json = (body, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
+  /** The time the market-wide lists below describe. Tests set it to run "Yesterday's best buys" at chosen times. */
+  let clockMs = null;
+  /** Rows that must never be picked: like an unknown symbol, Yahoo has no daily bars for them. */
+  const madeUpStocks = new Set(['QWRNW', 'QPRF-PA', 'QTNY', 'QTHN']);
+  /** The made-up small companies in the full stock lists, by symbol: price and change on the session shown. */
+  const smallStocks = new Map();
+  /** Stocks and coins Yahoo has no daily bars for (tests: the biggest gainers, to see the next ones are checked). */
+  let stockBarsMissing = new Set();
+  let coinBarsMissing = 0;
+  /** The day's biggest coin gainer gets a daily bar 30% off its listed close (tests: it is left out). */
+  let badCoinBar = false;
+  let yahooCoinsDown = false;
+  /** The session Nasdaq's screener shows (YYYY-MM-DD); null: the last finished one. Like the real one, it can lag. */
+  let nasdaqDay = null;
+  const clock = () => clockMs ?? Date.now();
+
+  /**
+   * Nasdaq's screener of every US stock: the site's own stocks, a few hundred made-up small ones, and
+   * rows that must never be picked: a warrant, a preferred share, one under the $1M floor and one that
+   * barely traded (each with a bigger gain than any real pick).
+   */
+  function nasdaqScreener(showDay = nasdaqDay) {
+    const rows = [];
+    const add = (symbol, name, price, pct, volume, cap) =>
+      rows.push({
+        symbol,
+        name,
+        lastsale: `$${price.toFixed(2)}`,
+        netchange: (price - price / (1 + pct / 100)).toFixed(2),
+        pctchange: `${pct.toFixed(3)}%`,
+        volume: String(Math.round(volume)),
+        marketCap: cap ? cap.toFixed(2) : '',
+        country: 'United States',
+        ipoyear: '',
+        industry: '',
+        sector: '',
+        url: `/market-activity/stocks/${symbol.toLowerCase()}`,
+      });
+    // The site's own stocks carry the session's real (generated) close and change, matching the Yahoo
+    // stand-in, so the endpoint can tell which session the list shows.
+    const now = Date.now();
+    for (const [sym, count] of Object.entries(shares)) {
+      const price = basePrice(sym);
+      if (!price || /-USD$|=F$|^\^/.test(sym)) continue;
+      const s = dailySeries(sym, 30, now);
+      if (!s) continue;
+      const keys = s.t.map((t) => calendar.etParts(t * 1000).key);
+      // By default the last finished session: the latest bar, or the one before while today's is still trading.
+      const day = showDay ?? keys[calendar.marketStatus(now).open ? keys.length - 2 : keys.length - 1];
+      const i = keys.indexOf(day);
+      if (i < 1) continue;
+      const r = rng(hash(`${sym}:nq`));
+      add(sym.replace(/-/g, '/'), `${names[sym] ?? sym} Common Stock`, s.c[i], (s.c[i] / s.c[i - 1] - 1) * 100, 2e6 + r() * 3e7, count * s.c[i]);
+    }
+    for (let i = 0; i < 700; i++) {
+      const r = rng(hash(`small${i}`));
+      const sym = `Q${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(65 + Math.floor(i / 26) % 26)}${i % 3 ? '' : 'X'}`;
+      const price = 0.5 + r() * 40;
+      const pct = gauss(r) * 6 + (i % 97 === 3 ? 60 + (i % 7) * 9 : 0);
+      smallStocks.set(sym, { price, pct });
+      add(sym, `Smallco ${i} Inc. Common Stock`, price, pct, 50_000 + r() * 4e6, 2e6 + r() * 3e9);
+    }
+    add('QWRNW', 'Smallco Holdings Inc. Warrant', 0.04, 400, 3e6, 4e7);
+    add('QPRF^A', 'Smallco Financial 7.5% Series A Preferred Stock', 21, 350, 1e6, 9e8);
+    add('QTNY', 'Tiny Shell Corp. Common Stock', 0.2, 500, 9e6, 600_000);
+    add('QTHN', 'Thinly Traded Inc. Common Stock', 3, 300, 900, 5e7);
+    return { data: { asOf: null, headers: {}, rows } };
+  }
+
+  /**
+   * CoinPaprika: 400 coins with rolling changes, and each coin's candle for yesterday (UTC) that agrees
+   * with them. As with stocks, one coin under the floor and one that barely traded have the biggest moves.
+   */
+  function paprikaCoins() {
+    const list = [];
+    for (let i = 0; i < 400; i++) {
+      const r = rng(hash(`pp${i}`));
+      const special = i === 398 ? 'tiny' : i === 399 ? 'thin' : null;
+      const id = special ? `${special}-${special}coin` : `c${i}-coin-${i}`;
+      // Some coins are priced in millionths of a dollar, as many are (one of them a runner).
+      const micro = !special && (i % 9 === 4 || (i % 41 === 9 && i % 3 === 2));
+      const price = Math.pow(10, -3 + r() * 5) * (micro ? 1e-5 : 1);
+      const cap = special === 'tiny' ? 400_000 : 5e9 * Math.pow(0.985, i) * (0.8 + r() * 0.4);
+      const volume = special === 'thin' ? 2_000 : cap * (0.03 + r() * 0.1);
+      const day = special ? 300 : gauss(r) * 5 + (i % 41 === 9 ? 45 + (i % 5) * 11 : 0);
+      list.push({ i, id, name: special ? `${special} coin` : `Coin ${i}`, symbol: special ? special.toUpperCase() : `C${i}`, base: price, price, cap, volume, day, today: gauss(r) * 1.5 });
+    }
+    // Every source tells the same story: yesterday's candle runs from the close two days ago to yesterday's
+    // close on the coin's one price path (coinCloseOn), and the price now is a little on from there.
+    const n = Math.floor(clock() / DAY_MS);
+    for (const c of list) {
+      const y0 = coinCloseOn(c, n - 2);
+      const y1 = coinCloseOn(c, n - 1);
+      c.day = (y1 / y0 - 1) * 100;
+      c.price = y1 * (1 + c.today / 100);
+    }
+    return list;
+  }
+  const paprikaById = () => new Map(paprikaCoins().map((c) => [c.id, c]));
+  const utcKeyOf = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+  function paprikaTickers() {
+    const now = clock();
+    return paprikaCoins().map((c) => ({
+      id: c.id,
+      name: c.name,
+      symbol: c.symbol,
+      rank: c.i + 1,
+      total_supply: 1e9,
+      max_supply: 0,
+      beta_value: 1,
+      first_data_at: '2020-01-01T00:00:00Z',
+      last_updated: new Date(now).toISOString(),
+      quotes: {
+        USD: {
+          price: c.price,
+          volume_24h: c.volume,
+          volume_24h_change_24h: 0,
+          market_cap: c.cap,
+          market_cap_change_24h: 0,
+          percent_change_15m: 0,
+          percent_change_30m: 0,
+          percent_change_1h: c.today / 4,
+          percent_change_6h: c.today / 2,
+          percent_change_12h: c.today,
+          percent_change_24h: ((1 + c.day / 100) * (1 + c.today / 100) - 1) * 100,
+          percent_change_7d: c.day,
+          ath_price: c.price * 3,
+          ath_date: '2021-11-10T00:00:00Z',
+          percent_from_price_ath: -60,
+        },
+      },
+    }));
+  }
+
+  /**
+   * Yahoo's list of every coin (CoinMarketCap's figures): the same coins, each with a close at every
+   * 00:00 UTC that follows a fixed path, so a test running over several days knows each day's change.
+   * Every 41st coin runs (+70% or so) on alternate days; TINY (under the floor) and THIN (barely traded)
+   * triple on odd days. A few tickers carry CoinMarketCap's id, as Yahoo does when tickers clash.
+   */
+  const DAY_MS = 86_400_000;
+  let paprikaDown = false;
+  function coinCloseOn(c, n) {
+    const r = rng(hash(`${c.id}:d${n}`));
+    const special = c.id.startsWith('tiny-') || c.id.startsWith('thin-');
+    const w = gauss(r) * 0.03 + (c.i % 41 === 9 ? ((n + c.i) % 2) * 0.55 : 0) + (special ? (n % 2) * 1.2 : 0);
+    return c.base * Math.exp(w);
+  }
+  /**
+   * Yahoo's bars for a mocked coin. Daily: a bar at each 00:00 UTC closing on the path, the last one at the
+   * price now, rounded to six decimals as Yahoo's are (which only matters for the smallest prices). Hourly
+   * (five days): full digits, moving along the path, each day's last bar closing on the day's close.
+   */
+  function coinBlock(c, days, interval = '1d') {
+    const now = clock();
+    const n = Math.floor(now / DAY_MS);
+    const t = [];
+    const close = [];
+    if (interval === '1h' || interval === '60m') {
+      const lastHour = Math.floor((now % DAY_MS) / 3_600_000);
+      for (let d = n - 4; d <= n; d++) {
+        const a = coinCloseOn(c, d - 1);
+        const b = d === n ? c.price : coinCloseOn(c, d);
+        const hours = d === n ? lastHour + 1 : 24;
+        for (let h = 0; h < hours; h++) {
+          t.push(d * 86_400 + h * 3600);
+          close.push(a * Math.pow(b / a, (h + 1) / hours));
+        }
+      }
+    } else {
+      for (let d = n - days + 1; d <= n; d++) {
+        t.push(d * 86_400);
+        close.push(d === n ? c.price : Math.round(coinCloseOn(c, d) * 1e6) / 1e6);
+      }
+    }
+    return {
+      meta: { currency: 'USD', symbol: yahooCoinSymbol(c), instrumentType: 'CRYPTOCURRENCY', regularMarketTime: Math.floor(clock() / 1000), regularMarketPrice: c.price, previousClose: close[close.length - 2], chartPreviousClose: close[0] },
+      timestamp: t,
+      indicators: { quote: [{ close }] },
+    };
+  }
+  const yahooCoinSymbol = (c) => (c.i % 50 === 7 ? `${c.symbol}${1000 + c.i}-USD` : `${c.symbol}-USD`);
+  function yahooCryptoScreener(start, count) {
+    const n = Math.floor(clock() / DAY_MS);
+    const rows = paprikaCoins()
+      .map((c) => {
+        const prev = coinCloseOn(c, n - 1);
+        return {
+          language: 'en-US',
+          region: 'US',
+          quoteType: 'CRYPTOCURRENCY',
+          typeDisp: 'Cryptocurrency',
+          quoteSourceName: 'CoinMarketCap',
+          currency: 'USD',
+          exchange: 'CCC',
+          coinImageUrl: `https://s2.coinmarketcap.com/static/img/coins/64x64/${1000 + c.i}.png`,
+          marketCap: c.cap,
+          volume24Hr: c.volume,
+          regularMarketTime: Math.floor(clock() / 1000),
+          regularMarketPrice: prev * (1 + c.today / 100),
+          regularMarketPreviousClose: prev,
+          shortName: `${c.name} USD`,
+          symbol: yahooCoinSymbol(c),
+        };
+      })
+      .sort((a, b) => b.marketCap - a.marketCap);
+    const quotes = rows.slice(start, start + count);
+    return { finance: { result: [{ id: 'all', title: 'All Cryptocurrencies', start, count: quotes.length, total: rows.length, quotes }], error: null } };
+  }
+
+  /**
+   * Yahoo's stock screener (needs a cookie from fc.yahoo.com and the crumb that goes with it): the same
+   * stocks as Nasdaq's list, for the last finished session, plus one row whose previous close is wrong
+   * (as Yahoo's has been for a share consolidation), making a small move look like +900%.
+   */
+  let yahooStocksDown = false;
+  let badYahooStock = null;
+  function yahooStockScreener(body) {
+    const rows = nasdaqScreener(null).data.rows;
+    const ops = JSON.stringify(body?.query ?? {});
+    const gainersOnly = ops.includes('"percentchange"');
+    const toQuote = (r, prevClose) => {
+      const price = parseFloat(r.lastsale.slice(1));
+      return {
+        symbol: r.symbol.replace(/\//g, '-').replace(/\^/g, '-P'),
+        quoteType: 'EQUITY',
+        exchange: 'NMS',
+        shortName: r.name,
+        longName: r.name,
+        regularMarketPrice: price,
+        regularMarketPreviousClose: prevClose ?? price / (1 + parseFloat(r.pctchange) / 100),
+        regularMarketVolume: Number(r.volume),
+        marketCap: Number(r.marketCap) || 0,
+        regularMarketTime: Math.floor(Date.parse(`${lastSessionKey()}T21:00:00Z`) / 1000),
+      };
+    };
+    const quotes = rows.map((r) => toQuote(r));
+    const big = quotes.find((q) => q.marketCap > 1e11);
+    if (big) big.regularMarketPreviousClose = big.regularMarketPrice / 10.08;
+    badYahooStock = big?.symbol ?? null;
+    const listed = quotes.filter((q) => q.marketCap >= 1e6 && (!gainersOnly || q.regularMarketPrice > q.regularMarketPreviousClose));
+    listed.sort((a, b) => b.regularMarketPrice / b.regularMarketPreviousClose - a.regularMarketPrice / a.regularMarketPreviousClose);
+    const size = Math.min(250, Number(body?.size) || 25);
+    return { finance: { result: [{ start: 0, count: Math.min(size, listed.length), total: listed.length, quotes: listed.slice(0, size) }], error: null } };
+  }
+  function lastSessionKey() {
+    const now = Date.now();
+    const p = calendar.etParts(now);
+    const today = calendar.tradingDay(p.y, p.m, p.d);
+    if (today && p.minutes >= today.close + 15) return today.key;
+    return calendar.prevTradingDay(p.y, p.m, p.d, false).key;
+  }
+
+  /**
+   * Daily bars for a made-up small stock, agreeing with the lists: the listed change on each of the last
+   * two finished sessions (Nasdaq's list can lag by one), ending at the listed price; flat before.
+   */
+  function smallStockBlock(sym) {
+    const row = smallStocks.get(sym);
+    if (!row) return null;
+    const keys = [lastSessionKey()];
+    while (keys.length < 22) {
+      const [y, m, d] = keys[0].split('-').map(Number);
+      keys.unshift(calendar.prevTradingDay(y, m, d, false).key);
+    }
+    const g = 1 + row.pct / 100;
+    const close = keys.map((_, j) => {
+      const back = keys.length - 1 - j;
+      return back <= 2 ? row.price / Math.pow(g, back) : (row.price / g / g) * (1 + 0.01 * Math.sin(j));
+    });
+    return {
+      meta: { currency: 'USD', symbol: sym, instrumentType: 'EQUITY', regularMarketTime: Math.floor(Date.parse(`${keys.at(-1)}T21:00:00Z`) / 1000), regularMarketPrice: row.price, previousClose: close.at(-2) },
+      timestamp: keys.map((k) => Math.floor(Date.parse(`${k}T14:30:00Z`) / 1000)),
+      indicators: { quote: [{ close }] },
+    };
+  }
+
+  /** Yesterday's (UTC) biggest coin gainers, biggest first, among the coins over the floors. */
+  function coinGainersByDay() {
+    const n = Math.floor(clock() / DAY_MS);
+    return paprikaCoins()
+      .filter((c) => !c.id.startsWith('tiny-') && !c.id.startsWith('thin-'))
+      .map((c) => ({ c, change: coinCloseOn(c, n - 1) / coinCloseOn(c, n - 2) }))
+      .sort((a, b) => b.change - a.change)
+      .map((x) => yahooCoinSymbol(x.c));
+  }
+
   /** Answer an upstream request, or return null if this host is not mocked. */
-  async function handle(input) {
+  async function handle(input, init) {
     const url = new URL(typeof input === 'string' ? input : input.url);
     const host = url.hostname;
     const q = url.searchParams;
 
+    if (host === 'fc.yahoo.com') {
+      return new Response('Not Found', { status: 404, headers: { 'Set-Cookie': 'A3=d=mock&S=mock; Max-Age=31557600; Domain=.yahoo.com; Path=/; Secure; HttpOnly; SameSite=None' } });
+    }
+    if (host === 'query2.finance.yahoo.com' && url.pathname === '/v1/test/getcrumb') {
+      const cookie = new Headers(init?.headers).get('cookie') ?? '';
+      return cookie.includes('A3=') ? new Response('mockCrumb.1', { headers: { 'Content-Type': 'text/plain' } }) : new Response('Unauthorized', { status: 401 });
+    }
+    if (host === 'query2.finance.yahoo.com' && url.pathname === '/v1/finance/screener') {
+      const cookie = new Headers(init?.headers).get('cookie') ?? '';
+      if (yahooStocksDown) return json({ finance: { result: null, error: { code: 'Internal Server Error' } } }, 500);
+      if (q.get('crumb') !== 'mockCrumb.1' || !cookie.includes('A3=')) return json({ finance: { result: null, error: { code: 'Unauthorized', description: 'Invalid Crumb' } } }, 401);
+      return json(yahooStockScreener(JSON.parse(init?.body ?? '{}')));
+    }
+
     if (host === 'query1.finance.yahoo.com' || host === 'query2.finance.yahoo.com') {
+      if (url.pathname === '/v1/finance/screener/predefined/saved' && q.get('scrIds') === 'all_cryptocurrencies_us') {
+        if (yahooCoinsDown) return json({ finance: { result: null, error: { code: 'Internal Server Error' } } }, 500);
+        return json(yahooCryptoScreener(Number(q.get('start')) || 0, Math.min(250, Number(q.get('count')) || 25)));
+      }
       if (url.pathname === '/v7/finance/spark') {
         const symbols = (q.get('symbols') ?? '').split(',').filter(Boolean);
         if (symbols.length > 20) return json({ spark: { result: null, error: { code: 'Bad Request' } } }, 400);
         const result = [];
+        const ranked = coinBarsMissing || badCoinBar ? coinGainersByDay() : [];
         for (const sym of symbols) {
+          if (madeUpStocks.has(sym) || stockBarsMissing.has(sym)) continue;
+          const small = smallStockBlock(sym);
+          if (small) {
+            result.push({ symbol: sym, response: [small] });
+            continue;
+          }
+          const coin = paprikaCoins().find((c) => yahooCoinSymbol(c) === sym);
+          if (coin) {
+            const at = ranked.indexOf(sym);
+            if (at >= 0 && at < coinBarsMissing) continue;
+            const b = coinBlock(coin, 30, q.get('interval') ?? '1d');
+            // The bar that closes yesterday (UTC): the last one before today.
+            const close = b.indicators.quote[0].close;
+            const today = Math.floor(clock() / DAY_MS) * 86_400;
+            const end = b.timestamp.reduce((m, x, i) => (x < today ? i : m), -1);
+            if (badCoinBar && at === 0 && end >= 0) close[end] *= 1.3;
+            result.push({ symbol: sym, response: [b] });
+            continue;
+          }
           const b = block(sym, q.get('range') ?? '1d', q.get('interval') ?? '1d');
           if (b) result.push({ symbol: sym, response: [b] });
         }
@@ -409,6 +716,44 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       return json(list.slice(0, per));
     }
 
+    if (host === 'api.nasdaq.com' && url.pathname === '/api/screener/stocks') return json(nasdaqScreener());
+
+    if (host === 'api.coinpaprika.com') {
+      if (paprikaDown) return json({ error: 'Too many requests from this address' }, 402);
+      const yesterday = utcKeyOf(clock() - 86_400_000);
+      if (url.pathname === '/v1/tickers') return json(paprikaTickers());
+      const latest = url.pathname.match(/^\/v1\/coins\/([^/]+)\/ohlcv\/latest$/);
+      if (latest) {
+        const c = paprikaById().get(decodeURIComponent(latest[1]));
+        if (!c) return json([]);
+        const close = c.price / (1 + c.today / 100);
+        const open = close / (1 + c.day / 100);
+        return json([{ time_open: `${yesterday}T00:00:00Z`, time_close: `${yesterday}T23:59:59Z`, open, high: Math.max(open, close) * 1.02, low: Math.min(open, close) * 0.98, close, volume: c.volume, market_cap: c.cap }]);
+      }
+      const hist = url.pathname.match(/^\/v1\/tickers\/([^/]+)\/historical$/);
+      if (hist) {
+        const c = paprikaById().get(decodeURIComponent(hist[1]));
+        if (!c) return json({ error: 'id not found' }, 404);
+        const start = Date.parse(`${q.get('start')}T00:00:00Z`);
+        const r = rng(hash(`${c.id}:hist`));
+        const open = c.price / (1 + c.today / 100) / (1 + c.day / 100);
+        const out = [];
+        let p = open;
+        const days = [];
+        for (let t = start; t <= clock(); t += 86_400_000) days.push(t);
+        // Walk back from yesterday's open so the series meets it at midnight.
+        const back = days.filter((t) => utcKeyOf(t) <= yesterday).reverse();
+        const vals = new Map();
+        for (const t of back) {
+          vals.set(t, p);
+          p = p / (1 + gauss(r) * 0.04);
+        }
+        for (const t of days) out.push({ timestamp: new Date(t).toISOString().replace('.000', ''), price: vals.get(t) ?? c.price, volume_24h: c.volume, market_cap: c.cap });
+        return json(out);
+      }
+      return json({ error: 'not mocked' }, 404);
+    }
+
     if (host === 'api.nasdaq.com') {
       const sym = decodeURIComponent(url.pathname.split('/')[3] ?? '').replace(/\./g, '-');
       const price = basePrice(sym);
@@ -460,7 +805,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       publishedMs: now - (i * 47 + 12) * 60_000,
       mediaType: i % 4 === 3 || i % 5 === 2 ? 'video' : 'article',
       topic: category,
-      type: i % 5 === 2 ? 'podcast' : i % 4 === 3 ? 'video' : 'article',
+      type: i % 4 === 3 || i % 5 === 2 ? 'video' : 'article',
     }));
     return {
       category,
@@ -477,7 +822,58 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     };
   }
 
-  return { handle, headlines, podcasts, livePrice };
+  return {
+    handle,
+    headlines,
+    livePrice,
+    /** Fix the time the market-wide lists describe (null: the real time). */
+    setClock(ms) {
+      clockMs = ms;
+    },
+    /** Make Nasdaq's screener show a given session (null: the last finished one). */
+    setNasdaqDay(key) {
+      nasdaqDay = key;
+    },
+    /** The stock Yahoo's screener stand-in gives a wrong previous close (+900%). */
+    get badYahooStock() {
+      return badYahooStock;
+    },
+    /** Make Yahoo's stock screener fail, so Nasdaq's list is used. */
+    setYahooStocksDown(down) {
+      yahooStocksDown = !!down;
+    },
+    /** Make CoinPaprika refuse every request, as it does Cloudflare Functions once the shared allowance is used. */
+    setPaprikaDown(down) {
+      paprikaDown = !!down;
+    },
+    /** Make Yahoo's coin list fail. */
+    setYahooCoinsDown(down) {
+      yahooCoinsDown = !!down;
+    },
+    /** Take away the daily bars of the n biggest stock gainers on the last finished session (by the lists' figures); returns their Yahoo symbols. */
+    setStockBarsMissing(n) {
+      const special = new Set(['QWRNW', 'QPRF^A', 'QTNY', 'QTHN']);
+      const rows = nasdaqScreener(null).data.rows.filter((r) => !special.has(r.symbol));
+      rows.sort((a, b) => parseFloat(b.pctchange) - parseFloat(a.pctchange));
+      stockBarsMissing = new Set(rows.slice(0, n).map((r) => r.symbol.replace(/\//g, '-')));
+      return [...stockBarsMissing];
+    },
+    /** Take away the daily bars of yesterday's n biggest coin gainers; returns their Yahoo symbols. */
+    setCoinBarsMissing(n) {
+      coinBarsMissing = n;
+      return coinGainersByDay().slice(0, n);
+    },
+    /** Give yesterday's biggest coin gainer a daily bar 30% off its listed close; returns its Yahoo symbol. */
+    setBadCoinBar(on) {
+      badCoinBar = !!on;
+      return coinGainersByDay()[0];
+    },
+    /** Each mocked coin's close at the end of a UTC day (YYYY-MM-DD), by Yahoo symbol, for checking answers. */
+    yahooCloses(dayKey) {
+      const n = Math.floor(Date.parse(`${dayKey}T00:00:00Z`) / DAY_MS);
+      return Object.fromEntries(paprikaCoins().map((c) => [yahooCoinSymbol(c), coinCloseOn(c, n)]));
+    },
+  };
 }
 
 /** A round icon with the ticker's first letters, standing in for coin and company logos. */
