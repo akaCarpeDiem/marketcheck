@@ -15,6 +15,7 @@
 import { cached, type KvLike, type WaitUntil } from './edgeCache';
 import { topicLabel, type TopicId } from './newsTopics';
 import { outletOf, type HeadlineItem } from './rssHeadlines';
+import { illustrate } from './storyImage';
 
 /* ── Tuning knobs ─────────────────────────────────────────────────────────── */
 
@@ -688,7 +689,8 @@ export function candidateEntry(c: Candidate, prev: AccStory | undefined, rank: n
     title: lead.title,
     link: lead.link,
     source: lead.source,
-    image: safeImage(lead.image) ?? prev?.image ?? null,
+    // The lead's picture, else any other outlet's for the same story.
+    image: safeImage(lead.image) ?? c.cluster.items.map((it) => safeImage(it.image)).find(Boolean) ?? prev?.image ?? null,
     summary: lead.summary ?? '',
     publishedAt: c.publishedMs != null ? iso(c.publishedMs) : (lead.publishedAt ?? null),
     outlets: mergeOutlets(c.cluster.outlets.slice(0, LIMITS.accOutlets), prev?.outlets ?? []),
@@ -834,6 +836,9 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
     await Promise.all(pending);
     return v;
   };
+  /** Stories without a picture get their article's preview picture (cached per article; see storyImage.ts). */
+  const pics = (stories: BoardStory[]): Promise<BoardStory[]> => illustrate(stories, { fetchFn: d.fetchFn, waitUntil: d.waitUntil });
+  const respond = async (r: BoardResponse): Promise<BoardResponse> => finish(r.stories.length ? { ...r, stories: await pics(r.stories) } : r);
 
   const memo = new Map<string, Promise<unknown>>();
   const read = <T>(key: string): Promise<T | null> => {
@@ -850,7 +855,7 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
     const date = isDateKey(d.date) ? d.date : yesterday;
     const [snap, days] = await Promise.all([read<Snapshot>(finalKey(date, topic)), read<string[]>(daysKey(topic))]);
     const list = (Array.isArray(days) ? days : []).filter(isDateKey).sort().reverse().slice(0, LIMITS.daysShown);
-    return finish({
+    return respond({
       ...head(d, now, 'day', date),
       status: snap?.stories?.length ? 'final' : 'empty',
       nextUpdateAt: iso(nextEtMidnight(now)),
@@ -865,13 +870,13 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
   if (!d.sweep && d.board === 'yesterday') {
     const snap = await read<Snapshot>(finalKey(yesterday, topic));
     if (snap?.stories?.length) {
-      return finish({ ...head(d, now, 'yesterday', yesterday), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: snap.lockedAt, signals: snap.signals, stories: snap.stories });
+      return respond({ ...head(d, now, 'yesterday', yesterday), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: snap.lockedAt, signals: snap.signals, stories: snap.stories });
     }
   }
   if (!d.sweep && d.board === 'today') {
     const snap = await read<Snapshot>(noonKey(today, topic));
     if (snap?.stories?.length) {
-      return finish({ ...head(d, now, 'today', today), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: snap.lockedAt, signals: snap.signals, stories: snap.stories });
+      return respond({ ...head(d, now, 'today', today), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: snap.lockedAt, signals: snap.signals, stories: snap.stories });
     }
   }
 
@@ -916,7 +921,7 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
   if (!noon && etHour(now) >= 12) {
     const stories = rankDayStories(todayEntries());
     if (stories.length) {
-      noon = { date: today, topic, lockedAt: iso(now), signals: meta, stories: stories.map((s) => ({ ...s, prevRank: null })) };
+      noon = { date: today, topic, lockedAt: iso(now), signals: meta, stories: await pics(stories.map((s) => ({ ...s, prevRank: null }))) };
       write(noonKey(today, topic), noon);
     }
   }
@@ -936,7 +941,7 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
           reddit: inDay.some((s) => s.signals.reddit),
           trends: inDay.some((s) => s.signals.trends),
         });
-        fin = { date: yesterday, topic, lockedAt: iso(now), signals: accMeta, stories };
+        fin = { date: yesterday, topic, lockedAt: iso(now), signals: accMeta, stories: await pics(stories) };
         write(finalKey(yesterday, topic), fin);
         defer(
           (async () => {
@@ -962,7 +967,7 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
     // Live shows the signals as they are now; staying power (sweeps, peak) still comes from the day so far.
     const scored = liveRanked.slice(0, LIMITS.boardSize).map(({ c, score }) => ({ e: { ...entryOf(c), signals: c.signals }, score }));
     const stories = shape(scored, prevRanks);
-    return finish(
+    return respond(
       stories.length
         ? { ...head(d, now, 'live', today), status: 'live', nextUpdateAt: iso(now + TIMING.responseFreshMs), signals: meta, stories }
         : empty('live', today, now + TIMING.responseFreshMs),
@@ -971,10 +976,10 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
 
   if (d.board === 'today') {
     if (noon?.stories.length) {
-      return finish({ ...head(d, now, 'today', today), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: noon.lockedAt, signals: noon.signals, stories: noon.stories });
+      return respond({ ...head(d, now, 'today', today), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: noon.lockedAt, signals: noon.signals, stories: noon.stories });
     }
     const stories = rankDayStories(todayEntries(), prevRanks);
-    return finish(
+    return respond(
       stories.length
         ? { ...head(d, now, 'today', today), status: 'provisional', nextUpdateAt: iso(etHour(now) >= 12 ? now + TIMING.responseFreshMs : nextEtNoon(now)), signals: meta, stories }
         : empty('today', today, etHour(now) >= 12 ? now + TIMING.responseFreshMs : nextEtNoon(now)),
@@ -983,13 +988,13 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
 
   // yesterday
   if (fin?.stories.length) {
-    return finish({ ...head(d, now, 'yesterday', yesterday), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: fin.lockedAt, signals: fin.signals, stories: fin.stories });
+    return respond({ ...head(d, now, 'yesterday', yesterday), status: 'final', nextUpdateAt: iso(nextEtMidnight(now)), lockedAt: fin.lockedAt, signals: fin.signals, stories: fin.stories });
   }
   const yEntries = cands
     .filter((c) => isHttp(c.cluster.lead.link) && c.publishedMs != null && c.publishedMs >= midnightYesterday && c.publishedMs < midnightToday)
     .map((c) => candidateEntry(c, undefined, liveRankOf.get(c) ?? null, now, false));
   const stories = rankDayStories(yEntries);
-  return finish(
+  return respond(
     stories.length
       ? { ...head(d, now, 'yesterday', yesterday), status: 'provisional', nextUpdateAt: iso(nextEtMidnight(now)), signals: meta, stories }
       : empty('yesterday', yesterday, nextEtMidnight(now)),

@@ -7,6 +7,7 @@
 
 import { makeCache, mapPool } from './cache';
 import { TOPIC_IDS, type ContentType, type TopicId } from './newsTopics';
+import { biggerImage } from './storyImage';
 
 /** News is organised by the ten topics in newsTopics.ts. (The name "category" is kept from the older code.) */
 export type HeadlineCategory = TopicId;
@@ -1119,6 +1120,12 @@ function pushImageCandidate(
   height: number | null,
 ): void {
   if (!url) return;
+  // A larger copy from the same image service (BBC sends 240 px thumbnails that are too small to show).
+  const bigger = biggerImage(url);
+  if (bigger) {
+    const score = scoreImageCandidate(bigger.url, bigger.width, bigger.height);
+    if (score != null) out.push({ url: bigger.url, score });
+  }
   const upgraded = upgradeYoutubeThumb(url);
   const variants = upgraded !== url ? [upgraded, url] : [url];
   for (const u of variants) {

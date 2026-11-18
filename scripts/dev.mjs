@@ -173,6 +173,7 @@ function installMock() {
     names,
     calendar: shared.calendar,
     live: flag('live'),
+    origin,
   });
   globalThis.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input.url;
@@ -320,7 +321,7 @@ async function handle(request) {
   const url = new URL(request.url);
   if (url.pathname.startsWith('/__dev/')) {
     const res = await devRoute(url);
-    if (res) return res;
+    if (res) return { res, settled: async () => {} };
   }
   const pending = [];
   const context = {

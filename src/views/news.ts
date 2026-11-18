@@ -27,6 +27,7 @@ import { Scope } from '../lib/store';
 import { openOverlay } from '../ui/overlay';
 import type { View } from '../router';
 import { mountHeadlines } from './parts/headlines';
+import { artHtml, mediaHtml } from './parts/storymedia';
 
 type UiBoard = 'live' | 'today' | 'yesterday';
 type Topic = TopicId | 'all';
@@ -153,7 +154,7 @@ export const newsView: View = {
       return out.join('');
     }
 
-    function rowHtml(s: BoardStory, st: { previous: BoardResponse | null } | undefined, read: Set<string>): string {
+    function rowHtml(s: BoardStory, t: TopicId, st: { previous: BoardResponse | null } | undefined, read: Set<string>): string {
       const m = moveFor(s, st);
       const hot = isHot(s.heat, m);
       const isRead = read.has(s.id);
@@ -174,6 +175,7 @@ export const newsView: View = {
         : '';
       return html`<li class="nb-row${medal}${isRead ? ' is-read' : ''}${hot ? ' is-hot' : ''}" data-id="${s.id}" data-rank="${s.rank}">
         <div class="nb-rank"><span class="nb-num">${s.rank}</span>${raw(moveHtml(m))}</div>
+        ${raw(mediaHtml({ image: s.image, title: s.title, topic: t, source: s.source, size: 'm', link: s.link, id: s.id, className: 'nb-pic', eager: s.rank <= 3 }))}
         <div class="nb-main">
           <h3 class="nb-title"><a href="${s.link}" target="_blank" rel="noopener noreferrer" data-open="${s.id}">${s.title}</a></h3>
           <div class="nb-meta"><span class="nb-src">${s.source}</span>${raw(when ? html`<span>${ago(when)}</span>` : '')}${raw(hot ? '<span class="tag tag-warn nb-hot">🔥 Hot</span>' : '')}${raw(isRead ? '<span class="tag nb-readtag">Read</span>' : '')}</div>
@@ -181,7 +183,6 @@ export const newsView: View = {
           <div class="nb-chips">${raw(chips(s))}</div>
           ${raw(more)}
         </div>
-        ${raw(s.image ? html`<img class="nb-thumb" src="${s.image}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()" />` : '')}
         <div class="nb-actions">
           <button type="button" class="nb-btn nb-check${isRead ? ' is-on' : ''}" data-act="read" data-id="${s.id}" aria-pressed="${isRead}" aria-label="${isRead ? 'Mark as unread' : 'Mark as read'}: ${s.title}" title="${isRead ? 'Mark as unread' : 'Mark as read'}">${raw(icon.check(16))}</button>
           <button type="button" class="nb-btn nb-chev" data-act="expand" data-id="${s.id}" aria-expanded="${open}" aria-controls="nb-more-${s.id}" aria-label="${open ? 'Hide' : 'Show'} who is covering: ${s.title}" title="Who’s covering it">${raw(icon.chevronDown(16))}</button>
@@ -190,7 +191,7 @@ export const newsView: View = {
     }
 
     const skeletonRows = (n: number): string =>
-      `<ol class="nb-list" aria-hidden="true">${Array.from({ length: n }, () => `<li class="nb-row is-loading"><div class="nb-rank"><span class="nb-num sk">0</span></div><div class="nb-main"><h3 class="nb-title"><span class="sk">A headline is loading in this spot right now</span></h3><div class="nb-meta"><span class="sk">Source name · 3h ago</span></div><div class="nb-heat"><span class="sk nb-skbar"></span></div></div></li>`).join('')}</ol>`;
+      `<ol class="nb-list" aria-hidden="true">${Array.from({ length: n }, () => `<li class="nb-row is-loading"><div class="nb-rank"><span class="nb-num sk">0</span></div><span class="nb-media sz-m nb-pic sk"></span><div class="nb-main"><h3 class="nb-title"><span class="sk">A headline is loading in this spot right now</span></h3><div class="nb-meta"><span class="sk">Source name · 3h ago</span></div><div class="nb-heat"><span class="sk nb-skbar"></span></div></div></li>`).join('')}</ol>`;
 
     function emptyText(): string {
       if (board === 'today') return 'The noon check hasn’t run yet today. The early look appears here once the first stories are in, and locks at noon New York time.';
@@ -208,7 +209,7 @@ export const newsView: View = {
       }
       if (st.data.status === 'empty' || !st.data.stories.length) return emptyHtml();
       const read = readSetNow();
-      return `<ol class="nb-list" aria-label="${labelOf(t).replace(/&/g, '&amp;')} leaderboard">${st.data.stories.map((s) => rowHtml(s, st, read)).join('')}</ol>`;
+      return `<ol class="nb-list" aria-label="${labelOf(t).replace(/&/g, '&amp;')} leaderboard">${st.data.stories.map((s) => rowHtml(s, t, st, read)).join('')}</ol>`;
     }
 
     /* ── the front page ── */
@@ -222,7 +223,9 @@ export const newsView: View = {
         const d = boardState(t, 'live')?.data;
         for (const s of d?.stories ?? []) if (!best || s.score > best.s.score) best = { s, t };
       }
-      if (!best) return `<div class="nb-hero card is-loading" aria-hidden="true"><span class="sk">Biggest story right now loading here</span></div>`;
+      if (!best) {
+        return `<div class="nb-hero card is-loading" aria-hidden="true"><div class="nb-hero-body"><span class="sk">Biggest story right now</span><span class="sk nb-sk-h">A big headline is loading in this spot</span><span class="sk">Source · 2h ago</span></div><span class="nb-media sz-l nb-hero-media sk"></span></div>`;
+      }
       const { s, t } = best;
       const when = ms(s.publishedAt);
       return html`<div class="nb-hero card">
@@ -232,9 +235,9 @@ export const newsView: View = {
           ${raw(s.summary ? html`<p class="nb-sum">${s.summary}</p>` : '')}
           <div class="nb-meta"><span class="nb-src">${s.source}</span>${raw(when ? html`<span>${ago(when)}</span>` : '')}</div>
           <div class="nb-chips">${raw(chips(s))}</div>
-          <p><button type="button" class="btn btn-outline btn-sm" data-topic="${t}">See the ${shortOf(t)} top 10 →</button></p>
+          <p class="nb-hero-cta"><button type="button" class="btn btn-outline btn-sm" data-topic="${t}">See the ${shortOf(t)} top 10 →</button></p>
         </div>
-        ${raw(s.image ? html`<img class="nb-hero-img" src="${s.image}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()" />` : '')}
+        ${raw(mediaHtml({ image: s.image, title: s.title, topic: t, source: s.source, size: 'l', link: s.link, id: s.id, className: 'nb-hero-media', eager: true }))}
       </div>`;
     }
 
@@ -242,27 +245,38 @@ export const newsView: View = {
       const st = stateOf(t);
       const d = st?.data;
       const read = readSetNow();
+      const label = labelOf(t);
+      let top: string;
       let inner: string;
-      if (!st || st.status === 'loading') {
-        inner = `<div class="nb-card-sk" aria-hidden="true"><span class="sk">A headline is loading in this card</span><span class="sk">Source</span><span class="sk">Another headline here</span><span class="sk">And one more headline</span></div>`;
-      } else if (!d || d.status === 'empty' || !d.stories.length) {
-        inner = `<p class="faint nb-card-empty">${st.status === 'error' ? 'Couldn’t load this topic.' : 'Nothing ranked yet.'}</p>`;
+      if (!st || st.status === 'loading' || !d || d.status === 'empty' || !d.stories.length) {
+        top = html`<span class="nb-media sz-m t-${t} nb-card-media" aria-hidden="true">${raw(artHtml({ title: '', topic: t, size: 'm' }))}</span>`;
+        inner =
+          !st || st.status === 'loading'
+            ? `<div class="nb-card-sk" aria-hidden="true"><span class="sk">A headline is loading in this card</span><span class="sk">Source</span><span class="sk">Another headline here</span><span class="sk">And one more headline</span></div>`
+            : `<p class="faint nb-card-empty">${st.status === 'error' ? 'Couldn’t load this topic.' : 'Nothing ranked yet.'}</p>`;
       } else {
         const [one, ...rest] = d.stories;
         const p = progress(d.stories.map((s) => s.id), read);
+        top = mediaHtml({ image: one!.image, title: one!.title, topic: t, source: one!.source, size: 'm', link: one!.link, id: one!.id, className: 'nb-card-media' });
         inner = html`<div class="nb-lead${read.has(one!.id) ? ' is-read' : ''}">
-            <h3><a href="${one!.link}" target="_blank" rel="noopener noreferrer" data-open="${one!.id}">${one!.title}</a></h3>
+            <h4><a href="${one!.link}" target="_blank" rel="noopener noreferrer" data-open="${one!.id}">${one!.title}</a></h4>
             <div class="nb-meta"><span class="nb-src">${one!.source}</span>${raw(miniMove(one!, st))}<span class="nb-minheat" title="Heat ${one!.heat} of 100"><span class="nb-bar"><i style="width:${one!.heat}%"></i></span><b class="num">${one!.heat}</b></span></div>
           </div>
           <ol class="nb-mini" start="2">${raw(
             rest
               .slice(0, 2)
-              .map((s) => html`<li class="${read.has(s.id) ? 'is-read' : ''}"><span class="nb-minirank">${s.rank}</span><a href="${s.link}" target="_blank" rel="noopener noreferrer" data-open="${s.id}">${s.title}</a></li>`)
+              .map(
+                (s) =>
+                  html`<li class="${read.has(s.id) ? 'is-read' : ''}"><span class="nb-minirank">${s.rank}</span>${raw(mediaHtml({ image: s.image, title: s.title, topic: t, size: 's', link: s.link, id: s.id }))}<a href="${s.link}" target="_blank" rel="noopener noreferrer" data-open="${s.id}">${s.title}</a></li>`,
+              )
               .join(''),
           )}</ol>
           <p class="faint nb-card-prog">${p.done ? 'All caught up ✓' : `${p.read} of ${p.total} read`}</p>`;
       }
-      return html`<article class="nb-card card"><header><h3>${labelOf(t)}</h3></header>${raw(inner)}<button type="button" class="btn btn-ghost btn-sm nb-more-btn" data-topic="${t}">See the top 10 →</button></article>`;
+      return html`<article class="nb-card card t-${t}">
+        <div class="nb-card-top">${raw(top)}<h3 class="nb-card-topic"><span class="nb-card-dot" aria-hidden="true"></span>${label}</h3></div>
+        <div class="nb-card-body">${raw(inner)}<button type="button" class="btn btn-ghost btn-sm nb-more-btn" data-topic="${t}">See the top 10 →</button></div>
+      </article>`;
     }
 
     function frontHtml(): string {
