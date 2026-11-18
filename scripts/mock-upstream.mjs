@@ -775,6 +775,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     if (host === 'trends.google.com') {
       return new Response(trendsAnswer(q.get('geo') ?? 'US', Date.now()), { status: 200, headers: { 'Content-Type': 'application/rss+xml' } });
     }
+    if (host === 'wikimedia.org' && url.pathname.includes('/metrics/pageviews/top/')) return json(wikiAnswer());
     if (host === 'lite-api.jup.ag') return json(jupiter());
     if (host === 'api.alternative.me') return json(fng());
     return null;
@@ -910,6 +911,18 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     }
     children.push({ kind: 't3', data: { title: 'Weekly discussion thread: ask anything', url: 'https://www.reddit.com/r/mock/weekly', score: 55, num_comments: 410, permalink: `/r/${sub}/comments/weekly/thread/`, subreddit: sub } });
     return { kind: 'Listing', data: { children } };
+  }
+
+  /** Most-read articles: real-looking noise plus a few that match mock story subjects. */
+  function wikiAnswer() {
+    const noise = ['Main_Page', 'Special:Search', 'Wikipedia:Featured_pictures', 'Portal:Current_events', 'Deaths_in_2026', 'Cleopatra', 'Taylor_Swift', 'United_States', '-'];
+    const subjects = ['Nvidia', 'Bitcoin', 'Federal_Reserve', 'Apple_Inc.', 'Tesla,_Inc.', 'Boeing', 'Walmart', 'Disney', 'Gold', 'Ethereum', 'Wall_Street', 'Microsoft', 'OpenAI', 'Zillow', 'Moderna', 'Starbucks', 'Coinbase', 'Pfizer'];
+    const articles = [];
+    noise.forEach((article, i) => articles.push({ article, views: 900_000 - i * 40_000 }));
+    subjects.forEach((article, i) => articles.push({ article: i % 3 === 0 ? `${article}_(company)` : article, views: 1_250_000 - i * 60_000 }));
+    articles.sort((a, b) => b.views - a.views);
+    articles.forEach((a, i) => (a.rank = i + 1));
+    return { items: [{ project: 'en.wikipedia', access: 'all-access', year: '2026', month: '01', day: '01', articles }] };
   }
 
   function trendsAnswer(geo, now) {

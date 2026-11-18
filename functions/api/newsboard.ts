@@ -1,7 +1,7 @@
 /**
  * GET /api/newsboard?topic=<id>&board=live|today|yesterday|day&date=YYYY-MM-DD&sweep=1
  *
- * News stories ranked by coverage, Hacker News, Reddit and Google Trends.
+ * News stories ranked by coverage, Hacker News, Reddit, Google Trends and Wikipedia.
  *   live       rolling last 24 hours
  *   today      stories released today (New York time), locked at the noon check
  *   yesterday  final top ten of the previous day
@@ -17,7 +17,7 @@ import { cached, jsonResponse, type KvLike, type WaitUntil } from '../_shared/ed
 import { buildBoard, TIMING, type BoardName, type BoardResponse, type FetchLike } from '../_shared/newsBoard';
 import { DEFAULT_TOPIC, TOPIC_IDS, topicFrom, topicLabel } from '../_shared/newsTopics';
 
-type Env = { LAYOUTS?: KvLike };
+type Env = { LAYOUTS?: KvLike; REDDIT_CLIENT_ID?: string; REDDIT_CLIENT_SECRET?: string };
 type Ctx = { request: Request; env?: Env; waitUntil?: WaitUntil };
 
 const BOARDS: BoardName[] = ['live', 'today', 'yesterday', 'day'];
@@ -42,14 +42,15 @@ export async function handleNewsBoard(request: Request, env: Env | undefined, wa
   const sweep = url.searchParams.get('sweep') === '1';
   // Looked up when called, so the dev server's stand-in fetch is the one used.
   const fetchFn: FetchLike = deps.fetchFn ?? ((u, init) => fetch(u, init));
+  const reddit = env?.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET ? { id: env.REDDIT_CLIENT_ID, secret: env.REDDIT_CLIENT_SECRET } : undefined;
   const run = (): Promise<BoardResponse> =>
-    buildBoard({ topic, board, date, sweep, now: deps.now, kv: env?.LAYOUTS ?? null, fetchFn, origin: request.url, waitUntil, ns: deps.ns });
+    buildBoard({ topic, board, date, sweep, now: deps.now, kv: env?.LAYOUTS ?? null, fetchFn, origin: request.url, waitUntil, ns: deps.ns, reddit });
 
   try {
     if (sweep || board === 'day') {
       return jsonResponse(await run(), { cacheControl: sweep ? 'no-store' : 'public, max-age=60' });
     }
-    const hit = await cached<BoardResponse>(`newsboard:resp:v1:${topic}:${board}${deps.ns ?? ''}`, {
+    const hit = await cached<BoardResponse>(`newsboard:resp:v2:${topic}:${board}${deps.ns ?? ''}`, {
       freshMs: TIMING.responseFreshMs,
       keepSec: 3600,
       retryMs: 60_000,
