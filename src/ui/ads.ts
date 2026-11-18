@@ -20,7 +20,7 @@ export function adSlot(name: string): string {
 }
 
 /**
- * News and podcast pages ship without the AdSense loader. When a visitor starts
+ * The news page ships without the AdSense loader. When a visitor starts
  * there and moves to a page with slots, add the loader once.
  */
 function ensureLoader(): void {

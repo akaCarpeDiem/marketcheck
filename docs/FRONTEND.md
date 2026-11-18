@@ -7,9 +7,9 @@ The browser app is plain TypeScript with no framework and no runtime dependencie
 | Folder | What lives there |
 |--------|------------------|
 | `site/` | `pages.ts`: the list of pages and the HTML document around each one (titles, descriptions, tags for Google Analytics and AdSense). `shell.ts`: the top bar, tab bar and footer. Both run at build time; `shell.ts` also runs in the browser |
-| `lib/` | Small tools with no knowledge of the site: `dom` (templates and rendering), `store` (signals), `format` (numbers, dates), `api`, `poll`, `icons`, `spark` (small charts), `pack` (bubble layout), `treemap` |
-| `data/` | What the app knows: `market` (prices), `user` (account, watchlist, portfolio, layout), `assets` (one way to describe any coin, stock or fund), `movers`, `news`, `calendar`, `portfolio`, `game`, `visit`, `theme` |
-| `ui/` | Parts used by more than one page: the asset sheet (`drawer`), search, sign-in, charts, the bubble map and heat map canvases, toasts, ad slots |
+| `lib/` | Small tools with no knowledge of the site: `dom` (templates and rendering), `store` (signals), `format` (numbers, dates), `api`, `poll`, `icons`, `spark` (small charts), `pack` (bubble layout), `treemap`, `stats` (averages, volatility, drawdown, correlation), `palette` (series colours) |
+| `data/` | What the app knows: `market` (prices), `history` (price series for charts and comparisons), `user` (account, watchlist, portfolio, layout), `assets` (one way to describe any coin, stock or fund), `movers`, `news`, `calendar`, `portfolio`, `game`, `visit`, `theme` |
+| `ui/` | Parts used by more than one page: the asset sheet (`drawer`), search, sign-in, charts (`chart`: D3 scales on a canvas, candles, volume, averages, compare, measuring), the bubble map and heat map canvases (`physics` adds Matter.js on demand), toasts, ad slots |
 | `views/` | One file per page, and `views/parts/` for the sections of the overview |
 | `styles/` | `tokens.css` (colours, sizes, both themes), `base.css`, `shell.css`, `ui.css`, `views.css` |
 
@@ -56,9 +56,9 @@ Refresh times follow the market: faster while New York is open, slower when it i
 - **Tiles, index tiles, movers panels:** signed-in only, through `/api/layout/*`.
 - **Display choices** (theme, which table tab is open): browser only, never sent.
 
-## News and podcasts
+## News
 
-`data/news.ts` loads headlines per topic and the podcast directory. Topics, content types and shows are defined once, in `functions/_shared/newsTopics.ts`, and imported by both sides. Every item carries a topic and a type (article, video or podcast), and the news page filters by either. Podcasts are a page of their own (`views/podcasts.ts`), not a topic.
+`data/news.ts` loads headlines per topic from `/api/headlines`, and the scrolling ticker at the top of every page uses the same source. Topics and content types are defined once, in `functions/_shared/newsTopics.ts`, and imported by both sides. Every item carries a topic and a type (article or video), and the news page filters by either.
 
 The news page (`views/news.ts`) is the News Leaderboard. `data/newsboard.ts` loads ranked stories from `/api/newsboard` (one cache entry per topic, board and date; live boards refresh every five minutes while the tab is visible, the others when their next update is due) and keeps the "caught up" record: story ids read, per New York date, in this browser (`mc-news-read-v1`, three days kept). The pure parts (movement arrows, hot flag, number formatting, read-log pruning) are in `lib/leaderboard.ts` and tested in `scripts/test/leaderboard.test.mjs`. When a live board refreshes, rows slide to their new places (FLIP: measure before and after `render()`), unless the reader prefers reduced motion. The plain headline feed (`views/parts/headlines.ts`) still exists as the "Latest headlines" section at the bottom of the page, or `?view=latest`. The address keeps `?topic=` (a topic id or `all`) and `?board=` (`live`, `today`, `yesterday`).
 

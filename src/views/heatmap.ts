@@ -60,6 +60,7 @@ export const heatmapView: View = {
     let cat = (url.searchParams.get('market') ?? pref('hm.cat', 'cryptos')) as MoverCat;
     if (!MOVER_CATS.some((c) => c.id === cat)) cat = 'cryptos';
     let mode = pref('hm.mode', 'bubbles') as Mode;
+    let physicsOn = pref('hm.phys', false);
     let tf = pref('hm.tf', '24h');
     let sizeBy = pref('hm.size', 'move') as SizeBy;
 
@@ -92,6 +93,7 @@ export const heatmapView: View = {
         tiles?.destroy();
         tiles = null;
         bubbles = createBubbleMap(host, { tooltip, onPick });
+        if (physicsOn) bubbles.setPhysics(true);
         lastKey = '';
       } else if (want === 'tiles' && !tiles) {
         bubbles?.destroy();
@@ -118,7 +120,11 @@ export const heatmapView: View = {
         seg('hm-cat', MOVER_CATS.map((c) => [c.id, c.label]), cat, 'Market') +
           (cat === 'solana' ? '' : seg('hm-mode', [['bubbles', 'Bubbles'], ['tiles', 'Heat map']], effMode, 'View')) +
           seg('hm-tf', options.map((o) => [o.id, o.label]), tf, 'Timeframe') +
-          seg('hm-size', effMode === 'bubbles' ? [['move', 'Size: move'], ['cap', 'Size: value']] : [['cap', 'Size: value'], ['move', 'Size: balanced']], sizeBy, 'Size'),
+          seg('hm-size', effMode === 'bubbles' ? [['move', 'Size: move'], ['cap', 'Size: value']] : [['cap', 'Size: value'], ['move', 'Size: balanced']], sizeBy, 'Size') +
+          (effMode === 'bubbles'
+            ? `<button type="button" class="chip-btn${physicsOn ? ' is-on' : ''}" data-hm-phys aria-pressed="${physicsOn}" title="Let the bubbles float: grab one and throw it">${icon.bolt(14)} Physics</button>` +
+              (physicsOn ? `<button type="button" class="chip-btn" data-hm-shake title="Throw every bubble">Shake</button>` : '')
+            : ''),
       );
       loadCat(cat, tf);
       ensure(effMode);
@@ -199,6 +205,12 @@ export const heatmapView: View = {
         setPref('hm.cat', (cat = t.dataset.hmCat as MoverCat));
         paint();
       }),
+      on(el, 'click', '[data-hm-phys]', () => {
+        setPref('hm.phys', (physicsOn = !physicsOn));
+        bubbles?.setPhysics(physicsOn);
+        paint();
+      }),
+      on(el, 'click', '[data-hm-shake]', () => bubbles?.shake()),
       on(el, 'click', '[data-hm-mode]', (_e, t) => {
         setPref('hm.mode', (mode = t.dataset.hmMode as Mode));
         paint();

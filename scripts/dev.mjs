@@ -67,17 +67,25 @@ const kv = {
   },
 };
 
+// Stand-in for Cloudflare's Cache API. Like the real one, an entry is gone once its max-age has passed.
 const edgeStore = new Map();
 globalThis.caches = {
   default: {
     async match(req) {
-      const hit = edgeStore.get(typeof req === 'string' ? req : req.url);
+      const key = typeof req === 'string' ? req : req.url;
+      const hit = edgeStore.get(key);
+      if (hit && Date.now() >= hit.expires) {
+        edgeStore.delete(key);
+        return undefined;
+      }
       return hit ? new Response(hit.body, { headers: hit.headers }) : undefined;
     },
     async put(req, res) {
+      const maxAge = /max-age=(\d+)/.exec(res.headers.get('Cache-Control') || '');
       edgeStore.set(typeof req === 'string' ? req : req.url, {
         body: await res.text(),
         headers: Object.fromEntries(res.headers),
+        expires: maxAge ? Date.now() + Number(maxAge[1]) * 1000 : Infinity,
       });
     },
   },
@@ -171,7 +179,7 @@ function installMock() {
     if (url.startsWith(origin) || url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
       return realFetch(input, init);
     }
-    const res = await mock.handle(input);
+    const res = await mock.handle(input, init);
     if (res) return res;
     throw new TypeError(`mock: no stand-in for ${new URL(url).hostname}`);
   };
@@ -331,11 +339,6 @@ async function handle(request) {
           if (url.searchParams.get('pool') !== '1') delete body.pool;
           return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
         }
-        if (useMock && key === '/api/podcasts') {
-          return new Response(JSON.stringify(mock.podcasts(shared.topics.PODCAST_SHOWS, shared.topics.TOPICS)), {
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
         const method = request.method[0] + request.method.slice(1).toLowerCase();
         const fn = mod[`onRequest${method}`] ?? mod.onRequest;
         if (!fn) return new Response('Method not allowed', { status: 405 });
@@ -346,8 +349,9 @@ async function handle(request) {
     },
   };
   const res = middleware?.onRequest ? await middleware.onRequest(context) : await context.next();
-  await Promise.all(pending);
-  return res;
+  // Background work is awaited after the body is read (see the server below): a streamed answer such as
+  // /api/batch only finishes its waitUntil work while it is being read, so waiting first would never end.
+  return { res, settled: () => Promise.all(pending) };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -360,7 +364,7 @@ const server = http.createServer(async (req, res) => {
       headers: req.headers,
       body: hasBody ? Buffer.concat(chunks) : undefined,
     });
-    const response = await handle(request);
+    const { res: response, settled } = await handle(request);
     const headers = {};
     response.headers.forEach((v, k) => {
       if (k !== 'set-cookie') headers[k] = v;
@@ -370,6 +374,7 @@ const server = http.createServer(async (req, res) => {
     if (cookies.length) headers['set-cookie'] = cookies.map((c) => c.replace(/;\s*Secure/gi, ''));
     res.writeHead(response.status, headers);
     res.end(Buffer.from(await response.arrayBuffer()));
+    await settled();
   } catch (e) {
     console.error(e);
     res.writeHead(500, { 'Content-Type': 'text/plain' });

@@ -6,10 +6,10 @@ import { startRouter, viewForPath, type View, type ViewId } from './router';
 import { reportAuthError } from './ui/auth';
 import { openFromLocation } from './ui/drawer';
 import { startShell } from './ui/shell';
+import { compareView } from './views/compare';
 import { heatmapView } from './views/heatmap';
 import { marketsView } from './views/markets';
 import { newsView } from './views/news';
-import { podcastsView } from './views/podcasts';
 import { overviewView } from './views/overview';
 import { portfolioView } from './views/portfolio';
 import { crypto, equities } from './data/market';
@@ -18,9 +18,9 @@ const views: Record<ViewId, () => View> = {
   overview: () => overviewView,
   markets: () => marketsView,
   heatmap: () => heatmapView,
+  compare: () => compareView,
   portfolio: () => portfolioView,
   news: () => newsView,
-  podcasts: () => podcastsView,
 };
 
 function boot(): void {

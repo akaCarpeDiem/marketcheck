@@ -265,7 +265,8 @@ export function startShell(): void {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  // Headlines for the ticker: all three categories at once, so they travel in the page's first /api/batch request.
+  // Headlines for the ticker come from the same /api/headlines source as the News page.
+  // A few topics at once, so they travel in the page's first /api/batch request.
   for (const c of TICKER_CATS) void loadNews(c);
   setInterval(() => {
     if (document.hidden) return;

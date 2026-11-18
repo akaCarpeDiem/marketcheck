@@ -63,6 +63,9 @@ export async function build({ dev = process.argv.includes('--dev') } = {}) {
     entryPoints: { app: 'src/main.ts' },
     bundle: true,
     format: 'esm',
+    // Rarely used, heavy parts (the bubble physics engine) load on demand as their own file.
+    splitting: true,
+    chunkNames: 'chunk-[hash]',
     target: 'es2020',
     minify: !dev,
     sourcemap: dev,

@@ -1,14 +1,13 @@
 /**
- * Headlines by topic (from /api/headlines) and the podcast directory (from
- * /api/podcasts). The topics and content types are defined once, in
- * functions/_shared/newsTopics.ts.
+ * Headlines by topic (from /api/headlines). The topics and content types are
+ * defined once, in functions/_shared/newsTopics.ts, and used by the News page
+ * and the scrolling ticker at the top of every page.
  */
 import {
   DEFAULT_TOPIC,
   TOPICS,
   topicFrom,
   type ContentType,
-  type PodcastShow,
   type TopicId,
 } from '../../functions/_shared/newsTopics';
 import { getJson } from '../lib/api';
@@ -31,15 +30,14 @@ export type Headline = {
   mediaType?: 'article' | 'video';
   /** Topic the item is filed under. */
   topic?: TopicId | null;
-  /** Article, video or podcast episode: independent of the topic. */
+  /** Article or video: independent of the topic. */
   type?: ContentType;
-  /** For a podcast episode, the show's id in the directory. */
-  show?: string;
   views?: number | null;
 };
 
 /** The content type of an item, whichever generation of the API it came from. */
-export const typeOf = (h: Headline): ContentType => h.type ?? (h.mediaType === 'video' ? 'video' : 'article');
+export const typeOf = (h: Headline): ContentType =>
+  h.type === 'video' || h.mediaType === 'video' ? 'video' : 'article';
 
 export type NewsState = {
   items: Headline[];
@@ -114,45 +112,4 @@ export function loadNews(topic: TopicId, force = false): Promise<void> {
   })();
   busy.set(topic, job);
   return job;
-}
-
-/* ── Podcast directory ─────────────────────────────────────────────────── */
-
-export type Show = PodcastShow & { url: string; episodes: Headline[] };
-
-export type PodcastState = {
-  status: 'idle' | 'loading' | 'ok' | 'error';
-  shows: Show[];
-  latest: Headline[];
-  /** Topics that have at least one show, in the site's order. */
-  topics: { id: TopicId; label: string; short: string }[];
-  at: number;
-};
-
-export const podcasts = signal<PodcastState>({ status: 'idle', shows: [], latest: [], topics: [], at: 0 });
-
-type PodcastPayload = { ok?: boolean; shows?: Show[]; latest?: Headline[]; topics?: PodcastState['topics'] };
-
-let podcastsBusy: Promise<void> | null = null;
-
-/** Load the directory unless a copy from the last twenty minutes is in hand. */
-export function loadPodcasts(): Promise<void> {
-  const have = podcasts.get();
-  if (have.status === 'ok' && Date.now() - have.at < 20 * 60_000) return Promise.resolve();
-  podcastsBusy ??= (async () => {
-    if (have.status !== 'ok') podcasts.set({ ...have, status: 'loading' });
-    try {
-      const d = await getJson<PodcastPayload>('/api/podcasts', { timeout: 25_000 });
-      const shows = (d.shows ?? [])
-        .map((s) => ({ ...s, url: safeUrl(s.url) ?? '#', episodes: clean(s.episodes) }))
-        .filter((s) => s.episodes.length > 0);
-      if (!shows.length) throw new Error('empty');
-      podcasts.set({ status: 'ok', shows, latest: clean(d.latest), topics: d.topics ?? [], at: Date.now() });
-    } catch {
-      podcasts.set({ ...podcasts.get(), status: podcasts.get().shows.length ? 'ok' : 'error' });
-    }
-  })().finally(() => {
-    podcastsBusy = null;
-  });
-  return podcastsBusy;
 }

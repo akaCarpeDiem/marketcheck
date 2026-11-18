@@ -55,7 +55,7 @@ results.push(await check('/', { expectIncludes: ['Market Check', 'id="app"', 'No
   }
   results.push(row);
 }
-for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'], ['/portfolio/', 'Portfolio'], ['/news/', 'Headlines'], ['/podcasts/', 'Podcasts'], ['/sources/', 'Sources']]) {
+for (const [path, word] of [['/markets/', 'Markets'], ['/heatmap/', 'Heat map'], ['/portfolio/', 'Portfolio'], ['/news/', 'Headlines'], ['/sources/', 'Sources']]) {
   results.push(await check(path, { expectStatus: 200, expectIncludes: [word, 'id="app"'] }));
 }
 results.push(await check('/privacy/', { expectStatus: 200, expectIncludes: ['Privacy'] }));
@@ -64,6 +64,8 @@ results.push(await check('/about/', { expectStatus: 200, expectIncludes: ['About
 results.push(await check('/learn/', { expectStatus: 200, expectIncludes: ['Learn'] }));
 results.push(await check('/faq/', { expectStatus: 200, expectIncludes: ['Frequently asked questions'] }));
 results.push(await check('/contact/', { expectStatus: 200, expectIncludes: ['Contact'] }));
+results.push(await check('/podcasts/', { expectStatus: 404 }));
+results.push(await check('/api/podcasts', { expectStatus: 404 }));
 results.push(await check('/robots.txt', { expectIncludes: ['Sitemap: https://marketcheck.money/sitemap.xml'] }));
 results.push(await check('/sitemap.xml', { expectXml: true, expectIncludes: ['https://marketcheck.money/'] }));
 results.push(
@@ -136,10 +138,18 @@ for (const topic of ['markets', 'investing', 'personal-finance', 'crypto', 'real
   );
 }
 results.push(
-  await check('/api/podcasts', {
+  await check('/api/yesterday', {
     expectJson: (j, row) => {
-      row.notes.push(`${j.shows?.length ?? 0} shows${j.failed?.length ? `; not answering: ${j.failed.join(', ')}` : ''}`);
-      if ((j.shows?.length ?? 0) < 10) row.ok = false;
+      // Right after a deploy a group can be pending (one list is worked out per request); the reason is shown, not failed.
+      const g = (x, label) => `${label} ${x?.day ?? '?'}: ${x?.items?.length ?? 0} shown, ${x?.checked ?? 0} compared${x?.pending ? ', pending' : ''}${x?.why ? ` (${x.why})` : ''}`;
+      row.notes.push(`${g(j.crypto, 'crypto')}; ${g(j.stocks, 'stocks')}`);
+      if (!j.ok) row.ok = false;
+      // A list that is in always has at least five rows.
+      for (const [label, x] of [['crypto', j.crypto], ['stocks', j.stocks]])
+        if (x?.items?.length && x.items.length < 5) {
+          row.ok = false;
+          row.notes.push(`${label}: only ${x.items.length} rows`);
+        }
     },
   }),
 );
@@ -154,16 +164,29 @@ results.push(
   }),
 );
 
+// The pages.dev copy must not compete with marketcheck.money in search. Pages skip Functions
+// (public/_routes.json), so its pages are served as-is with a noindex header rather than
+// redirected; /api on it is redirected by functions/_middleware.ts. Either is fine here.
 try {
-  const redir = await fetch('https://market-check.pages.dev/', { redirect: 'manual' });
+  const copy = await fetch('https://market-check.pages.dev/', { redirect: 'manual' });
+  const location = copy.headers.get('location') || '';
+  const robots = copy.headers.get('x-robots-tag') || '';
   results.push({
-    path: 'pages.dev→canonical',
-    status: redir.status,
-    ok: redir.status >= 300 && redir.status < 400 && (redir.headers.get('location') || '').includes('marketcheck.money'),
-    notes: [`location=${redir.headers.get('location')}`],
+    path: 'pages.dev copy kept out of search',
+    status: copy.status,
+    ok: (copy.status >= 300 && copy.status < 400 && location.includes('marketcheck.money')) || (copy.ok && /noindex/i.test(robots)),
+    notes: [location ? `location=${location}` : `x-robots-tag=${robots || 'none'}`],
   });
 } catch (e) {
-  results.push({ path: 'pages.dev→canonical', status: 0, ok: false, notes: [`could not reach market-check.pages.dev: ${e?.cause?.code || e?.message}`] });
+  results.push({ path: 'pages.dev copy kept out of search', status: 0, ok: false, notes: [`could not reach market-check.pages.dev: ${e?.cause?.code || e?.message}`] });
+}
+// And the real site must never carry noindex.
+try {
+  const live = await fetch('https://marketcheck.money/', { redirect: 'manual' });
+  const robots = live.headers.get('x-robots-tag') || '';
+  results.push({ path: 'marketcheck.money indexable', status: live.status, ok: live.ok && !/noindex/i.test(robots), notes: robots ? [`x-robots-tag=${robots}`] : [] });
+} catch (e) {
+  results.push({ path: 'marketcheck.money indexable', status: 0, ok: false, notes: [`could not reach marketcheck.money: ${e?.cause?.code || e?.message}`] });
 }
 
 let failed = 0;

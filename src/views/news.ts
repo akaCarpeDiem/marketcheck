@@ -73,7 +73,6 @@ export const newsView: View = {
           <p>The stories getting the most coverage and engagement right now, ranked.</p>
           <div class="nb-live"><span class="nb-pulse" data-pulse aria-hidden="true"></span><span data-updated>Loading…</span><button type="button" class="btn btn-ghost btn-sm" data-act="how">${icon.info(14)} How ranking works</button></div>
         </div>
-        <div class="page-tools"><a class="btn btn-outline" href="/podcasts/">${icon.mic(15)} Podcasts</a></div>
       </div>
       <div class="nb-controls"><div class="seg" role="group" aria-label="Board" data-boards></div><div class="nb-days" data-days-slot></div></div>
       <p class="nb-status" data-status></p>

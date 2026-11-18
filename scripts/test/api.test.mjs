@@ -14,6 +14,9 @@ import { onRequestGet as equities } from '../../functions/api/equities.ts';
 import { onRequestGet as markets } from '../../functions/api/markets.ts';
 import { onRequestGet as trending } from '../../functions/api/trending.ts';
 import { onRequestGet as sparklines } from '../../functions/api/sparklines.ts';
+import { onRequestGet as chartApi } from '../../functions/api/chart.ts';
+import { answerAt, forgetForTests, onRequestGet as yesterday } from '../../functions/api/yesterday.ts';
+import { BEST_MIN_CAP, BEST_MIN_TRADED, BEST_SHOW, COIN_MICRO, TRAIL_DAYS, cryptoDay, prevDayKey, sessionBefore, stockDay } from '../../functions/_shared/bestBuys.ts';
 
 // Stand-ins for the Cloudflare runtime.
 const edge = new Map();
@@ -61,7 +64,7 @@ globalThis.fetch = async (input, init) => {
     if (coinGeckoRefuses && !key) return new Response('{"status":{"error_code":429}}', { status: 429 });
     if (ethListRefused && url.includes('category=ethereum-ecosystem')) return new Response('{"status":{"error_code":429}}', { status: 429 });
   }
-  const res = await mock.handle(input);
+  const res = await mock.handle(input, init);
   if (res) return res;
   throw new TypeError(`no stand-in for ${new URL(url).hostname}`);
 };
@@ -388,6 +391,291 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.equal(await kvPutIfOlder(full, 'snap', value(), 1, 60), false, 'a used-up write allowance is not an error');
 }
 
+/* ── Candles: open, high and low line up with the closes ─────────────────── */
+{
+  const { status, body } = await call(chartApi, '/api/chart?symbol=AAPL&range=6mo&interval=1d');
+  assert.equal(status, 200);
+  const n = body.closes.length;
+  assert.ok(n > 50, 'six months of daily bars');
+  assert.equal(body.opens.length, n);
+  assert.equal(body.highs.length, n);
+  assert.equal(body.lows.length, n);
+  for (let i = 0; i < n; i++) {
+    const top = Math.max(body.opens[i], body.closes[i]);
+    const bottom = Math.min(body.opens[i], body.closes[i]);
+    assert.ok(body.highs[i] >= top - 1e-9 && body.lows[i] <= bottom + 1e-9, `bar ${i}: the range holds the open and close`);
+  }
+  const long = await call(chartApi, '/api/chart?symbol=SPY&range=10y&interval=1wk');
+  assert.equal(long.status, 200, 'ten years is an allowed range (lead-in for 200-week averages)');
+}
+
+/* ── Yesterday's best buys ──────────────────────────────────────────────── */
+// Stocks come from Yahoo's screener, or Nasdaq's full list when that fails. Nasdaq's can lag by a session
+// or more: while it still shows the session before, that one is saved under its own date and shown; once it
+// catches up, the newest is. Coins come from Yahoo's list compared with the day before's saved closes, or,
+// when those were not saved, with Yahoo's daily bars, read over a few requests. Every row shown has been
+// checked against Yahoo's daily closes, and every list has at least five rows.
+{
+  // Coin closes are read from 00:15 UTC; keep clear of that window.
+  const DAY = 86_400_000;
+  const t0 = Date.now() % DAY < 20 * 60_000 ? Date.now() + 20 * 60_000 : Date.now();
+  const latest = stockDay(t0);
+  const before = sessionBefore(latest);
+  const writesBefore = kvWrites.length;
+  const nasdaqCalls = () => upstream.filter((u) => u.includes('/api/screener/stocks')).length;
+  const yahooStockCalls = () => upstream.filter((u) => u.includes('/v1/finance/screener?')).length;
+  const paprikaCalls = () => upstream.filter((u) => u.includes('api.coinpaprika.com')).length;
+  const paprikaAtStart = paprikaCalls();
+
+  const check = (body, label, groups = ['crypto', 'stocks']) => {
+    for (const g of groups) {
+      const group = body[g].items;
+      assert.ok(group.length >= BEST_SHOW && group.length <= 10, `${label}: a full ${g} list (${group.length} rows; ${body[g].why ?? ''})`);
+      group.forEach((r, i) => {
+        assert.ok(r.change > 0, `${r.sym} gained`);
+        assert.ok(r.marketCap >= BEST_MIN_CAP, `${r.sym} is over the size floor`);
+        assert.ok(r.traded == null || r.traded >= BEST_MIN_TRADED, `${r.sym} traded enough`);
+        assert.ok(Math.abs(r.change - (r.to / r.from - 1) * 100) < 1e-6, `${r.sym} change is close to close`);
+        assert.equal(r.trail[r.trail.length - 1], r.to, `${r.sym} trend ends on the day`);
+        assert.ok(r.trail.length >= 2 && r.trail.length <= TRAIL_DAYS);
+        if (i) assert.ok(group[i - 1].change >= r.change, 'biggest first');
+      });
+    }
+    const syms = groups.flatMap((g) => body[g].items.map((r) => r.sym));
+    for (const bad of ['QWRNW', 'QPRF^A', 'QTNY', 'QTHN', 'TINY', 'THIN'])
+      assert.ok(!syms.includes(bad), `${label}: ${bad} (warrant, preferred, under the floor or barely traded) is left out`);
+  };
+  /** Upstream requests per run, to stay inside the free plan's 50 sub-requests. */
+  const perRun = [];
+  const run = async (at) => {
+    mock.setClock(at);
+    const n = upstream.length;
+    const a = await answerAt(ctx('/api/yesterday'), at);
+    await Promise.allSettled(pending.splice(0));
+    perRun.push(upstream.length - n);
+    return a;
+  };
+  /** Requests a minute apart until crypto's list for the day is in; the answer, and how many it took. */
+  const untilCoins = async (from) => {
+    let a;
+    let n = 0;
+    do a = await run(from + n++ * 61_000);
+    while (a.crypto.pending && n < 8);
+    return { a, n };
+  };
+  /**
+   * Each coin's close before the day as the list starts it: the saved close, or (`viaBars`, when none was
+   * saved) Yahoo's daily bar, rounded to six decimals, except for coins under COIN_MICRO, read from hourly bars.
+   */
+  const startOf = (k, s, e, viaBars) => (viaBars && e[k] >= COIN_MICRO ? Math.round(s[k] * 1e6) / 1e6 : s[k]);
+  /** Every coin over the floors (but `without`), by its change from one day's close to the next, biggest first. */
+  const coinRanking = (startDay, endDay, without = [], viaBars = false) => {
+    const s = mock.yahooCloses(startDay);
+    const e = mock.yahooCloses(endDay);
+    return Object.keys(e)
+      .filter((k) => s[k] > 0 && !/^(TINY|THIN)-/.test(k) && !without.includes(k))
+      .map((k) => ({ k, change: (e[k] / startOf(k, s, e, viaBars) - 1) * 100 }))
+      .sort((x, y) => y.change - x.change);
+  };
+  /** The coin list is exact: each from close to close, and it is the day's ranking (bar the coins left out). */
+  const exactCoins = (a, label, without = [], viaBars = false) => {
+    const day = a.crypto.day;
+    const startDay = prevDayKey(day);
+    const s = mock.yahooCloses(startDay);
+    const e = mock.yahooCloses(day);
+    a.crypto.items.forEach((r) => {
+      assert.ok(r.yahoo, `${r.sym} has its Yahoo symbol`);
+      const from = startOf(r.yahoo, s, e, viaBars);
+      assert.ok(Math.abs(r.from / from - 1) < 1e-9 && Math.abs(r.to / e[r.yahoo] - 1) < 1e-9, `${label}: ${r.sym} from close to close (${r.from} / ${from}, ${r.to} / ${e[r.yahoo]})`);
+      assert.equal(r.sym, r.yahoo.replace(/(\d{4})?-USD$/, ''), 'a ticker shows without the id Yahoo adds when tickers clash');
+      assert.ok(!without.includes(r.yahoo), `${label}: ${r.yahoo} could not be checked, so it is left out`);
+    });
+    const want = coinRanking(startDay, day, without, viaBars).slice(0, a.crypto.items.length);
+    assert.deepEqual(a.crypto.items.map((r) => r.yahoo), want.map((x) => x.k), `${label}: the day's biggest gainers, in order`);
+    if (without.length < 3) assert.ok(a.crypto.items[0].change > 40, `${label}: a planted runner leads`);
+    assert.ok(a.crypto.checked >= 300, `${label}: every coin over the floor is compared (${a.crypto.checked})`);
+    assert.match(a.crypto.source, /Yahoo/);
+  };
+
+  // 1. The first request works out one list (crypto); never both in one request (CPU and sub-request limits).
+  // No coin closes were saved for the day before (the first day), so today's are saved for tomorrow, and each
+  // coin's start is read from Yahoo's daily bars over the next requests. CoinPaprika is never asked: it
+  // refuses Cloudflare Functions.
+  // Steps 1 to 5: Yahoo's stock screener is down, so Nasdaq's list is used.
+  mock.setYahooStocksDown(true);
+  mock.setNasdaqDay(before);
+  const d0 = cryptoDay(t0);
+  let a = await run(t0);
+  assert.equal(a.crypto.day, d0, 'crypto: the UTC day before');
+  assert.ok(a.crypto.pending && a.retrySoon, 'crypto is under way, and the page asks again in a minute');
+  assert.match(a.crypto.why ?? '', /not saved.*daily bars: 0 of \d+ read/, `why: ${a.crypto.why}`);
+  assert.ok(kvWrites.includes(`best:closes:${d0}`), "the day's coin closes are saved for tomorrow");
+  assert.ok(kvWrites.includes(`best:fill:${d0}`), 'and the coins to read are saved, so any location carries on');
+  assert.ok(a.stocks.pending, 'stocks are left to the next request');
+  assert.equal(nasdaqCalls(), 0);
+
+  // 2. Next request: stocks' turn, as they have not been tried yet. Nasdaq still shows the session before:
+  // it is recognised and saved as that session.
+  a = await run(t0 + 61_000);
+  assert.equal(nasdaqCalls(), 1, 'one read of the full stock list');
+  assert.equal(a.stocks.day, before, 'labelled with the session it really shows');
+  assert.match(a.stocks.source, /Nasdaq/);
+  assert.ok(a.stocks.pending, 'and marked as not the newest');
+  assert.ok(a.stocks.checked > 500, `every listed stock over the floor is compared (${a.stocks.checked})`);
+  assert.ok(a.stocks.items[0].change > 40, 'the planted small-cap runners rank, not just the big names');
+  check(a, 'lagging', ['stocks']);
+  assert.ok(a.crypto.pending, 'crypto waits for the next request');
+
+  // 2b. The next requests read the coins' daily bars, then the list is worked out: exact, the day's real
+  // ranking, at least five.
+  let got = await untilCoins(t0 + 150_000);
+  a = got.a;
+  assert.ok(!a.crypto.pending, `a list for ${d0}: ${a.crypto.why ?? ''}`);
+  assert.ok(got.n <= 3, `done within three more requests (${got.n})`);
+  exactCoins(a, 'first day', [], true);
+  assert.ok(a.crypto.items.some((r) => r.to < COIN_MICRO), 'a coin priced in millionths of a dollar ranks (read from hourly bars)');
+  assert.equal(nasdaqCalls(), 1, 'stocks are not looked at again meanwhile');
+
+  // 3. Ten minutes on, Nasdaq has caught up, but it is not looked at again until 20 minutes have passed.
+  mock.setNasdaqDay(latest);
+  a = await run(t0 + 11 * 60_000);
+  assert.equal(nasdaqCalls(), 1, 'not looked at again yet');
+  assert.equal(a.stocks.day, before);
+  assert.ok(!a.retrySoon, 'no point asking again every minute');
+
+  // 4. Twenty minutes on it is, and the newest session is saved and shown.
+  a = await run(t0 + 22 * 60_000);
+  assert.equal(nasdaqCalls(), 2);
+  assert.equal(a.stocks.day, latest, 'the newest finished session');
+  assert.ok(!a.stocks.pending && !a.retrySoon);
+  check(a, 'caught up');
+  const stocks = a.stocks.items.map((r) => r.sym);
+  const writes = kvWrites.slice(writesBefore);
+  const fills = writes.filter((k) => k.startsWith('best:fill:'));
+  assert.deepEqual(
+    writes.filter((k) => !k.startsWith('best:fill:')).sort(),
+    [`best:closes:${d0}`, `best:v2:crypto:${d0}`, `best:v2:stocks:${before}`, `best:v2:stocks:${latest}`].sort(),
+    'one saved list per group per day, and one set of coin closes',
+  );
+  assert.ok(fills.length <= 3, `the coins to read are saved a few times at most (${fills.length})`);
+  assert.equal(paprikaCalls(), paprikaAtStart, 'CoinPaprika is not asked');
+
+  // 5. From then on the saved list is used and Nasdaq is left alone, even if it moves on to a session still trading.
+  mock.setNasdaqDay(null);
+  a = await run(t0 + 45 * 60_000);
+  assert.equal(nasdaqCalls(), 2, 'the full list is not read again');
+  assert.deepEqual(a.stocks.items.map((r) => r.sym), stocks, 'the saved list, unchanged');
+
+  // Through the endpoint itself, and kept rather than rebuilt on every view.
+  const { status, body } = await call(yesterday, '/api/yesterday');
+  assert.equal(status, 200);
+  assert.ok(body.ok, 'answers');
+  assert.equal(body.minCap, BEST_MIN_CAP);
+  assert.equal(body.minTraded, BEST_MIN_TRADED);
+  const again = upstream.length;
+  const second = await call(yesterday, '/api/yesterday');
+  if (!second.body.retrySoon) assert.equal(upstream.length, again, 'the answer is kept, not rebuilt on every view');
+
+  // 5b. With Yahoo's screener working, the newest session comes from it: already current the evening of the
+  // session, the session read from each row rather than guessed, and each gainer measured again from daily
+  // closes, so a row with a wrong previous close (+900% on a small move) does not get in.
+  const dropStocks = () => {
+    forgetForTests();
+    for (const k of [...kv.store.keys()]) if (k.startsWith('best:v2:stocks:')) kv.store.delete(k);
+  };
+  dropStocks();
+  mock.setYahooStocksDown(false);
+  const nasdaqSoFar = nasdaqCalls();
+  a = await run(t0 + 70 * 60_000);
+  assert.match(a.stocks.source, /Yahoo/, `from Yahoo: ${a.stocks.why ?? ''}`);
+  assert.equal(a.stocks.day, latest, 'the newest finished session');
+  assert.ok(!a.stocks.pending);
+  assert.equal(nasdaqCalls(), nasdaqSoFar, 'Nasdaq is not needed');
+  assert.ok(a.stocks.checked > 500, `every listed stock over the floor is counted (${a.stocks.checked})`);
+  assert.ok(a.stocks.items[0].change > 40, 'the planted small-cap runners rank');
+  assert.ok(mock.badYahooStock && !a.stocks.items.some((r) => r.yahoo === mock.badYahooStock && r.change > 100), `${mock.badYahooStock}'s bad previous close is not believed`);
+  assert.ok(!a.stocks.items.some((r) => r.sym === 'QPRF-PA'), 'the preferred share is left out under its Yahoo symbol too');
+  check(a, 'from Yahoo');
+
+  // 5c. When Yahoo has no daily bars for the biggest gainers (more than one round of forty), they cannot be
+  // checked and are left out, and the next ones are checked until the list is full.
+  dropStocks();
+  const noBars = mock.setStockBarsMissing(45);
+  a = await run(t0 + 95 * 60_000);
+  assert.ok(!a.stocks.pending, `a list: ${a.stocks.why ?? ''}`);
+  assert.ok(!a.stocks.items.some((r) => noBars.includes(r.yahoo)), 'nothing that could not be checked');
+  check(a, 'gainers without bars');
+  mock.setStockBarsMissing(0);
+
+  // 6. The next day, yesterday's saved closes are the starting point: every coin is measured from Yahoo's
+  // list in one request, and the changes are exact.
+  const t1 = t0 + DAY;
+  const d1 = cryptoDay(t1);
+  a = await run(t1);
+  assert.equal(a.crypto.day, d1);
+  assert.ok(!a.crypto.pending, `a list for ${d1} in one request: ${a.crypto.why ?? ''}`);
+  exactCoins(a, 'from saved closes');
+  assert.ok(a.crypto.items.some((r) => r.to < COIN_MICRO), 'a coin priced in millionths of a dollar ranks');
+  assert.ok(a.crypto.items.length >= BEST_SHOW);
+  assert.ok(kvWrites.includes(`best:closes:${d1}`), "and that day's closes are saved for the next");
+
+  // 6b. Yahoo has no daily bars for the 25 biggest gainers (more than one round of twenty): they are left
+  // out, and the list is the biggest of the rest, still at least five.
+  const t2 = t0 + 2 * DAY;
+  mock.setClock(t2);
+  const noCoinBars = mock.setCoinBarsMissing(25);
+  a = await run(t2);
+  assert.ok(!a.crypto.pending, `a list: ${a.crypto.why ?? ''}`);
+  exactCoins(a, 'gainers without bars', noCoinBars);
+  check(a, 'coins without bars', ['crypto']);
+  mock.setCoinBarsMissing(0);
+
+  // 6c. The biggest gainer's daily bar disagrees with the list's close (one of them is wrong): it is left out.
+  const t3 = t0 + 3 * DAY;
+  mock.setClock(t3);
+  const wrong = mock.setBadCoinBar(true);
+  a = await run(t3);
+  assert.ok(!a.crypto.items.some((r) => r.yahoo === wrong), `${wrong}, whose figures disagree, is left out`);
+  exactCoins(a, 'a bar that disagrees', [wrong]);
+  mock.setBadCoinBar(false);
+
+  // 7. A day nobody visited the day before (no closes saved), while Yahoo's coin list is down: pending, and
+  // the answer says why. It does not take every request's turn: next time both are due, stocks go first.
+  // Once Yahoo is back, the coins' starts are read from the daily bars and the list comes in.
+  const t5 = t0 + 5 * DAY;
+  const d5 = cryptoDay(t5);
+  mock.setYahooCoinsDown(true);
+  a = await run(t5);
+  assert.ok(a.crypto.pending && a.crypto.day !== d5, 'the last saved day stands in, marked pending');
+  assert.match(a.crypto.why ?? '', /coin list answered HTTP 500/, `the reason is given: ${a.crypto.why}`);
+  const readsBefore = nasdaqCalls() + yahooStockCalls();
+  a = await run(t5 + 21 * 60_000);
+  assert.ok(nasdaqCalls() + yahooStockCalls() > readsBefore, 'the stock list is read this time');
+  assert.ok(a.crypto.pending, 'crypto waits for its next turn');
+  mock.setYahooCoinsDown(false);
+  got = await untilCoins(t5 + 22 * 60_000 + 30_000);
+  a = got.a;
+  assert.ok(!a.crypto.pending && a.crypto.day === d5, `a list for ${d5}: ${a.crypto.why ?? ''}`);
+  assert.ok(got.n <= 4, `within a few requests (${got.n})`);
+  exactCoins(a, 'a day after a missed one', [], true);
+  assert.ok(kvWrites.includes(`best:closes:${d5}`) && kvWrites.includes(`best:fill:${d5}`));
+
+  // 8. A list saved with fewer than five rows (by an older version) is worked out again.
+  const t6 = t0 + 6 * DAY;
+  const d6 = cryptoDay(t6);
+  const shortKey = `best:v2:crypto:${d6}`;
+  kv.store.set(shortKey, JSON.stringify({ day: d6, items: a.crypto.items.slice(0, 3), checked: 1375, at: new Date(t6).toISOString(), source: 'CoinPaprika (2,000 largest coins)' }));
+  forgetForTests();
+  a = await run(t6);
+  assert.ok(a.crypto.items.length >= BEST_SHOW && !a.crypto.pending, `worked out again: ${a.crypto.items.length} rows; ${a.crypto.why ?? ''}`);
+  assert.ok(JSON.parse(kv.store.get(shortKey)).items.length >= BEST_SHOW, 'and the short one replaced');
+  exactCoins(a, 'replacing a short list');
+
+  assert.equal(paprikaCalls(), paprikaAtStart, 'CoinPaprika is never asked');
+  assert.ok(Math.max(...perRun) <= 45, `each request stays inside the free plan's 50 sub-requests (most: ${Math.max(...perRun)})`);
+  mock.setClock(null);
+}
+
 /* ── Storage budget ─────────────────────────────────────────────────────── */
 // The free plan allows 1,000 KV writes a day, shared with sign-in and saved layouts.
 // Loading every data endpoint from cold must cost at most a few.
@@ -395,6 +683,8 @@ assert.ok(kvWrites.some((k) => k.includes('crypto-eth')), 'the Ethereum list kee
 assert.ok(kvWrites.some((k) => k.includes('crypto-bnb')), 'so does the BNB Chain list');
 assert.ok(kvWrites.some((k) => k.includes('crypto-l2')), 'and the layer-2 list');
 // One write per list: the main coins, each chain list (at most twice a day), share counts and the snapshot.
-assert.ok(kvWrites.length <= 6, `data endpoints wrote to KV ${kvWrites.length} times: ${kvWrites.join(', ')}`);
+// (Yesterday's best buys add one per group per day, checked above; the test runs several days, so they are counted there.)
+const dataWrites = kvWrites.filter((k) => !k.startsWith('best:'));
+assert.ok(dataWrites.length <= 6, `data endpoints wrote to KV ${dataWrites.length} times: ${dataWrites.join(', ')}`);
 
 console.log(`api: ok (${upstream.length} upstream requests, ${kvWrites.length} KV writes)`);
