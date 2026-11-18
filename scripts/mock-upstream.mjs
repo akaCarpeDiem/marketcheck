@@ -52,7 +52,7 @@ const NAMES = {
   'GC=F': 'Gold Dec 26', 'SI=F': 'Silver Dec 26', 'CL=F': 'Crude Oil Nov 26', 'HG=F': 'Copper Dec 26',
 };
 
-export function createMock({ universePrices = {}, shares = {}, names = {}, calendar, live = false } = {}) {
+export function createMock({ universePrices = {}, shares = {}, names = {}, calendar, live = false, origin = 'http://127.0.0.1:5173' } = {}) {
   const prices = { ...universePrices, ...EXTRA_PRICES };
   const isCrypto = (s) => /-USD$/.test(s);
   const isFuture = (s) => /=F$/.test(s);
@@ -778,7 +778,23 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     if (host === 'wikimedia.org' && url.pathname.includes('/metrics/pageviews/top/')) return json(wikiAnswer());
     if (host === 'lite-api.jup.ag') return json(jupiter());
     if (host === 'api.alternative.me') return json(fng());
+    if (host === 'example.com' || host.endsWith('.example.com')) return articlePage(url);
     return null;
+  }
+
+  /**
+   * A news article, read by the board for its preview picture. Like real
+   * publishers, most set one (og:image) and some turn the request away.
+   */
+  function articlePage(url) {
+    const [topic = '', slug = ''] = url.pathname.split('/').filter(Boolean);
+    const i = Number(slug.split('-')[0]);
+    if (!Number.isFinite(i) || i % 4 === 3) return new Response('Forbidden', { status: 403, headers: { 'Content-Type': 'text/html' } });
+    const img = `${origin}/__dev/img?i=${(hash(topic) % 9) + i + 40}`;
+    return new Response(`<!doctype html><html><head><title>Story ${i}</title><meta property="og:image" content="${img}"></head><body><p>Story</p></body></html>`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   }
 
 
@@ -806,6 +822,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
   // How many outlets run each story (index = story number).
   const STORY_OUTLETS = [5, 3, 2, 1, 6, 2, 1, 3, 1, 4, 2, 1, 4, 1, 2, 3, 1, 5, 2, 1, 3, 1, 2, 1];
   const STORY_OUTLET_NAMES = ['BBC Business', 'CNBC Markets', 'WSJ Markets', 'NYT Business', 'Guardian Business', 'CoinDesk', 'Reuters', 'Bloomberg'];
+  const NO_PICTURE = new Set(['CNBC Markets', 'WSJ Markets', 'Reuters', 'Bloomberg']);
   const WORDING = [(t) => t, (t) => `${t}, analysts say`, (t) => `${t} - what to know`, (t) => `Why ${t}`, (t) => `${t} as investors react`, (t) => `Report: ${t}`];
   const REDDIT_TOPIC = { economics: 'markets', investing: 'investing', personalfinance: 'personal-finance', cryptocurrency: 'crypto', realestate: 'real-estate', technology: 'technology', politics: 'policy', business: 'business', energy: 'commodities', health: 'healthcare' };
   const ETF = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -854,7 +871,8 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
           title: v.title,
           link: v.link,
           summary: 'A short summary of the story appears here so the card has two or three lines of supporting text to show.',
-          image: s.i % 5 === 4 ? null : `/__dev/img?i=${hash(topic) % 9 + s.i}`,
+          // Like the real feeds, some outlets send no picture (the board then reads the article page).
+          image: s.i % 5 === 4 || NO_PICTURE.has(v.source) ? null : `/__dev/img?i=${hash(topic) % 9 + s.i}`,
           source: v.source,
           publishedAt: new Date(v.publishedMs).toISOString(),
           publishedMs: v.publishedMs,

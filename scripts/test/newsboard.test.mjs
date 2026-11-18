@@ -8,6 +8,7 @@ import {
 } from '../../functions/_shared/newsBoard.ts';
 import { handleNewsBoard } from '../../functions/api/newsboard.ts';
 import { TOPIC_IDS } from '../../functions/_shared/newsTopics.ts';
+import { IMAGE_LOOKUP } from '../../functions/_shared/storyImage.ts';
 
 const MIN = 60_000;
 const HOUR = 3_600_000;
@@ -249,6 +250,10 @@ const makeFetch = (opts = {}) => {
     if (u.hostname === 'www.reddit.com') return opts.reddit === false ? new Response('blocked', { status: 403 }) : ok(REDDIT_JSON);
     if (u.hostname === 'trends.google.com') return opts.trends === false ? new Response('no', { status: 500 }) : ok(TRENDS_XML(u.searchParams.get('geo')), 'application/rss+xml');
     if (u.hostname === 'wikimedia.org') return opts.wiki === false ? new Response('no', { status: 503 }) : ok(WIKI_JSON);
+    // Article pages, read for their preview picture.
+    const page = opts.pages?.[url];
+    if (typeof page === 'number') return new Response('blocked', { status: page, headers: { 'Content-Type': 'text/html' } });
+    if (typeof page === 'string') return ok(page, 'text/html; charset=utf-8');
     throw new Error(`unexpected fetch ${url}`);
   };
   return { fn, calls, seen };
@@ -556,6 +561,36 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns, env } = {}) => {
   assert.equal(f.calls.length, n);
   await ask('topic=policy&board=live&sweep=1', { fetchFn: f, ns });
   assert.ok(f.calls.length > n, 'sweep=1 bypasses it');
+}
+
+/* ── pictures: from another outlet in the cluster, else from the article page ── */
+{
+  const kv = memKv();
+  const bare = pool().map((it) =>
+    it.source === 'NYT Business' || it.link.includes('nvidia') || it.link.includes('bakery') ? { ...it, image: null, link: it.link.replace('.example/', '.example/pics/') } : it,
+  );
+  const f = makeFetch({
+    poolItems: bare,
+    pages: {
+      'https://cnbc.example/pics/nvidia': '<html><head><meta property="og:image" content="https://cdn.example/nvidia.jpg"></head></html>',
+      'https://tc.example/pics/nvidia': '<html><head><meta property="og:image" content="https://cdn.example/nvidia-tc.jpg"></head></html>',
+      'https://local.example/pics/bakery': 403,
+    },
+  });
+  const r = await ask('topic=markets&board=live', { kv, fetchFn: f });
+  const by = (word) => r.body.stories.find((s) => s.title.toLowerCase().includes(word));
+  const fed = r.body.stories.find((s) => s.signals.outlets >= 5);
+  assert.equal(fed.source, 'NYT Business');
+  assert.equal(fed.image, 'https://img.example/x.jpg', 'the NYT lead has none: another outlet in the cluster lends its picture');
+  assert.equal(by('nvidia').image, 'https://cdn.example/nvidia.jpg', 'no picture in any feed: the article page has one');
+  assert.equal(by('bakery').image, null, 'a page that refuses leaves the story for the topic artwork');
+  const pageCalls = f.calls.filter((c) => /\/pics\//.test(c));
+  assert.ok(pageCalls.length >= 1 && pageCalls.length <= IMAGE_LOOKUP.perBuild, `article pages read: ${pageCalls.length}`);
+  assert.ok(f.calls.length - pageCalls.length <= 9, 'signal and pool requests stay within their own limit');
+  const noonSnap = JSON.parse(kv.m.get(noonKey('2026-06-15', 'markets')));
+  assert.equal(noonSnap.stories.find((s) => s.title.includes('Nvidia'))?.image, 'https://cdn.example/nvidia.jpg', 'the stored snapshot keeps the picture');
+  const today = await ask('topic=markets&board=today', { kv, fetchFn: makeFetch({ pages: {} }) });
+  assert.equal(today.calls.length, 0, 'the locked board reuses pictures and remembered misses');
 }
 
 for (const id of TOPIC_IDS) {

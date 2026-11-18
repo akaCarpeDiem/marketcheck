@@ -56,6 +56,7 @@ Copy `.env.example` to `.env` for optional build-time settings. `.env` is gitign
 | `board` | The leaderboard: a record cannot be faked from the browser, results and ranking |
 | `history` | The hourly price record behind 4h and 8h crypto changes |
 | `news` | The ten news topics, where each old category went, and feed limits |
+| `storyimage` | Story pictures: bigger BBC thumbnails, preview pictures read from article pages, the per-article cache and the lookup budget, and the company names the artwork recognises |
 
 ## Deploy
 
@@ -131,7 +132,9 @@ Ranks news stories per topic (the ten in `functions/_shared/newsTopics.ts`) by p
 
 Reddit needs an app key from cloud servers: create a "script" app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` as Cloudflare Pages secrets. Without them the unsigned request is tried and usually refused.
 
-The stories come from `/api/headlines?topic=<id>&pool=1`, fetched as one subrequest so the board stays well under the 50-subrequest limit. A board request makes at most 9 fetches (headlines, Hacker News, Reddit, Wikipedia, five Trends geos; plus one token request when Reddit is keyed, or a second Wikipedia day) plus a few KV reads.
+The stories come from `/api/headlines?topic=<id>&pool=1`, fetched as one subrequest so the board stays well under the 50-subrequest limit. A board request makes at most 9 fetches (headlines, Hacker News, Reddit, Wikipedia, five Trends geos; plus one token request when Reddit is keyed, or a second Wikipedia day) and at most 12 for pictures (below), plus a few KV reads.
+
+**Pictures** (`functions/_shared/storyImage.ts`). Every story should show one. In order: the lead outlet's picture from its feed (BBC's 240 px thumbnails are asked for at 976 px, `biggerImage`); another outlet's picture for the same story; then the article page's own preview picture (`og:image`, then `twitter:image`), read from the top of the page only. Page lookups are cached per article in the Cache API (found a week, no picture 12 hours, no answer 2 hours), never in KV, and a board build reads at most 12 pages (`IMAGE_LOOKUP`). Noon and final snapshots are saved with their pictures. A story that still has none, or whose picture the publisher refuses, is drawn in the browser with the topic's artwork, or the logo of the company or coin the headline names (`src/views/parts/storymedia.ts`, `src/lib/brands.ts`).
 
 **KV** (`LAYOUTS`, keys `newsboard:v1:`, 14-day expiry): `acc:<ETdate>:<topic>` (stories seen that day with their best signals, written at most once an hour per topic), `noon:<ETdate>:<topic>`, `final:<ETdate>:<topic>`, `days:<topic>` (index of finals). Without KV (local dev) an in-memory map is used.
 
