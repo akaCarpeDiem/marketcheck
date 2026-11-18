@@ -127,9 +127,11 @@ Ranks news stories per topic (the ten in `functions/_shared/newsTopics.ts`) by p
 - **yesterday**: the final top 10 of the previous day. **day** returns the stored final for `date` plus `days`, the dates available.
 - Day boundaries and noon use America/New_York.
 
-**Signals** (scoring constants sit at the top of `functions/_shared/newsBoard.ts`): outlet coverage, Hacker News (one Algolia request shared by all topics), Reddit (one `top.json` request per topic; often refused from cloud addresses, then the signal shows as not ok), and Google Trends daily trending searches (five countries, one request each). Each is cached 20 to 30 minutes; a failed signal never fails the board.
+**Signals** (scoring constants sit at the top of `functions/_shared/newsBoard.ts`): outlet coverage, Hacker News (one Algolia request shared by all topics), Reddit (one `top.json` request per topic; often refused from cloud addresses, then the signal shows as not ok), Google Trends daily trending searches (five countries, one request each), and Wikipedia's most-read articles of the previous UTC day (one request, cached 3 hours, matched to a story by article title). Each is cached 20 to 30 minutes (Wikipedia 3 hours); a failed signal never fails the board, and its reason is shown in the "How ranking works" dialog (`error` in `signals[]`).
 
-The stories come from `/api/headlines?topic=<id>&pool=1`, fetched as one subrequest so the board stays well under the 50-subrequest limit. A board request makes at most 8 fetches (headlines, Hacker News, Reddit, five Trends geos) plus a few KV reads.
+Reddit needs an app key from cloud servers: create a "script" app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` as Cloudflare Pages secrets. Without them the unsigned request is tried and usually refused.
+
+The stories come from `/api/headlines?topic=<id>&pool=1`, fetched as one subrequest so the board stays well under the 50-subrequest limit. A board request makes at most 9 fetches (headlines, Hacker News, Reddit, Wikipedia, five Trends geos; plus one token request when Reddit is keyed, or a second Wikipedia day) plus a few KV reads.
 
 **KV** (`LAYOUTS`, keys `newsboard:v1:`, 14-day expiry): `acc:<ETdate>:<topic>` (stories seen that day with their best signals, written at most once an hour per topic), `noon:<ETdate>:<topic>`, `final:<ETdate>:<topic>`, `days:<topic>` (index of finals). Without KV (local dev) an in-memory map is used.
 

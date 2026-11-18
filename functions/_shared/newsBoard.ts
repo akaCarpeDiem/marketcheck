@@ -3,7 +3,7 @@
  * instead of listing recent headlines.
  *
  *   1. Cluster the RSS pool into stories (the same event reported by several outlets).
- *   2. Attach signals: outlet coverage, Hacker News, Reddit, Google Trends.
+ *   2. Attach signals: outlet coverage, Hacker News, Reddit, Google Trends, Wikipedia pageviews.
  *   3. Score. "live" decays with age; "today" and "yesterday" use the best each
  *      signal reached during the day, plus how long a story stayed near the top.
  *   4. Keep a per-day accumulator, a noon snapshot and a final snapshot in KV.
@@ -27,6 +27,8 @@ export const SCORE = {
   reddit: 8,
   /** trends = k * log10(traffic) */
   trends: 4,
+  /** wiki = k * log10(views of the most-read matching article yesterday) */
+  wiki: 4,
   /** Live score halves every this many hours of story age. */
   halfLifeHours: 18,
   /** Day score: bonus per recorded sweep (capped), and for the best rank reached. */
@@ -41,6 +43,7 @@ export const TIMING = {
   hnFreshMs: 20 * 60_000,
   redditFreshMs: 20 * 60_000,
   trendsFreshMs: 30 * 60_000,
+  wikiFreshMs: 3 * 3_600_000,
   /** At most one accumulator write per topic in this time (KV free tier: 1000 writes a day for the whole site). */
   accWriteEveryMs: 60 * 60_000,
   kvTtlSec: 14 * 86_400,
@@ -63,6 +66,14 @@ export const LIMITS = {
 export const KV_PREFIX = 'newsboard:v1:';
 export const TREND_GEOS = ['US', 'GB', 'IN', 'CA', 'AU'] as const;
 export const REDDIT_UA = 'MarketCheck/1.0 (+https://marketcheck.money)';
+/** Wikimedia asks API clients for a descriptive User-Agent with a contact. */
+export const WIKI_UA = 'MarketCheck/1.0 (+https://marketcheck.money; support@marketcheck.money)';
+export const TRENDS_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+export const REDDIT_NO_KEY_ERROR = 'Reddit blocks unsigned requests from cloud servers; add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET';
 
 export const REDDIT_SUBS: Record<TopicId, string[]> = {
   markets: ['economics', 'stocks', 'StockMarket'],
@@ -82,6 +93,7 @@ export const SIGNAL_INFO = [
   { id: 'hn', label: 'Hacker News', about: 'Hacker News points and comments in the last 36 hours.' },
   { id: 'reddit', label: 'Reddit', about: 'Reddit score and comments in the topic’s main subreddits over the last day.' },
   { id: 'trends', label: 'Google Trends', about: 'Search traffic for matching daily trending searches in the US, UK, India, Canada and Australia.' },
+  { id: 'wiki', label: 'Wikipedia', about: 'Most-read English Wikipedia articles worldwide yesterday, matched to the story’s subject.' },
 ] as const;
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
@@ -92,9 +104,10 @@ export type Outlet = { source: string; title: string; link: string; publishedAt:
 export type HnSignal = { points: number; comments: number; url: string };
 export type RedditSignal = { score: number; comments: number; url: string; sub: string };
 export type TrendSignal = { query: string; traffic: number; geo: string };
-export type StorySignals = { outlets: number; hn?: HnSignal; reddit?: RedditSignal; trends?: TrendSignal };
+export type WikiSignal = { article: string; views: number; url: string };
+export type StorySignals = { outlets: number; hn?: HnSignal; reddit?: RedditSignal; trends?: TrendSignal; wiki?: WikiSignal };
 
-export type SignalMeta = { id: 'coverage' | 'hn' | 'reddit' | 'trends'; label: string; ok: boolean; about: string };
+export type SignalMeta = { id: 'coverage' | 'hn' | 'reddit' | 'trends' | 'wiki'; label: string; ok: boolean; about: string; error?: string };
 
 export type BoardStory = {
   id: string;
@@ -293,14 +306,45 @@ export type SignalOpts = {
   waitUntil?: WaitUntil;
   /** Added to cache keys; lets tests keep their fixtures apart. */
   ns?: string;
+  /** Reddit app credentials (Pages secrets). Without them the unsigned request is tried. */
+  reddit?: { id: string; secret: string };
 };
 
-async function fetchText(fetchFn: FetchLike, url: string, headers?: Record<string, string>): Promise<string> {
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    host: string,
+  ) {
+    super(`${host} answered ${status}`);
+  }
+}
+
+/** A short, safe reason for the "How ranking works" dialog. Never carries a token or a full URL. */
+export function reasonOf(e: unknown): string {
+  let m = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+  if (e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError')) return 'timed out';
+  m = m
+    .replace(/bearer\s+\S+/gi, 'bearer ***')
+    .replace(/basic\s+\S+/gi, 'basic ***')
+    .replace(/https?:\/\/\S+/gi, (u) => {
+      try {
+        return new URL(u).hostname;
+      } catch {
+        return 'a URL';
+      }
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (/aborted/i.test(m)) return 'timed out';
+  return (m || 'failed').slice(0, 140);
+}
+
+async function fetchText(fetchFn: FetchLike, url: string, headers?: Record<string, string>, init?: { method?: string; body?: string }): Promise<string> {
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), TIMING.fetchTimeoutMs) : null;
   try {
-    const res = await fetchFn(url, { headers, signal: ctl?.signal });
-    if (!res.ok) throw new Error(`${new URL(url).hostname} answered ${res.status}`);
+    const res = await fetchFn(url, { ...init, headers, signal: ctl?.signal });
+    if (!res.ok) throw new HttpError(res.status, new URL(url).hostname);
     return await res.text();
   } finally {
     if (timer) clearTimeout(timer);
@@ -364,16 +408,76 @@ export async function fetchHn(opts: SignalOpts, now: number): Promise<ExternalPo
   return hit.data;
 }
 
-/** One request per topic. Reddit often turns cloud addresses away; the caller carries on without it. */
+/* Reddit app-only token, kept for the life of the isolate. */
+let redditToken: { key: string; token: string; expiresAt: number } | null = null;
+let redditTokenLoad: { key: string; p: Promise<string> } | null = null;
+/** Forget the kept token (tests). */
+export const resetRedditToken = (): void => {
+  redditToken = null;
+  redditTokenLoad = null;
+};
+
+const b64 = (s: string): string => btoa(s);
+
+async function redditAccessToken(creds: { id: string; secret: string }, fetchFn: FetchLike): Promise<string> {
+  const key = creds.id;
+  if (redditToken && redditToken.key === key && Date.now() < redditToken.expiresAt) return redditToken.token;
+  if (redditTokenLoad && redditTokenLoad.key === key) return redditTokenLoad.p;
+  const p = (async () => {
+    const text = await fetchText(
+      fetchFn,
+      'https://www.reddit.com/api/v1/access_token',
+      {
+        'User-Agent': REDDIT_UA,
+        Authorization: `Basic ${b64(`${creds.id}:${creds.secret}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      { method: 'POST', body: 'grant_type=client_credentials' },
+    );
+    let j: { access_token?: unknown; expires_in?: unknown; error?: unknown };
+    try {
+      j = JSON.parse(text);
+    } catch {
+      throw new Error('Reddit token request did not return JSON');
+    }
+    if (typeof j.access_token !== 'string' || !j.access_token) {
+      throw new Error(`Reddit token request refused${typeof j.error === 'string' ? ` (${j.error})` : ''}`);
+    }
+    const ttl = typeof j.expires_in === 'number' && j.expires_in > 0 ? j.expires_in : 3600;
+    redditToken = { key, token: j.access_token, expiresAt: Date.now() + Math.max(60, ttl - 300) * 1000 };
+    return j.access_token;
+  })();
+  redditTokenLoad = { key, p };
+  try {
+    return await p;
+  } finally {
+    if (redditTokenLoad?.p === p) redditTokenLoad = null;
+  }
+}
+
+/** One request per topic. Reddit often turns cloud addresses away unless an app key is set; the caller carries on without it. */
 export async function fetchReddit(topic: TopicId, opts: SignalOpts): Promise<ExternalPost[]> {
   const subs = REDDIT_SUBS[topic].join('+');
-  const url = `https://www.reddit.com/r/${subs}/top.json?t=day&limit=100`;
-  const hit = await cached<ExternalPost[]>(`newsboard:reddit:v1:${topic}${opts.ns ?? ''}`, {
+  const creds = opts.reddit?.id && opts.reddit.secret ? opts.reddit : null;
+  const hit = await cached<ExternalPost[]>(`newsboard:reddit:v2:${topic}${opts.ns ?? ''}`, {
     freshMs: TIMING.redditFreshMs,
     keepSec: 6 * 3600,
     retryMs: 2 * 60_000,
     waitUntil: opts.waitUntil,
-    load: async () => parseReddit(JSON.parse(await fetchText(opts.fetchFn, url, { 'User-Agent': REDDIT_UA, Accept: 'application/json' }))),
+    load: async () => {
+      if (creds) {
+        const token = await redditAccessToken(creds, opts.fetchFn);
+        const url = `https://oauth.reddit.com/r/${subs}/top?t=day&limit=100&raw_json=1`;
+        return parseReddit(JSON.parse(await fetchText(opts.fetchFn, url, { 'User-Agent': REDDIT_UA, Authorization: `bearer ${token}`, Accept: 'application/json' })));
+      }
+      try {
+        const url = `https://www.reddit.com/r/${subs}/top.json?t=day&limit=100`;
+        return parseReddit(JSON.parse(await fetchText(opts.fetchFn, url, { 'User-Agent': REDDIT_UA, Accept: 'application/json' })));
+      } catch {
+        throw new Error(REDDIT_NO_KEY_ERROR);
+      }
+    },
   });
   return hit.data;
 }
@@ -422,18 +526,85 @@ export function parseTrendsRss(xml: string, geo: string): Trend[] {
   return out;
 }
 
+/** "not a feed (got ...)" with the first 60 characters of what came back, tags stripped. */
+export function notFeedReason(body: string): string {
+  const text = body
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60)
+    .trim();
+  if (text) return `not a feed (got ${text})`;
+  return /<html|<!doctype/i.test(body) ? 'not a feed (got HTML)' : body.trim() ? 'not a feed' : 'not a feed (empty body)';
+}
+
 /** One geo, shared for 30 minutes. Each geo is cached on its own so one failure does not drop the rest. */
 export async function fetchTrendsGeo(geo: string, opts: SignalOpts): Promise<Trend[]> {
   const url = `https://trends.google.com/trending/rss?geo=${geo}`;
-  const hit = await cached<Trend[]>(`newsboard:trends:v1:${geo}${opts.ns ?? ''}`, {
+  const hit = await cached<Trend[]>(`newsboard:trends:v2:${geo}${opts.ns ?? ''}`, {
     freshMs: TIMING.trendsFreshMs,
     keepSec: 6 * 3600,
     retryMs: 2 * 60_000,
     waitUntil: opts.waitUntil,
     load: async () => {
-      const xml = await fetchText(opts.fetchFn, url);
-      if (!/<rss|<feed/i.test(xml)) throw new Error('not a feed');
+      const xml = await fetchText(opts.fetchFn, url, TRENDS_HEADERS);
+      if (!/<rss|<feed/i.test(xml)) throw new Error(notFeedReason(xml));
       return parseTrendsRss(xml, geo);
+    },
+  });
+  return hit.data;
+}
+
+/* ── Wikipedia most-read ──────────────────────────────────────────────────── */
+
+export type WikiArticle = { article: string; views: number };
+
+const WIKI_SKIP = /^(?:Main_Page|-|Deaths_in_.*|Lists?_of_.*|\d+)$/i;
+/** Titles too generic to mean one story, even when they are a real article. */
+const WIKI_GENERIC = new Set(['news', 'list', 'video', 'game', 'music', 'film', 'love', 'time', 'life', 'world', 'death', 'year', 'week', 'series', 'season', 'episode', 'show', 'sport', 'wikipedia']);
+
+/** items[0].articles of the pageviews payload, content pages only, best 1000. Throws when the payload is not one. */
+export function parseWikiTop(json: unknown): WikiArticle[] {
+  const list = (json as { items?: { articles?: unknown[] }[] })?.items?.[0]?.articles;
+  if (!Array.isArray(list)) throw new Error('unexpected Wikipedia payload');
+  const out: WikiArticle[] = [];
+  for (const a of list as Record<string, unknown>[]) {
+    const article = typeof a?.article === 'string' ? a.article : '';
+    const views = num(a?.views);
+    if (!article || views <= 0 || article.includes(':') || WIKI_SKIP.test(article)) continue;
+    out.push({ article, views });
+  }
+  return out.sort((a, b) => b.views - a.views).slice(0, 1000);
+}
+
+/** "Nvidia_(company)" -> "Nvidia" (for matching). */
+export const wikiTitle = (article: string): string => article.replace(/_/g, ' ').replace(/\s*\([^()]*\)\s*$/, '').trim();
+
+const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10).replace(/-/g, '/');
+
+/**
+ * Yesterday's most-read articles (UTC), or the day before when yesterday is not
+ * published yet. One request for every topic, shared for three hours.
+ */
+export async function fetchWiki(opts: SignalOpts, now: number): Promise<WikiArticle[]> {
+  const hit = await cached<WikiArticle[]>(`newsboard:wiki:v1${opts.ns ?? ''}`, {
+    freshMs: TIMING.wikiFreshMs,
+    keepSec: 24 * 3600,
+    retryMs: 5 * 60_000,
+    waitUntil: opts.waitUntil,
+    load: async () => {
+      let last: unknown;
+      for (const back of [1, 2]) {
+        const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia.org/all-access/${utcDay(now - back * 86_400_000)}`;
+        try {
+          return parseWikiTop(JSON.parse(await fetchText(opts.fetchFn, url, { 'User-Agent': WIKI_UA, Accept: 'application/json' })));
+        } catch (e) {
+          last = e;
+          if (!(e instanceof HttpError && e.status === 404)) throw e;
+        }
+      }
+      throw last;
     },
   });
   return hit.data;
@@ -471,40 +642,82 @@ export function matchTrends(clusters: Cluster[], trends: Trend[]): (TrendSignal 
   });
 }
 
+/** The most-read article whose whole title appears in one of the cluster's headlines. */
+export function matchWiki(clusters: Cluster[], articles: WikiArticle[]): (WikiSignal | undefined)[] {
+  const prepared: { a: WikiArticle; toks: string[] }[] = [];
+  for (const a of articles) {
+    const toks = tokenize(wikiTitle(a.article));
+    if (!toks.length) continue;
+    if (toks.length === 1 && (toks[0]!.length < 4 || /^\d+$/.test(toks[0]!) || WIKI_GENERIC.has(toks[0]!))) continue;
+    prepared.push({ a, toks });
+  }
+  return clusters.map((c) => {
+    const sets = c.tokenSets.map((t) => new Set(t));
+    let best: WikiArticle | undefined;
+    for (const { a, toks } of prepared) {
+      if (best && a.views <= best.views) continue;
+      if (sets.some((set) => toks.every((w) => set.has(w)))) best = a;
+    }
+    return best ? { article: best.article.replace(/_/g, ' '), views: best.views, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(best.article)}` } : undefined;
+  });
+}
+
+export type SignalKey = 'hn' | 'reddit' | 'trends' | 'wiki';
+
 export type Gathered = {
   hn: (HnSignal | undefined)[];
   reddit: (RedditSignal | undefined)[];
   trends: (TrendSignal | undefined)[];
-  ok: { hn: boolean; reddit: boolean; trends: boolean };
+  wiki: (WikiSignal | undefined)[];
+  ok: Record<SignalKey, boolean>;
+  /** Why a signal is down: the first failure, or for trends each country's reason once. */
+  errors: Partial<Record<SignalKey, string>>;
 };
 
 /** Fetch every external signal at once. A failure marks that signal not ok and nothing else. */
 export async function gatherSignals(clusters: Cluster[], topic: TopicId, opts: SignalOpts, now: number): Promise<Gathered> {
-  const [hn, reddit, ...geos] = await Promise.allSettled([
+  const [hn, reddit, wiki, ...geos] = await Promise.allSettled([
     fetchHn(opts, now),
     fetchReddit(topic, opts),
+    fetchWiki(opts, now),
     ...TREND_GEOS.map((g) => fetchTrendsGeo(g, opts)),
   ]);
   const hnPosts = hn.status === 'fulfilled' ? hn.value : [];
   const redditPosts = reddit.status === 'fulfilled' ? reddit.value : [];
+  const wikiList = wiki.status === 'fulfilled' ? (wiki.value as WikiArticle[]) : [];
   const trends: Trend[] = [];
   let trendsOk = false;
+  const trendWhy: string[] = [];
   for (const g of geos) {
     if (g.status === 'fulfilled') {
       trendsOk = true;
       trends.push(...(g.value as Trend[]));
+    } else {
+      const why = reasonOf(g.reason);
+      if (!trendWhy.includes(why)) trendWhy.push(why);
     }
   }
+  const errors: Gathered['errors'] = {};
+  if (hn.status === 'rejected') errors.hn = reasonOf(hn.reason);
+  if (reddit.status === 'rejected') errors.reddit = reasonOf(reddit.reason);
+  if (wiki.status === 'rejected') errors.wiki = reasonOf(wiki.reason);
+  if (!trendsOk && trendWhy.length) errors.trends = trendWhy.join('; ').slice(0, 200);
   return {
     hn: matchPosts(clusters, hnPosts).map((p) => (p ? { points: p.a, comments: p.b, url: p.link } : undefined)),
     reddit: matchPosts(clusters, redditPosts).map((p) => (p ? { score: p.a, comments: p.b, url: p.link, sub: p.sub ?? '' } : undefined)),
     trends: matchTrends(clusters, trends),
-    ok: { hn: hn.status === 'fulfilled', reddit: reddit.status === 'fulfilled', trends: trendsOk },
+    wiki: matchWiki(clusters, wikiList),
+    ok: { hn: hn.status === 'fulfilled', reddit: reddit.status === 'fulfilled', trends: trendsOk, wiki: wiki.status === 'fulfilled' },
+    errors,
   };
 }
 
-export function signalMeta(ok: Partial<Record<'hn' | 'reddit' | 'trends', boolean>>): SignalMeta[] {
-  return SIGNAL_INFO.map((s) => ({ id: s.id, label: s.label, about: s.about, ok: s.id === 'coverage' ? true : ok[s.id] === true }));
+export function signalMeta(ok: Partial<Record<SignalKey, boolean>>, errors: Partial<Record<SignalKey, string>> = {}): SignalMeta[] {
+  return SIGNAL_INFO.map((s) => {
+    const up = s.id === 'coverage' ? true : ok[s.id] === true;
+    const error = s.id === 'coverage' || up ? undefined : errors[s.id];
+    return { id: s.id, label: s.label, about: s.about, ok: up, ...(error ? { error } : {}) };
+  });
 }
 
 /* ── Scoring ──────────────────────────────────────────────────────────────── */
@@ -512,11 +725,12 @@ export function signalMeta(ok: Partial<Record<'hn' | 'reddit' | 'trends', boolea
 export const coverageScore = (outlets: number): number => SCORE.coverageBase + SCORE.coverageLog * Math.log2(Math.max(1, outlets));
 export const hnScore = (s?: HnSignal): number => (s ? SCORE.hn * Math.log10(1 + s.points + s.comments) : 0);
 export const redditScore = (s?: RedditSignal): number => (s ? SCORE.reddit * Math.log10(1 + s.score + s.comments) : 0);
+export const wikiScore = (s?: WikiSignal): number => (s && s.views > 1 ? SCORE.wiki * Math.log10(s.views) : 0);
 export const trendsScore = (s?: TrendSignal): number => (s && s.traffic > 1 ? SCORE.trends * Math.log10(s.traffic) : 0);
 
-/** Sum of the four signal parts, no time decay. */
+/** Sum of the signal parts, no time decay. */
 export function baseScore(s: StorySignals): number {
-  return coverageScore(s.outlets) + hnScore(s.hn) + redditScore(s.reddit) + trendsScore(s.trends);
+  return coverageScore(s.outlets) + hnScore(s.hn) + redditScore(s.reddit) + trendsScore(s.trends) + wikiScore(s.wiki);
 }
 
 /** Live: the sum, halved every `halfLifeHours` of age. */
@@ -547,6 +761,8 @@ export function mergeSignals(a: StorySignals, b?: StorySignals): StorySignals {
   if (rd) out.reddit = rd;
   const tr = a.trends && b.trends ? (b.trends.traffic > a.trends.traffic ? b.trends : a.trends) : (a.trends ?? b.trends);
   if (tr) out.trends = tr;
+  const wk = a.wiki && b.wiki ? (b.wiki.views > a.wiki.views ? b.wiki : a.wiki) : (a.wiki ?? b.wiki);
+  if (wk) out.wiki = wk;
   return out;
 }
 const pickRedditMeta = (a: RedditSignal, b: RedditSignal) => {
@@ -656,9 +872,11 @@ export function buildCandidates(clusters: Cluster[], g: Gathered | null): Candid
     const hn = g?.hn[i];
     const rd = g?.reddit[i];
     const tr = g?.trends[i];
+    const wk = g?.wiki[i];
     if (hn) signals.hn = hn;
     if (rd) signals.reddit = rd;
     if (tr) signals.trends = tr;
+    if (wk) signals.wiki = wk;
     return { cluster, signals, tokens: tokenize(cluster.lead.title), id: storyId(cluster.lead.title), publishedMs: cluster.earliestMs ?? cluster.lead.publishedMs ?? null };
   });
 }
@@ -782,6 +1000,8 @@ export type BoardDeps = {
   origin: string;
   waitUntil?: WaitUntil;
   ns?: string;
+  /** Reddit app credentials, when configured. */
+  reddit?: { id: string; secret: string };
 };
 
 export async function fetchPool(topic: TopicId, origin: string, fetchFn: FetchLike): Promise<HeadlineItem[]> {
@@ -878,8 +1098,8 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
   /* Gather. */
   const poolItems = await fetchPool(topic, d.origin, d.fetchFn);
   const clusters = clusterPool(poolItems);
-  const sig = await gatherSignals(clusters, topic, { fetchFn: d.fetchFn, waitUntil: d.waitUntil, ns: d.ns }, now);
-  const meta = signalMeta(sig.ok);
+  const sig = await gatherSignals(clusters, topic, { fetchFn: d.fetchFn, waitUntil: d.waitUntil, ns: d.ns, reddit: d.reddit }, now);
+  const meta = signalMeta(sig.ok, sig.errors);
   const cands = buildCandidates(clusters, sig);
   const accToday = await read<Acc>(accKey(today, topic));
 
@@ -935,6 +1155,7 @@ async function buildBoardInner(d: BoardDeps): Promise<BoardResponse> {
           hn: inDay.some((s) => s.signals.hn),
           reddit: inDay.some((s) => s.signals.reddit),
           trends: inDay.some((s) => s.signals.trends),
+          wiki: inDay.some((s) => s.signals.wiki),
         });
         fin = { date: yesterday, topic, lockedAt: iso(now), signals: accMeta, stories };
         write(finalKey(yesterday, topic), fin);

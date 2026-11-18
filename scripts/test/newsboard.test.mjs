@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   SCORE, addDays, baseScore, canonicalUrl, clusterPool, coverageScore, buildCandidates, dayScore, etDate, etHour, etWallToMs, finalKey,
   accKey, noonKey, daysKey, liveScore, matchPosts, matchTrends, nextEtMidnight, nextEtNoon, parseHn, parseReddit, parseTraffic, parseTrendsRss,
-  recordSweep, sameStory, storyId, tokenize, TIMING,
+  recordSweep, sameStory, storyId, tokenize, TIMING, matchWiki, parseWikiTop, wikiScore, resetRedditToken, REDDIT_NO_KEY_ERROR,
 } from '../../functions/_shared/newsBoard.ts';
 import { handleNewsBoard } from '../../functions/api/newsboard.ts';
 import { TOPIC_IDS } from '../../functions/_shared/newsTopics.ts';
@@ -217,24 +217,46 @@ function memKv() {
     async put(k, v, o) { puts.push([k, o]); m.set(k, v); },
   };
 }
+const WIKI_JSON = {
+  items: [{ articles: [
+    { article: 'Main_Page', views: 9_000_000, rank: 1 },
+    { article: 'Special:Search', views: 8_000_000, rank: 2 },
+    { article: 'Wikipedia:Featured_pictures', views: 700_000, rank: 3 },
+    { article: 'Deaths_in_2026', views: 650_000, rank: 4 },
+    { article: '-', views: 600_000, rank: 5 },
+    { article: 'Nvidia_(company)', views: 1_200_000, rank: 6 },
+    { article: 'Nvidia', views: 300_000, rank: 7 },
+    { article: 'Federal_Reserve', views: 450_000, rank: 8 },
+    { article: 'Time', views: 400_000, rank: 9 },
+    { article: 'Oil', views: 390_000, rank: 10 },
+    { article: 'Cleopatra', views: 380_000, rank: 11 },
+  ] }],
+};
 const makeFetch = (opts = {}) => {
   const calls = [];
-  const fn = async (url) => {
+  const seen = [];
+  const fn = async (url, init) => {
     const u = new URL(url);
     calls.push(u.hostname + u.pathname);
+    seen.push({ url: String(url), init });
+    if (opts.custom) {
+      const r = await opts.custom(u, init);
+      if (r) return r;
+    }
     const ok = (body, type = 'application/json') => new Response(typeof body === 'string' ? body : JSON.stringify(body), { headers: { 'Content-Type': type } });
     if (u.pathname === '/api/headlines') return opts.pool === false ? new Response('x', { status: 500 }) : ok({ topic: 'markets', items: [], pool: opts.poolItems ?? pool() });
     if (u.hostname === 'hn.algolia.com') return opts.hn === false ? new Response('no', { status: 503 }) : ok(HN_JSON);
     if (u.hostname === 'www.reddit.com') return opts.reddit === false ? new Response('blocked', { status: 403 }) : ok(REDDIT_JSON);
     if (u.hostname === 'trends.google.com') return opts.trends === false ? new Response('no', { status: 500 }) : ok(TRENDS_XML(u.searchParams.get('geo')), 'application/rss+xml');
+    if (u.hostname === 'wikimedia.org') return opts.wiki === false ? new Response('no', { status: 503 }) : ok(WIKI_JSON);
     throw new Error(`unexpected fetch ${url}`);
   };
-  return { fn, calls };
+  return { fn, calls, seen };
 };
 let nsN = 0;
-const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
+const ask = async (query, { kv, now = NOW, fetchFn, ns, env } = {}) => {
   const f = fetchFn ?? makeFetch();
-  const res = await handleNewsBoard(new Request(`https://t.example/api/newsboard?${query}`), kv ? { LAYOUTS: kv } : {}, undefined, { fetchFn: f.fn ?? f, now, ns: ns ?? `t${++nsN}` });
+  const res = await handleNewsBoard(new Request(`https://t.example/api/newsboard?${query}`), { ...(kv ? { LAYOUTS: kv } : {}), ...(env ?? {}) }, undefined, { fetchFn: f.fn ?? f, now, ns: ns ?? `t${++nsN}` });
   return { res, body: await res.json(), calls: f.calls };
 };
 
@@ -255,7 +277,7 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
   assert.equal(b.date, '2026-06-15');
   assert.equal(b.topic, 'markets');
   assert.ok(b.label);
-  assert.deepEqual(b.signals.map((s) => [s.id, s.ok]), [['coverage', true], ['hn', true], ['reddit', true], ['trends', true]]);
+  assert.deepEqual(b.signals.map((s) => [s.id, s.ok]), [['coverage', true], ['hn', true], ['reddit', true], ['trends', true], ['wiki', true]]);
   assert.ok(b.signals.every((s) => s.about.length > 10));
   assert.ok(b.stories.length >= 3 && b.stories.length <= 10);
   const top = b.stories[0];
@@ -264,6 +286,9 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
   assert.equal(top.signals.hn.points, 400);
   assert.equal(top.signals.reddit.sub, 'economics');
   assert.equal(top.signals.trends.geo, 'GB');
+  assert.deepEqual(top.signals.wiki, { article: 'Federal Reserve', views: 450_000, url: 'https://en.wikipedia.org/wiki/Federal_Reserve' });
+  const nv = b.stories.find((x) => x.title.startsWith('Nvidia'));
+  assert.deepEqual(nv.signals.wiki, { article: 'Nvidia (company)', views: 1_200_000, url: 'https://en.wikipedia.org/wiki/Nvidia_(company)' });
   assert.equal(top.heat, 100);
   assert.equal(top.prevRank, null);
   assert.equal(top.outlets.length, 6);
@@ -271,7 +296,7 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
   for (let i = 1; i < b.stories.length; i++) assert.ok(b.stories[i].score <= b.stories[i - 1].score, 'sorted by score');
   assert.ok(b.stories.every((s, i) => s.rank === i + 1 && /^https?:/.test(s.link) && typeof s.id === 'string'));
   assert.ok(Date.parse(b.nextUpdateAt) - Date.parse(b.generatedAt) === 10 * MIN);
-  assert.ok(f.calls.length <= 8, `subrequests per board request: ${f.calls.length}`);
+  assert.ok(f.calls.length <= 9, `subrequests per board request: ${f.calls.length}`);
   assert.equal(f.calls.filter((c) => c.includes('/api/headlines')).length, 1, 'one self-fetch');
 
   // The sweep wrote the accumulator once, and (it is past noon) the noon snapshot.
@@ -349,13 +374,13 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
   const kv = memKv();
   const r = await ask('topic=technology&board=live', { kv, fetchFn: makeFetch({ hn: false, reddit: false, trends: false }) });
   assert.equal(r.res.status, 200);
-  assert.deepEqual(r.body.signals.map((s) => s.ok), [true, false, false, false]);
+  assert.deepEqual(r.body.signals.map((s) => s.ok), [true, false, false, false, true]);
   assert.ok(r.body.stories.length > 0);
   assert.equal(r.body.stories[0].signals.outlets, 6);
   assert.equal(r.body.stories[0].signals.hn, undefined);
 
   const partial = await ask('topic=technology&board=live', { kv, fetchFn: makeFetch({ reddit: false }) });
-  assert.deepEqual(partial.body.signals.map((s) => s.ok), [true, true, false, true]);
+  assert.deepEqual(partial.body.signals.map((s) => s.ok), [true, true, false, true, true]);
 
   const dead = await ask('topic=crypto&board=live', { fetchFn: makeFetch({ pool: false, hn: false, reddit: false, trends: false }) });
   assert.equal(dead.res.status, 200);
@@ -364,6 +389,161 @@ const ask = async (query, { kv, now = NOW, fetchFn, ns } = {}) => {
   const thrown = await ask('topic=crypto&board=live', { fetchFn: async () => { throw new TypeError('network down'); } });
   assert.equal(thrown.res.status, 200);
   assert.equal(thrown.body.status, 'empty');
+}
+
+/* ── error reasons ── */
+{
+  const r = await ask('topic=technology&board=live', { fetchFn: makeFetch({ hn: false, reddit: false, trends: false, wiki: false }) });
+  const by = Object.fromEntries(r.body.signals.map((x) => [x.id, x]));
+  assert.equal(by.coverage.error, undefined);
+  assert.equal(by.hn.error, 'hn.algolia.com answered 503');
+  assert.equal(by.reddit.error, REDDIT_NO_KEY_ERROR, 'unsigned Reddit failure explains the key');
+  assert.equal(by.trends.error, 'trends.google.com answered 500', 'five identical geo reasons collapse to one');
+  assert.equal(by.wiki.error, 'wikimedia.org answered 503');
+  // A working signal carries no error.
+  const okAll = await ask('topic=technology&board=live', {});
+  assert.ok(okAll.body.signals.every((x) => x.error === undefined));
+
+  // 403 from Trends, an HTML page from Trends, a timeout from HN.
+  const mixed = await ask('topic=business&board=live', {
+    fetchFn: makeFetch({
+      custom: async (u) => {
+        if (u.hostname === 'trends.google.com') return u.searchParams.get('geo') === 'US' ? new Response('no', { status: 403 }) : new Response('<!doctype html><html><head><title>Before you continue</title></head><body><script>x()</script><p>Consent</p></body></html>', { status: 200 });
+        if (u.hostname === 'hn.algolia.com') throw Object.assign(new Error('This operation was aborted'), { name: 'AbortError' });
+      },
+    }),
+  });
+  const m = Object.fromEntries(mixed.body.signals.map((x) => [x.id, x]));
+  assert.equal(m.trends.ok, false);
+  assert.ok(m.trends.error.includes('trends.google.com answered 403'), m.trends.error);
+  assert.ok(m.trends.error.includes('not a feed (got Before you continue Consent)'), m.trends.error);
+  assert.equal(m.hn.error, 'timed out');
+  const html = await ask('topic=policy&board=live', { fetchFn: makeFetch({ custom: async (u) => (u.hostname === 'wikimedia.org' ? new Response('<html>nope</html>') : undefined) }) });
+  assert.ok(html.body.signals.find((x) => x.id === 'wiki').error, 'a non-JSON body gives a reason');
+}
+
+/* ── Google Trends sends browser-like headers ── */
+{
+  const f = makeFetch();
+  await ask('topic=healthcare&board=live', { fetchFn: f });
+  const tr = f.seen.filter((x) => x.url.includes('trends.google.com'));
+  assert.equal(tr.length, 5);
+  for (const t of tr) {
+    assert.match(t.init.headers['User-Agent'], /^Mozilla\/5\.0 \(Windows NT 10\.0; Win64; x64\) AppleWebKit\/537\.36 .*Chrome\/124\.0 Safari\/537\.36$/);
+    assert.equal(t.init.headers['Accept-Language'], 'en-US,en;q=0.9');
+    assert.match(t.init.headers.Accept, /^application\/rss\+xml/);
+  }
+}
+
+/* ── Wikipedia ── */
+{
+  const list = parseWikiTop(WIKI_JSON);
+  assert.deepEqual(list.map((a) => a.article), ['Nvidia_(company)', 'Federal_Reserve', 'Time', 'Oil', 'Cleopatra', 'Nvidia'], 'non-content pages dropped, sorted by views');
+  assert.throws(() => parseWikiTop({}), /unexpected/);
+  const big = parseWikiTop({ items: [{ articles: Array.from({ length: 1500 }, (_, i) => ({ article: `Page_${i}`, views: 5000 - i })) }] });
+  assert.equal(big.length, 1000);
+  const cl = clusterPool(pool());
+  const m = matchWiki(cl, list);
+  const fedIdx = cl.findIndex((c) => c.items.length >= 5);
+  const nvIdx = cl.findIndex((c) => c.lead.title.startsWith('Nvidia'));
+  assert.equal(m[fedIdx].article, 'Federal Reserve');
+  assert.equal(m[nvIdx].views, 1_200_000, 'the best match by views wins, parenthetical ignored for matching');
+  assert.equal(m[nvIdx].article, 'Nvidia (company)');
+  assert.equal(m[cl.findIndex((c) => c.lead.title.startsWith('Bakery'))], undefined);
+  assert.equal(m.filter(Boolean).length, 2, 'generic "Time", 3-letter "Oil" and unrelated "Cleopatra" never match');
+  assert.equal(matchWiki(cl, [{ article: 'Federal_Express', views: 5 }])[fedIdx], undefined, 'every token of the title must be in one headline');
+
+  assert.equal(wikiScore(undefined), 0);
+  assert.equal(wikiScore({ article: 'a', views: 1, url: 'u' }), 0);
+  assert.ok(Math.abs(wikiScore({ article: 'a', views: 1_000_000, url: 'u' }) - SCORE.wiki * 6) < 1e-9);
+  assert.ok(Math.abs(baseScore({ outlets: 1, wiki: { article: 'a', views: 100_000, url: 'u' } }) - (5 + 20)) < 1e-9);
+
+  // The day: yesterday UTC first, the day before on 404.
+  const urls = [];
+  const f = makeFetch({
+    custom: async (u) => {
+      if (u.hostname !== 'wikimedia.org') return undefined;
+      urls.push(u.pathname);
+      return u.pathname.endsWith('/2026/06/14') ? new Response('not yet', { status: 404 }) : undefined;
+    },
+  });
+  const r = await ask('topic=markets&board=live', { fetchFn: f });
+  assert.deepEqual(urls, [
+    '/api/rest_v1/metrics/pageviews/top/en.wikipedia.org/all-access/2026/06/14',
+    '/api/rest_v1/metrics/pageviews/top/en.wikipedia.org/all-access/2026/06/13',
+  ]);
+  assert.equal(r.body.signals.find((x) => x.id === 'wiki').ok, true);
+  assert.ok(r.body.stories[0].signals.wiki);
+  const wikiCall = f.seen.find((x) => x.url.includes('wikimedia.org'));
+  assert.equal(wikiCall.init.headers['User-Agent'], 'MarketCheck/1.0 (+https://marketcheck.money; support@marketcheck.money)');
+
+  const gone = await ask('topic=markets&board=live', { fetchFn: makeFetch({ custom: async (u) => (u.hostname === 'wikimedia.org' ? new Response('', { status: 404 }) : undefined) }) });
+  const gw = gone.body.signals.find((x) => x.id === 'wiki');
+  assert.equal(gw.ok, false);
+  assert.equal(gw.error, 'wikimedia.org answered 404');
+
+  // It adds to the ranking.
+  const withW = await ask('topic=technology&board=live', { fetchFn: makeFetch() });
+  const noW = await ask('topic=technology&board=live', { fetchFn: makeFetch({ wiki: false }) });
+  const nvW = withW.body.stories.find((x) => x.title.startsWith('Nvidia'));
+  const nvN = noW.body.stories.find((x) => x.title.startsWith('Nvidia'));
+  assert.ok(nvW.score > nvN.score, 'wiki adds to the score');
+}
+
+/* ── Reddit with an app key ── */
+{
+  const mk = () => {
+    let tokens = 0;
+    const f = makeFetch({
+      custom: async (u) => {
+        if (u.hostname === 'www.reddit.com' && u.pathname === '/api/v1/access_token') {
+          tokens++;
+          return new Response(JSON.stringify({ access_token: `tok${tokens}`, expires_in: 86400, token_type: 'bearer' }), { headers: { 'Content-Type': 'application/json' } });
+        }
+        if (u.hostname === 'oauth.reddit.com') return new Response(JSON.stringify(REDDIT_JSON), { headers: { 'Content-Type': 'application/json' } });
+        if (u.hostname === 'www.reddit.com') return new Response('blocked', { status: 403 });
+      },
+    });
+    return { f, count: () => tokens };
+  };
+  const env = { REDDIT_CLIENT_ID: 'my-id', REDDIT_CLIENT_SECRET: 'my-secret' };
+  resetRedditToken();
+  const { f, count } = mk();
+  const first = await ask('topic=markets&board=live', { fetchFn: f, env });
+  assert.equal(first.body.signals.find((x) => x.id === 'reddit').ok, true);
+  assert.equal(first.body.stories[0].signals.reddit.sub, 'economics');
+  const tokReq = f.seen.find((x) => x.url === 'https://www.reddit.com/api/v1/access_token');
+  assert.equal(tokReq.init.method, 'POST');
+  assert.equal(tokReq.init.body, 'grant_type=client_credentials');
+  assert.equal(tokReq.init.headers.Authorization, `Basic ${Buffer.from('my-id:my-secret').toString('base64')}`);
+  assert.ok(tokReq.init.headers['User-Agent'].startsWith('MarketCheck/'));
+  const api = f.seen.find((x) => x.url.startsWith('https://oauth.reddit.com/'));
+  assert.equal(api.url, 'https://oauth.reddit.com/r/economics+stocks+StockMarket/top?t=day&limit=100&raw_json=1');
+  assert.equal(api.init.headers.Authorization, 'bearer tok1');
+  assert.ok(api.init.headers['User-Agent'].startsWith('MarketCheck/'));
+  assert.ok(!f.seen.some((x) => x.url.startsWith('https://www.reddit.com/r/')), 'no unsigned request when keyed');
+  await ask('topic=technology&board=live', { fetchFn: f, env });
+  assert.equal(count(), 1, 'token requested once and reused');
+  assert.ok(f.seen.filter((x) => x.url.startsWith('https://oauth.reddit.com/')).every((x) => x.init.headers.Authorization === 'bearer tok1'));
+
+  // A refused token: a reason, and no secret anywhere in the response.
+  resetRedditToken();
+  const bad = await ask('topic=crypto&board=live', {
+    env,
+    fetchFn: makeFetch({ custom: async (u) => (u.pathname === '/api/v1/access_token' ? new Response('{"error":"invalid_grant"}', { status: 401 }) : undefined) }),
+  });
+  const be = bad.body.signals.find((x) => x.id === 'reddit');
+  assert.equal(be.ok, false);
+  assert.equal(be.error, 'www.reddit.com answered 401');
+  assert.ok(!JSON.stringify(bad.body).includes('my-secret'));
+
+  // No key: unsigned attempt only, helpful error when refused.
+  resetRedditToken();
+  const none = await ask('topic=policy&board=live', { fetchFn: makeFetch({ reddit: false }) });
+  assert.equal(none.body.signals.find((x) => x.id === 'reddit').error, 'Reddit blocks unsigned requests from cloud servers; add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET');
+  const nf = makeFetch();
+  await ask('topic=business&board=live', { fetchFn: nf });
+  assert.ok(nf.seen.every((x) => !x.url.includes('oauth.reddit.com') && !x.url.includes('access_token')));
 }
 
 /* ── the response cache: a second plain request does not rebuild ── */
