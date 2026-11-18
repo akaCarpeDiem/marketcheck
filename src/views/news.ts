@@ -1,5 +1,5 @@
-/** The News Leaderboard: the biggest stories per topic, ranked by coverage, Hacker News, Reddit and search trends. */
-import { SIGNAL_INFO } from '../../functions/_shared/newsBoard';
+/** The News Leaderboard: the biggest stories per topic, ranked by coverage, Hacker News, Reddit, search trends and Wikipedia readers. */
+import { SIGNAL_INFO, type SignalMeta } from '../../functions/_shared/newsBoard';
 import {
   DEFAULT_TOPIC,
   TOPICS,
@@ -151,6 +151,7 @@ export const newsView: View = {
       if (g.hn) out.push(html`<a class="nb-chip nb-chip-link" href="${g.hn.url}" target="_blank" rel="noopener noreferrer" title="Hacker News thread">Hacker News ▲${g.hn.points.toLocaleString('en-US')} · ${g.hn.comments.toLocaleString('en-US')} comments</a>`);
       if (g.reddit) out.push(html`<a class="nb-chip nb-chip-link" href="${g.reddit.url}" target="_blank" rel="noopener noreferrer" title="Reddit thread">Reddit ${count(g.reddit.score)} upvotes · ${subName(g.reddit.sub)}</a>`);
       if (g.trends) out.push(html`<span class="nb-chip" title="${g.trends.query}">Searched ${traffic(g.trends.traffic)} · ${geoName(g.trends.geo)}</span>`);
+      if (g.wiki) out.push(html`<a class="nb-chip nb-chip-link" href="${g.wiki.url}" target="_blank" rel="noopener noreferrer" title="Wikipedia article">Wikipedia ${count(g.wiki.views)} reads · ${g.wiki.article}</a>`);
       return out.join('');
     }
 
@@ -431,12 +432,12 @@ export const newsView: View = {
     /* ── the explainer ── */
     function openHow(): void {
       const d = head();
-      const sigs = d?.signals?.length ? d.signals : SIGNAL_INFO.map((s) => ({ ...s, ok: true }));
+      const sigs: SignalMeta[] = d?.signals?.length ? d.signals : SIGNAL_INFO.map((s) => ({ ...s, ok: true }));
       const o = openOverlay({ kind: 'dialog', label: 'How ranking works', focus: '[data-close]' });
       o.panel.classList.add('nb-how');
       o.panel.innerHTML = html`<h2>How ranking works</h2>
-        <p>Real click counts aren’t public, so stories are ranked by what is public: how many outlets ran the story, Hacker News and Reddit engagement, and Google search trends in the US, UK, India, Canada and Australia. The more signals a story shows up in, the hotter it is. Heat runs from 0 to 100 against the top story of its board.</p>
-        <ul class="nb-signals">${raw(sigs.map((s) => html`<li class="${s.ok ? 'ok' : 'off'}"><span class="nb-sig-mark" aria-hidden="true">${s.ok ? '✓' : '✕'}</span><div><b>${s.label}</b><span class="sr-only">${s.ok ? ' (working now)' : ' (unavailable right now)'}</span><p>${s.about}</p></div></li>`).join(''))}</ul>
+        <p>Real click counts aren’t public, so stories are ranked by what is public: how many outlets ran the story, Hacker News and Reddit engagement, Google search trends in the US, UK, India, Canada and Australia, and how many people read the matching Wikipedia article. The more signals a story shows up in, the hotter it is. Heat runs from 0 to 100 against the top story of its board.</p>
+        <ul class="nb-signals">${raw(sigs.map((s) => html`<li class="${s.ok ? 'ok' : 'off'}"><span class="nb-sig-mark" aria-hidden="true">${s.ok ? '✓' : '✕'}</span><div><b>${s.label}</b><span class="sr-only">${s.ok ? ' (working now)' : ' (unavailable right now)'}</span><p>${s.about}</p>${raw(!s.ok && s.error ? html`<p class="nb-sig-err faint">${s.error}</p>` : '')}</div></li>`).join(''))}</ul>
         <p class="faint">A signal marked ✕ could not be reached on the last update, and rankings fall back on the others.</p>
         <button type="button" class="btn btn-primary btn-sm" data-close>Got it</button>`;
     }

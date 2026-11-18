@@ -2563,6 +2563,11 @@ a.nb-media:hover > img {
   margin: 2px 0 0;
   font-size: 12.5px;
 }
+.nb-signals .nb-sig-err {
+  font-size: 11.5px;
+  color: var(--text-3, var(--text-2));
+  overflow-wrap: anywhere;
+}
 .nb-sig-mark {
   flex: none;
   display: grid;

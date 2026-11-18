@@ -63,6 +63,7 @@ function cleanStory(s: BoardStory): BoardStory | null {
       hn: sig.hn && safeUrl(sig.hn.url) ? { ...sig.hn, url: safeUrl(sig.hn.url)! } : undefined,
       reddit: sig.reddit && safeUrl(sig.reddit.url) ? { ...sig.reddit, url: safeUrl(sig.reddit.url)! } : undefined,
       trends: sig.trends,
+      wiki: sig.wiki && safeUrl(sig.wiki.url) ? { ...sig.wiki, url: safeUrl(sig.wiki.url)! } : undefined,
     },
   };
 }
