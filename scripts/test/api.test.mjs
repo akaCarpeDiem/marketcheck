@@ -417,8 +417,19 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
 // checked against Yahoo's daily closes, and every list has at least five rows.
 {
   // Coin closes are read from 00:15 UTC; keep clear of that window.
+  // Steps 5b and 5c run the clock up to 95 minutes ahead; stay on the same crypto day so
+  // stocks still get the request's turn after dropStocks().
   const DAY = 86_400_000;
-  const t0 = Date.now() % DAY < 20 * 60_000 ? Date.now() + 20 * 60_000 : Date.now();
+  const CLEAR = 20 * 60_000;
+  const SAME_DAY_AHEAD = 95 * 60_000;
+  const now = Date.now();
+  const todaysUtc = now % DAY;
+  const t0 =
+    todaysUtc < CLEAR
+      ? now - todaysUtc + CLEAR
+      : DAY - todaysUtc <= SAME_DAY_AHEAD
+        ? now - todaysUtc + DAY + CLEAR
+        : now;
   const latest = stockDay(t0);
   const before = sessionBefore(latest);
   const writesBefore = kvWrites.length;
