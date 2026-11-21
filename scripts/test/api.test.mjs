@@ -55,9 +55,18 @@ let coinGeckoRefuses = false;
 /** Set to make CoinGecko refuse only the Ethereum-category request. */
 let ethListRefused = false;
 const coinGeckoKeysSeen = [];
+/** CoinGecko's day files (scripts/coingecko-day.mjs) as the coin-data branch serves them, by day; an empty one otherwise. */
+const cgFiles = new Map();
+/** Set to make the day's CoinGecko file not there yet (404). */
+let cgFileMissing = false;
 globalThis.fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
   upstream.push(url);
+  const cgFile = url.match(/^https:\/\/raw\.githubusercontent\.com\/akaCarpeDiem\/marketcheck\/coin-data\/coingecko\/(\d{4}-\d{2}-\d{2})\.json$/);
+  if (cgFile) {
+    if (cgFileMissing) return new Response('404: Not Found', { status: 404 });
+    return new Response(JSON.stringify(cgFiles.get(cgFile[1]) ?? { day: cgFile[1], compared: 0, rows: [] }), { headers: { 'Content-Type': 'application/json' } });
+  }
   if (url.includes('api.coingecko.com')) {
     const key = new Headers(init?.headers).get('x-cg-demo-api-key');
     if (key) coinGeckoKeysSeen.push(key);
@@ -476,9 +485,9 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   };
   /**
    * Each coin's close before the day as the list starts it: the saved close, or (`viaBars`, when none was
-   * saved) Yahoo's daily bar, rounded to six decimals, except for coins under COIN_MICRO, read from hourly bars.
+   * saved) Yahoo's hourly bars, which carry every digit, for every coin.
    */
-  const startOf = (k, s, e, viaBars) => (viaBars && e[k] >= COIN_MICRO ? Math.round(s[k] * 1e6) / 1e6 : s[k]);
+  const startOf = (k, s) => s[k];
   /** Every coin over the floors (but `without`), by its change from one day's close to the next, biggest first. */
   const coinRanking = (startDay, endDay, without = [], viaBars = false) => {
     const s = mock.yahooCloses(startDay);
@@ -565,7 +574,7 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const fills = writes.filter((k) => k.startsWith('best:fill:'));
   assert.deepEqual(
     writes.filter((k) => !k.startsWith('best:fill:')).sort(),
-    [`best:closes:${d0}`, `best:v2:crypto:${d0}`, `best:v2:stocks:${before}`, `best:v2:stocks:${latest}`].sort(),
+    [`best:closes:${d0}`, `best:v3:crypto:${d0}`, `best:v2:stocks:${before}`, `best:v2:stocks:${latest}`].sort(),
     'one saved list per group per day, and one set of coin closes',
   );
   assert.ok(fills.length <= 3, `the coins to read are saved a few times at most (${fills.length})`);
@@ -630,13 +639,25 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   assert.ok(a.crypto.items.length >= BEST_SHOW);
   assert.ok(kvWrites.includes(`best:closes:${d1}`), "and that day's closes are saved for the next");
 
-  // 6b. Yahoo has no daily bars for the 25 biggest gainers (more than one round of twenty): they are left
-  // out, and the list is the biggest of the rest, still at least five.
+  // 6b. Yahoo sends no closes for the 25 biggest gainers (more than one round of twenty), even when asked
+  // again. A failed lookup is not a failed check: the list is not published from what is left, the last
+  // saved day stays up, and the reason is given.
   const t2 = t0 + 2 * DAY;
+  const d2 = cryptoDay(t2);
   mock.setClock(t2);
-  const noCoinBars = mock.setCoinBarsMissing(25);
+  mock.setCoinBarsMissing(25);
   a = await run(t2);
-  assert.ok(!a.crypto.pending, `a list: ${a.crypto.why ?? ''}`);
+  assert.ok(a.crypto.pending && a.crypto.day !== d2, `no list for ${d2} from what got through; the last one stays up (${a.crypto.day})`);
+  assert.match(a.crypto.why ?? '', /could not be read for 25 of the \d+ biggest coin gainers/, `why: ${a.crypto.why}`);
+  assert.ok(!kv.store.has(`best:v3:crypto:${d2}`), 'and nothing is saved for the day');
+
+  // 6b'. Only a few lookups fail (three of the biggest gainers): those are skipped for now (and logged),
+  // and the list is the biggest of the rest.
+  forgetForTests();
+  const noCoinBars = mock.setCoinBarsMissing(3);
+  got = await untilCoins(t2 + 21 * 60_000);
+  a = got.a;
+  assert.ok(!a.crypto.pending && a.crypto.day === d2, `a list: ${a.crypto.why ?? ''}`);
   exactCoins(a, 'gainers without bars', noCoinBars);
   check(a, 'coins without bars', ['crypto']);
   mock.setCoinBarsMissing(0);
@@ -674,13 +695,84 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   // 8. A list saved with fewer than five rows (by an older version) is worked out again.
   const t6 = t0 + 6 * DAY;
   const d6 = cryptoDay(t6);
-  const shortKey = `best:v2:crypto:${d6}`;
+  const shortKey = `best:v3:crypto:${d6}`;
   kv.store.set(shortKey, JSON.stringify({ day: d6, items: a.crypto.items.slice(0, 3), checked: 1375, at: new Date(t6).toISOString(), source: 'CoinPaprika (2,000 largest coins)' }));
   forgetForTests();
   a = await run(t6);
   assert.ok(a.crypto.items.length >= BEST_SHOW && !a.crypto.pending, `worked out again: ${a.crypto.items.length} rows; ${a.crypto.why ?? ''}`);
   assert.ok(JSON.parse(kv.store.get(shortKey)).items.length >= BEST_SHOW, 'and the short one replaced');
   exactCoins(a, 'replacing a short list');
+
+  // 9. Yahoo's daily bars for coins are down, as they were on 2026-11-20, when every coin priced over
+  // $0.001 was turned away and the list was only coins under it. Coins are checked against hourly closes,
+  // so the list is the day's real ranking, coins over $0.001 included.
+  const t7 = t0 + 7 * DAY;
+  mock.setClock(t7);
+  mock.setCoinDailyDown(true);
+  got = await untilCoins(t7);
+  a = got.a;
+  assert.ok(!a.crypto.pending && a.crypto.day === cryptoDay(t7), `a list with daily bars down: ${a.crypto.why ?? ''}`);
+  exactCoins(a, 'daily bars down');
+  assert.ok(a.crypto.items.filter((r) => r.to >= COIN_MICRO).length >= BEST_SHOW, 'coins over $0.001 rank');
+  check(a, 'daily bars down', ['crypto']);
+  mock.setCoinDailyDown(false);
+
+  // 10. CoinGecko's file adds the coins Yahoo's list does not carry. A coin only CoinGecko has, over both
+  // floors, ranks from CoinGecko's own close-to-close figures; one under the size floor or that traded
+  // under $100K over the day does not. A coin on both lists is shown once (Yahoo's row), and the day's
+  // volume from CoinGecko decides whether it traded enough.
+  const t8 = t0 + 8 * DAY;
+  const d7 = cryptoDay(t8);
+  mock.setClock(t8);
+  const yTop = mock.coinGainers()[0];
+  const yc = mock.yahooCoin(yTop);
+  const e7 = mock.yahooCloses(d7);
+  const s7 = mock.yahooCloses(prevDayKey(d7));
+  const yChange = (e7[yTop] / s7[yTop] - 1) * 100;
+  const cgRow = (id, symbol, name, from, change, marketCap, traded) => ({ id, symbol, name, image: null, from, to: from * (1 + change / 100), change, marketCap, traded });
+  const kyo = cgRow('kyo', 'KYO', 'KYO', 0.01, 128.6, 4.25e6, 1.8e6);
+  {
+    // The change must be exactly to / from, as the file writes it.
+    kyo.change = (kyo.to / kyo.from - 1) * 100;
+  }
+  const rows7 = [
+    kyo,
+    cgRow('tiny-cg', 'TCG', 'Tiny CG', 0.5, 300, 400_000, 5e6),
+    cgRow('thin-cg', 'THCG', 'Thin CG', 0.5, 250, 5e6, 30_000),
+    // Yahoo's biggest gainer, as CoinGecko measures it: the same coin, with the day's own volume.
+    { ...cgRow(`cg-${yc.symbol.toLowerCase()}`, yc.symbol, yc.name, s7[yTop], yChange, 9e6, 777_777), to: e7[yTop], change: yChange },
+  ].map((r) => ({ ...r, change: (r.to / r.from - 1) * 100 }));
+  cgFiles.set(d7, { day: d7, compared: 2_500, rows: rows7 });
+  got = await untilCoins(t8);
+  a = got.a;
+  assert.ok(!a.crypto.pending && a.crypto.day === d7, `a list with CoinGecko's coins: ${a.crypto.why ?? ''}`);
+  const syms7 = a.crypto.items.map((r) => r.sym);
+  assert.equal(syms7[0], 'KYO', `the coin only CoinGecko has leads: ${syms7.join(', ')}`);
+  assert.equal(a.crypto.items[0].cg, 'kyo');
+  assert.ok(!a.crypto.items[0].yahoo, 'and has no Yahoo pair');
+  assert.ok(!syms7.includes('TCG') && !syms7.includes('THCG'), 'under the size floor, or under $100K traded on the day: left out');
+  const twins = a.crypto.items.filter((r) => r.sym === yc.symbol);
+  assert.equal(twins.length, 1, 'a coin on both lists shows once');
+  assert.equal(twins[0].yahoo, yTop, "as Yahoo's row");
+  assert.equal(twins[0].traded, 777_777, "with CoinGecko's figure for the day's volume");
+  assert.ok(a.crypto.checked >= 2_500, 'coins over the floor on either list are counted');
+  assert.match(a.crypto.source, /CoinGecko/);
+  check(a, 'with CoinGecko', ['crypto']);
+
+  // 11. CoinGecko's file is not there yet: the list waits for it for two hours into the day, then goes
+  // ahead with Yahoo's coins alone.
+  const t8day = Math.floor((t0 + 9 * DAY) / DAY) * DAY;
+  const d8 = cryptoDay(t8day + 30 * 60_000);
+  cgFileMissing = true;
+  forgetForTests();
+  a = await untilCoins(t8day + 30 * 60_000).then((g) => g.a);
+  assert.ok(a.crypto.pending && a.crypto.day !== d8, `waits for CoinGecko (${a.crypto.day})`);
+  assert.match(a.crypto.why ?? '', /Waiting for CoinGecko/, `why: ${a.crypto.why}`);
+  got = await untilCoins(t8day + 2 * 3_600_000 + 60_000);
+  a = got.a;
+  assert.ok(!a.crypto.pending && a.crypto.day === d8, `then goes ahead without it: ${a.crypto.why ?? ''}`);
+  exactCoins(a, 'without CoinGecko');
+  cgFileMissing = false;
 
   assert.equal(paprikaCalls(), paprikaAtStart, 'CoinPaprika is never asked');
   assert.ok(Math.max(...perRun) <= 45, `each request stays inside the free plan's 50 sub-requests (most: ${Math.max(...perRun)})`);

@@ -275,11 +275,11 @@ const DAY = 86_400_000;
   assert.ok(!listIsPast(coins.slice(0, 20), stale, day), 'read too early: the closes are the day before');
 
   // A day filled in from daily bars when the day before's closes were not saved.
-  const extra = [quote('LOWV-USD', 'Barely Traded', 1, 1, 5e7, BEST_MIN_TRADED - 1, 1), quote('SMOL-USD', 'Small', 1, 1, BEST_MIN_CAP / 2, 5e6, 2)];
+  const extra = [quote('LOWV-USD', 'Barely Traded', 1, 1, 5e7, BEST_MIN_TRADED / 4 - 1, 1), quote('SMOL-USD', 'Small', 1, 1, BEST_MIN_CAP / 2, 5e6, 2)];
   const all = parseYahooCoins(page([...many, ...extra]));
   const fill = startFill(all, day, '2026-11-17T01:00:00Z');
   assert.equal(fill.checked, all.length - 1, 'every coin over the size floor is counted');
-  assert.equal(fill.coins.length, all.length - 2, 'only coins that traded enough need their bars read');
+  assert.equal(fill.coins.length, all.length - 2, 'only coins that traded enough (loosely: the day’s own volume decides later) need their bars read');
   assert.ok(!fill.coins.some((f) => f.y === 'LOWV-USD' || f.y === 'SMOL-USD'));
   const bars = new Map();
   for (const f of fill.coins) {

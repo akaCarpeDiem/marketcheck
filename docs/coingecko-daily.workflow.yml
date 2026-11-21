@@ -1,0 +1,32 @@
+# GitHub Actions workflow for CoinGecko's daily coin list (scripts/coingecko-publish.sh).
+# To use it, copy it to .github/workflows/coingecko-daily.yml (pushing workflow files needs a token with
+# the `workflow` scope). It runs a few times after 00:00 UTC; a run finds the day already published and stops.
+name: CoinGecko daily coin list
+on:
+  schedule:
+    - cron: '7 0 * * *'
+    - cron: '37 0 * * *'
+    - cron: '7 1 * * *'
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'UTC day (YYYY-MM-DD); default yesterday'
+        required: false
+permissions:
+  contents: write
+concurrency:
+  group: coingecko-daily
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: scripts/coingecko-publish.sh ${{ github.event.inputs.day }}
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com

@@ -335,6 +335,8 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
   let coinBarsMissing = 0;
   /** The day's biggest coin gainer gets a daily bar 30% off its listed close (tests: it is left out). */
   let badCoinBar = false;
+  /** Yahoo's daily bars for coins down (hourly ones still answer), as on 2026-11-20. */
+  let coinDailyDown = false;
   let yahooCoinsDown = false;
   /** The session Nasdaq's screener shows (YYYY-MM-DD); null: the last finished one. Like the real one, it can lag. */
   let nasdaqDay = null;
@@ -651,6 +653,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
           }
           const coin = paprikaCoins().find((c) => yahooCoinSymbol(c) === sym);
           if (coin) {
+            if (coinDailyDown && (q.get('interval') ?? '1d') === '1d') continue;
             const at = ranked.indexOf(sym);
             if (at >= 0 && at < coinBarsMissing) continue;
             const b = coinBlock(coin, 30, q.get('interval') ?? '1d');
@@ -1051,6 +1054,19 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
     setCoinBarsMissing(n) {
       coinBarsMissing = n;
       return coinGainersByDay().slice(0, n);
+    },
+    /** Take away Yahoo's daily bars for every coin (hourly ones still answer). */
+    setCoinDailyDown(down) {
+      coinDailyDown = !!down;
+    },
+    /** Yesterday's coin gainers by Yahoo symbol, biggest first. */
+    coinGainers() {
+      return coinGainersByDay();
+    },
+    /** A coin as Yahoo's list shows it: ticker, name and price now, by Yahoo symbol. */
+    yahooCoin(sym) {
+      const c = paprikaCoins().find((x) => yahooCoinSymbol(x) === sym);
+      return c ? { symbol: c.symbol, name: c.name, price: c.price } : null;
     },
     /** Give yesterday's biggest coin gainer a daily bar 30% off its listed close; returns its Yahoo symbol. */
     setBadCoinBar(on) {
