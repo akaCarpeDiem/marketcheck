@@ -385,7 +385,9 @@ export function coinDayRows(coins: YahooCoin[], before: Record<string, number>):
     if (marketCap < BEST_MIN_CAP) continue;
     compared++;
     const change = (c.prevClose / from - 1) * 100;
-    if (change > 0 && c.volume >= BEST_MIN_TRADED) gained.push({ c, from, marketCap, change });
+    // Loosely on the 24h volume at the time of reading: the day's own volume (from CoinGecko's file, when the
+    // coin is in it) decides later, so a coin that traded on the day but less since is not dropped here.
+    if (change > 0 && c.volume >= COIN_PREFILTER_TRADED) gained.push({ c, from, marketCap, change });
   }
   if (both < 50 || same > both / 2) return null;
   gained.sort((a, b) => b.change - a.change || b.marketCap - a.marketCap);
@@ -406,6 +408,92 @@ export function dayCloses(s: Bars | undefined, day: string, key: (sec: number) =
   const from = k > 0 ? s.c[k - 1]! : 0;
   const to = k > 0 ? s.c[k]! : 0;
   return from > 0 && to > 0 ? { k, from, to } : null;
+}
+
+/** The 24h volume (USD, at the time of reading) a coin needs before it is looked at further; the day's own volume decides. */
+export const COIN_PREFILTER_TRADED = BEST_MIN_TRADED / 4;
+
+/** What checking the gainers against Yahoo's hourly closes came to. */
+export type CoinCheck = {
+  /** Gainers looked at. */
+  looked: number;
+  /** Their hourly closes could not be read (no answer, or none reaching the day): skipped for now, not judged. */
+  failed: number;
+  /** Their closes were read and disagree with the list's: left out. */
+  rejected: number;
+};
+
+/**
+ * Whether a check is good enough to publish: null when it is, else why not. A list is not published (the
+ * last saved one stays up, and the day is tried again later) when more than a quarter of the lookups failed,
+ * or when most of the gainers looked at did not check out. Either way something is wrong with the source at
+ * that moment, and a list from what is left would be a list of whatever happened to get through (as on
+ * 2026-11-20, when only coins under $0.001 did).
+ */
+export function coinCheckVerdict(c: CoinCheck): string | null {
+  if (c.looked <= 0) return null;
+  if (c.failed > c.looked / 4) return `Yahoo's hourly closes could not be read for ${c.failed} of the ${c.looked} biggest coin gainers; the list waits until they can`;
+  if (c.failed + c.rejected > c.looked / 2) return `${c.failed + c.rejected} of the ${c.looked} biggest coin gainers did not check out against Yahoo's hourly closes; not published`;
+  return null;
+}
+
+/* ── CoinGecko's list ─────────────────────────────────────────────────────── */
+
+/** One coin in CoinGecko's file for a day (scripts/coingecko-day.mjs): measured close to close from CoinGecko's hourly prices. */
+export type CgDayRow = { id: string; symbol: string; name: string; image?: string | null; from: number; to: number; change: number; marketCap: number; traded: number };
+export type CgDay = { day: string; at?: string; compared?: number; rows: CgDayRow[] };
+
+/** A day's CoinGecko file, or null when it is not one (wrong day, not the expected shape). Rows that do not add up are dropped. */
+export function parseCgDay(raw: unknown, day: string): CgDay | null {
+  const f = raw as Partial<CgDay> | null;
+  if (!f || f.day !== day || !Array.isArray(f.rows)) return null;
+  const rows = f.rows.filter(
+    (r): r is CgDayRow =>
+      !!r && typeof r.id === 'string' && typeof r.symbol === 'string' && r.from > 0 && r.to > 0 && Number.isFinite(r.change) && Math.abs((r.to / r.from - 1) * 100 - r.change) < 1e-6 * Math.max(1, Math.abs(r.change)) + 1e-9,
+  );
+  return { day, at: f.at, compared: Number(f.compared) || 0, rows };
+}
+
+const plainName = (s: string) => s.toLowerCase().replace(/\s+usd$/, '').replace(/[^a-z0-9]/g, '');
+
+/** A coin as Yahoo lists it, for telling whether a CoinGecko coin is the same one. */
+export type YahooCoinId = { sym: string; name: string; price: number };
+
+/** Whether CoinGecko's coin is Yahoo's: the same ticker, and the same name or a price within 3%. */
+export function sameCoin(g: Pick<CgDayRow, 'symbol' | 'name' | 'to'>, y: YahooCoinId): boolean {
+  if (g.symbol.toUpperCase() !== y.sym.toUpperCase()) return false;
+  return plainName(g.name) === plainName(y.name) || samePrice(g.to, y.price, 0.03);
+}
+
+/**
+ * Yahoo's checked rows and CoinGecko's file together: each coin once. A coin on both keeps Yahoo's row and
+ * takes CoinGecko's figure for what traded over the day; a coin only CoinGecko has (Yahoo's list leaves many
+ * out) is added from CoinGecko's own measurement. `onYahoo`: every coin on Yahoo's list that might be the same
+ * as one of CoinGecko's (gainer or not), so a coin Yahoo has but that did not gain there is not added twice.
+ */
+export function mergeCoinGecko(yahooRows: BestRow[], cg: CgDay | null, onYahoo: YahooCoinId[]): { rows: BestRow[]; added: number } {
+  if (!cg?.rows.length) return { rows: yahooRows, added: 0 };
+  const out = yahooRows.map((r) => ({ ...r }));
+  let added = 0;
+  for (const g of cg.rows) {
+    const twin = out.find((r) => sameCoin(g, { sym: r.sym, name: r.name, price: r.to }));
+    if (twin) {
+      if (g.traded > 0) twin.traded = g.traded;
+      continue;
+    }
+    if (onYahoo.some((y) => sameCoin(g, y))) continue;
+    if (!(g.change > 0)) continue;
+    out.push({ kind: 'crypto', sym: g.symbol.toUpperCase(), name: g.name, cg: g.id, image: g.image ?? null, marketCap: g.marketCap, from: g.from, to: g.to, change: g.change, traded: g.traded, now: null, trail: [g.from, g.to] });
+    added++;
+  }
+  return { rows: out, added };
+}
+
+/** Tickers a Yahoo coin symbol may stand for: "GFI13967-USD" → GFI13967 and GFI; "C98-USD" → C98 and C. */
+export function yahooTickers(yahoo: string): string[] {
+  const base = yahoo.replace(/-USD$/i, '').toUpperCase();
+  const bare = base.replace(/\d+$/, '');
+  return bare && bare !== base ? [base, bare] : [base];
 }
 
 /**
@@ -468,7 +556,7 @@ export function startFill(coins: YahooCoin[], day: string, at: string): CoinFill
     if (m < BEST_MIN_CAP) continue;
     checked++;
     // One that barely traded cannot make the list, whatever it did: no need to read its bars.
-    if (c.volume < BEST_MIN_TRADED) continue;
+    if (c.volume < COIN_PREFILTER_TRADED) continue;
     const { sym, name, image } = coinLabel(c);
     list.push({ y: c.yahoo, to: c.prevClose, m, v: c.volume, now: c.price, sym, name, img: image });
   }

@@ -33,6 +33,21 @@ This is served at `https://preview-redesign.market-check.pages.dev`. Normally ev
 
 Sign-in is not expected to work on a preview address: the Google and Microsoft sign-in settings only allow marketcheck.money, and Pages keeps separate secrets for previews. Everything else works, including saving a watchlist and portfolio in the browser.
 
+## CoinGecko's daily coin list
+
+"Yesterday's best buys" adds the coins Yahoo's list does not carry from a file per UTC day, written outside
+Cloudflare (CoinGecko often refuses Cloudflare Functions) and published on the repo's `coin-data` branch:
+
+```bash
+scripts/coingecko-publish.sh              # yesterday (UTC)
+scripts/coingecko-publish.sh 2026-11-20   # one day
+```
+
+It uses CoinGecko's keyless public API (no key, nothing in Cloudflare) and takes 15 to 30 minutes, mostly
+waiting out CoinGecko's rate limit. Run it every day shortly after 00:00 UTC; the site waits for the day's
+file until 02:00 UTC, then goes ahead with Yahoo's coins alone. `docs/coingecko-daily.workflow.yml` is a
+GitHub Actions workflow that does this on a schedule once copied to `.github/workflows/`.
+
 ## Settings and secrets
 
 `wrangler.toml` binds the KV namespace `LAYOUTS`. Secrets are set in the Cloudflare dashboard (Workers & Pages → market-check → Settings → Variables and secrets) or with `wrangler pages secret put`. They never go in the repo. `.env.example` lists the names.

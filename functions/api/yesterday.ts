@@ -15,20 +15,34 @@
  *   bars instead, 560 coins a request, the progress kept in KV (best:fill:<day>).
  *   (CoinPaprika and CoinGecko sit behind Cloudflare and often refuse Cloudflare Functions,
  *   which reach them from shared addresses; Yahoo does not.)
- * Every row is checked against Yahoo's daily closes before it is shown, and the next biggest
- * gainers are checked until at least five pass, so a list always has five.
+ *   CoinGecko's full coin list is added from a file written outside Cloudflare shortly after 00:00 UTC
+ *   (scripts/coingecko-day.mjs, published on the repo's coin-data branch), so coins Yahoo does not
+ *   carry are compared too; a coin on both is counted once, and CoinGecko's figure for what it traded
+ *   over the day is used for the $100K floor.
+ * Every Yahoo row is checked against Yahoo's hourly closes before it is shown (hourly for every coin:
+ * daily bars round prices to six decimals, and on 2026-11-20 the daily check turned away every coin
+ * priced over $0.001), and the next biggest gainers are checked until at least five pass. A lookup
+ * that fails is retried, then skipped for now and logged, never taken as a coin that failed the check;
+ * when many fail, or most do not check out, the list is not published and the last one stays up.
  * At most one list is worked out per request, to stay inside the free plan's CPU and
  * sub-request limits. When a list cannot be worked out, the reason is in the group's `why`.
  */
 import {
   BEST_KEEP,
+  coinCheckVerdict,
+  mergeCoinGecko,
+  parseCgDay,
+  yahooTickers,
+  type CgDay,
+  type CoinCheck,
+  type YahooCoinId,
   BEST_MIN_CAP,
   BEST_MIN_TRADED,
   BEST_SHOW,
-  COIN_MICRO,
   YAHOO_COIN_FIELDS,
   barsAgree,
   coinDayRows,
+  coinLabel,
   coinRow,
   commonDay,
   cryptoDay,
@@ -84,8 +98,12 @@ const FILL_CALLS = 28;
 const FILL_RETRY_CALLS = 6;
 /** A fill's last share this small leaves room to finish the list in the same request. */
 const FILL_FINISH_CALLS = 14;
-/** Rows checked against Yahoo's daily closes per round, and rounds at most: coins, then stocks. */
-const COIN_ROUNDS = 5;
+/** Rows checked against Yahoo's hourly closes per round (twenty), and rounds at most: coins, then stocks. */
+const COIN_ROUNDS = 8;
+/** CoinGecko's list for a day, written outside Cloudflare (scripts/coingecko-day.mjs). */
+const CG_DAY_URL = (day: string) => `https://raw.githubusercontent.com/akaCarpeDiem/marketcheck/coin-data/coingecko/${day}.json`;
+/** Hours into the next UTC day that a list waits for CoinGecko's file before going ahead with Yahoo's alone. */
+const CG_WAIT_H = 2;
 const STOCK_BATCH = 40;
 const STOCK_ROUNDS = 4;
 const HEADERS = {
@@ -109,7 +127,8 @@ type Later = { later: string };
 /** A list, or why there is none (yet). */
 type Capture = BestGroup | string | Later;
 
-const snapKey = (kind: Kind, day: string) => `best:v2:${kind}:${day}`;
+// v3 for coins: lists saved before hourly checks and CoinGecko's coins are worked out again.
+const snapKey = (kind: Kind, day: string) => `best:${kind === 'crypto' ? 'v3' : 'v2'}:${kind}:${day}`;
 const closesKey = (day: string) => `best:closes:${day}`;
 const fillKey = (day: string) => `best:fill:${day}`;
 const mem = new Map<string, BestGroup>();
@@ -311,6 +330,29 @@ async function stockList(rows: ScreenRow[], day: string, now: number, checked: n
 /* ── Crypto ───────────────────────────────────────────────────────────────── */
 
 const COIN_SOURCE = 'Yahoo Finance (CoinMarketCap prices for every coin)';
+const COIN_SOURCE_CG = 'Yahoo Finance (CoinMarketCap prices) and CoinGecko';
+
+/** CoinGecko's file for the day: the file, null when there is none (yet), or why it could not be read. */
+async function cgDay(day: string): Promise<CgDay | null | string> {
+  try {
+    const res = await fetch(CG_DAY_URL(day), { headers: { Accept: 'application/json' } });
+    if (res.status === 404) return null;
+    if (!res.ok) return `CoinGecko's list for ${day} answered HTTP ${res.status}`;
+    const f = parseCgDay(await res.json(), day);
+    return f ?? `CoinGecko's list for ${day} is not in the expected form`;
+  } catch (e) {
+    return `CoinGecko's list for ${day} could not be read: ${errText(e)}`;
+  }
+}
+
+/** The coins on Yahoo's list that share a ticker with one in CoinGecko's file, as Yahoo names them. */
+function yahooTwins(coins: { yahoo: string; label: () => YahooCoinId }[], cg: CgDay | null): YahooCoinId[] {
+  if (!cg?.rows.length) return [];
+  const syms = new Set(cg.rows.map((r) => r.symbol.toUpperCase()));
+  const out: YahooCoinId[] = [];
+  for (const c of coins) if (yahooTickers(c.yahoo).some((t) => syms.has(t))) out.push(c.label());
+  return out;
+}
 
 /** Every coin on Yahoo's list down to a quarter of the size floor, largest first. */
 async function yahooCoins(): Promise<YahooCoin[] | string> {
@@ -359,21 +401,28 @@ async function saveCloses(kv: KvLike | undefined, day: string, coins: YahooCoin[
 }
 
 /**
- * Yahoo's daily bars for coins (Yahoo symbol, and a recent close to tell the smallest prices by): daily for
- * most, hourly over five days turned into daily closes for coins under COIN_MICRO, whose daily bars Yahoo
- * rounds away. 20 coins a call.
+ * Each coin's daily closes (UTC) from Yahoo's hourly bars over five days, for every coin: daily bars round
+ * prices to six decimals, and hourly ones carry the same closes as Yahoo's coin list. 20 coins a call.
+ * A coin Yahoo sent nothing for is not in the map.
  */
-async function coinBars(coins: { y: string; to: number }[], range: string): Promise<Map<string, Bars>> {
-  const small = coins.filter((c) => c.to < COIN_MICRO).map((c) => c.y);
-  const rest = coins.filter((c) => c.to >= COIN_MICRO).map((c) => c.y);
-  const none = () => new Map<string, Bars>();
-  const [daily, hourly] = await Promise.all([
-    rest.length ? fetchSparkAll(rest, range, '1d', 6).catch(none) : none(),
-    small.length ? fetchSparkAll(small, '5d', '1h', 2).catch(none) : none(),
-  ]);
-  const out = new Map<string, Bars>(daily);
-  for (const [k, v] of hourly) out.set(k, dailyFromHourly(v));
+async function coinBars(coins: { y: string }[]): Promise<Map<string, Bars>> {
+  const hourly = await fetchSparkAll(
+    coins.map((c) => c.y),
+    '5d',
+    '1h',
+    4,
+  ).catch(() => new Map<string, Bars>());
+  const out = new Map<string, Bars>();
+  for (const [k, v] of hourly) if (v.c.length) out.set(k, dailyFromHourly(v));
   return out;
+}
+
+/** coinBars, asked once more for the coins the first answer left out. */
+async function coinBarsRetry(coins: { y: string }[]): Promise<Map<string, Bars>> {
+  const series = await coinBars(coins);
+  const gaps = coins.filter((c) => !series.has(c.y));
+  if (gaps.length) for (const [k, v] of await coinBars(gaps)) series.set(k, v);
+  return series;
 }
 
 /** A day being filled in from Yahoo's daily bars: this isolate's copy or the saved one, whichever is further on. */
@@ -395,38 +444,70 @@ async function saveFill(kv: KvLike | undefined, fill: CoinFill): Promise<void> {
 }
 
 /**
- * Yahoo's daily closes for the coins, biggest gainer first, 20 a call, until ten agree with them (or
- * the gainers run out). A coin Yahoo has no bar for, or whose bars disagree with the list, is left
- * out: every coin shown has been checked twice. The same bars give the trend line.
+ * Yahoo's hourly closes for the coins, biggest gainer first, 20 a call, until ten agree with them (or the
+ * gainers run out). A coin whose closes disagree with the list is left out: every coin shown has been
+ * checked twice. A coin whose closes could not be read is asked for once more, then skipped for now and
+ * logged; it is never counted as one that failed the check. When too many could not be read, or most did
+ * not check out, there is no list (coinCheckVerdict). The same closes give the trend line.
  */
-async function checkCoins(rows: BestRow[], day: string): Promise<{ ok: BestRow[]; looked: number } | string> {
+async function checkCoins(rows: BestRow[], day: string): Promise<({ ok: BestRow[] } & CoinCheck) | string> {
   const ok: BestRow[] = [];
-  let looked = 0;
+  const c: CoinCheck = { looked: 0, failed: 0, rejected: 0 };
   let answered = false;
-  for (let round = 0; round < COIN_ROUNDS && looked < rows.length && rankBest(ok).length < BEST_KEEP; round++) {
-    const batch = rows.slice(looked, looked + SPARK_MAX);
-    looked += batch.length;
-    const series = await coinBars(batch.map((r) => ({ y: r.yahoo!, to: r.to })), '1mo');
+  for (let round = 0; round < COIN_ROUNDS && c.looked < rows.length && rankBest(ok).length < BEST_KEEP; round++) {
+    const batch = rows.slice(c.looked, c.looked + SPARK_MAX);
+    c.looked += batch.length;
+    const series = await coinBarsRetry(batch.map((r) => ({ y: r.yahoo! })));
     answered ||= series.size > 0;
     for (const r of batch) {
       const s = series.get(r.yahoo!);
       const d = dayCloses(s, day, utcKey, prevDayKey(day));
-      if (!s || !d || !barsAgree(r, d)) continue;
+      if (!s || !d) {
+        c.failed++;
+        console.warn(`best-buys ${day}: no hourly closes for ${r.yahoo} (${s ? 'none reaching the day' : 'no answer'}); skipped for now`);
+        continue;
+      }
+      if (!barsAgree(r, d)) {
+        c.rejected++;
+        console.log(`best-buys ${day}: ${r.yahoo} left out, closes disagree (list ${r.from} → ${r.to}, hourly ${d.from} → ${d.to})`);
+        continue;
+      }
       r.trail = trailFrom(s.c.slice(0, d.k), r.from, r.to);
       ok.push(r);
     }
   }
-  // No bars at all (rather than none for some coins): Yahoo did not answer.
-  return answered ? { ok, looked } : `Yahoo's daily closes could not be read to check the coins`;
+  // No closes at all (rather than none for some coins): Yahoo did not answer.
+  if (!answered) return `Yahoo's hourly closes could not be read to check the coins`;
+  const verdict = coinCheckVerdict(c);
+  if (verdict) {
+    console.warn(`best-buys ${day}: ${verdict}`);
+    return verdict;
+  }
+  return { ok, ...c };
 }
 
-/** The list from the day's gainers (biggest first): checked, the ten best kept, and named after the site's own coins. */
-async function coinList(gainers: BestRow[], total: number, day: string, checked: number, now: number, env: Env | undefined, waitUntil: WaitUntil | undefined): Promise<Capture> {
+/**
+ * The list from the day's gainers (biggest first): checked, CoinGecko's coins added (`cg`, `twins`: Yahoo's
+ * coins that may be the same as one of them), the ten best kept, and named after the site's own coins.
+ */
+async function coinList(
+  gainers: BestRow[],
+  total: number,
+  day: string,
+  checked: number,
+  now: number,
+  env: Env | undefined,
+  waitUntil: WaitUntil | undefined,
+  cg: CgDay | null,
+  twins: YahooCoinId[],
+): Promise<Capture> {
   const got = await checkCoins(gainers.slice(0, COIN_ROUNDS * SPARK_MAX), day);
   if (typeof got === 'string') return got;
-  const items = rankBest(got.ok);
+  const merged = mergeCoinGecko(got.ok, cg, twins);
+  const items = rankBest(merged.rows);
   const notEnough = short(items, got.looked, total, 'coin gainers');
   if (notEnough) return notEnough;
+
   // Coins the site already lists open their own panel and use its logo.
   const cu = await getCryptoUniverse(env, waitUntil).catch(() => null);
   for (const r of items) {
@@ -436,20 +517,21 @@ async function coinList(gainers: BestRow[], total: number, day: string, checked:
       if (match.image) r.image = match.image;
     }
   }
-  return { day, items, checked, at: new Date(now).toISOString(), source: COIN_SOURCE };
+  return { day, items, // Coins over the floor on either list; most are on both, so the larger count is the honest one.
+    checked: Math.max(checked, cg?.compared ?? 0), at: new Date(now).toISOString(), source: cg ? COIN_SOURCE_CG : COIN_SOURCE };
 }
 
 /** The next share of a day being filled in from Yahoo's daily bars, and the list once all are in. */
-async function continueFill(fill: CoinFill, kv: KvLike | undefined, now: number, env: Env | undefined, waitUntil: WaitUntil | undefined): Promise<Capture> {
+async function continueFill(fill: CoinFill, kv: KvLike | undefined, now: number, env: Env | undefined, waitUntil: WaitUntil | undefined, cg: CgDay | null): Promise<Capture> {
   if (fill.next < fill.coins.length) {
     const start = fill.next;
     const upto = start + FILL_CALLS * SPARK_MAX;
     const todo = fill.coins.slice(start, upto);
-    const series = await coinBars(todo, '5d');
+    const series = await coinBars(todo);
     // A call that failed leaves twenty coins out: asked once more.
     const gaps = todo.filter((f) => !series.has(f.y));
     if (gaps.length && gaps.length <= FILL_RETRY_CALLS * SPARK_MAX) {
-      for (const [k, v] of await coinBars(gaps, '5d')) series.set(k, v);
+      for (const [k, v] of await coinBars(gaps)) series.set(k, v);
     }
     const missing = fillFromBars(fill, upto, series);
     if (missing > todo.length / 4) {
@@ -463,7 +545,11 @@ async function continueFill(fill: CoinFill, kv: KvLike | undefined, now: number,
     }
   }
   const rows = fillRows(fill);
-  return coinList(rows, rows.length, fill.day, fill.checked, now, env, waitUntil);
+  const twins = yahooTwins(
+    fill.coins.map((f) => ({ yahoo: f.y, label: () => ({ sym: f.sym, name: f.name, price: f.to }) })),
+    cg,
+  );
+  return coinList(rows, rows.length, fill.day, fill.checked, now, env, waitUntil, cg, twins);
 }
 
 /** Yesterday (UTC) for every coin: Yahoo's closes compared with the day before's saved ones, else with Yahoo's daily bars. */
@@ -472,10 +558,16 @@ async function captureCrypto(day: string, now: number, env: Env | undefined, wai
   const hoursIn = (now - Date.parse(`${nextDayKey(day)}T00:00:00Z`)) / 3_600_000;
   if (hoursIn < 0.25) return 'The UTC day has only just ended; closes are read from 00:15 UTC';
 
+  // CoinGecko's file for the day: waited for up to CG_WAIT_H hours into the next day, then gone ahead without.
+  const cgGot = await cgDay(day);
+  if (typeof cgGot === 'string') console.warn(`best-buys ${day}: ${cgGot}`);
+  const cg = typeof cgGot === 'string' ? null : cgGot;
+  if (!cg && hoursIn < CG_WAIT_H) return `Waiting for CoinGecko's list for ${day} (until ${String(CG_WAIT_H).padStart(2, '0')}:00 UTC)`;
+
   const before = await readCloses(kv, prevDayKey(day));
   if (!before) {
     const fill = await readFill(kv, day);
-    if (fill) return continueFill(fill, kv, now, env, waitUntil);
+    if (fill) return continueFill(fill, kv, now, env, waitUntil, cg);
   }
   const coins = await yahooCoins();
   if (typeof coins === 'string') return coins;
@@ -487,7 +579,17 @@ async function captureCrypto(day: string, now: number, env: Env | undefined, wai
     // Read too early: Yahoo still gives the day before's closes. Nothing saved; looked at again later.
     if (!got) return notYet;
     await saveCloses(kv, day, coins, now);
-    return coinList(got.gained.slice(0, COIN_ROUNDS * SPARK_MAX).map(coinRow), got.gained.length, day, got.compared, now, env, waitUntil);
+    const twins = yahooTwins(
+      coins.map((c) => ({
+        yahoo: c.yahoo,
+        label: () => {
+          const l = coinLabel(c);
+          return { sym: l.sym, name: l.name, price: c.prevClose };
+        },
+      })),
+      cg,
+    );
+    return coinList(got.gained.slice(0, COIN_ROUNDS * SPARK_MAX).map(coinRow), got.gained.length, day, got.compared, now, env, waitUntil, cg, twins);
   }
 
   // The day before's closes were not saved (the first day, or a day nobody visited): each coin's start is
@@ -607,7 +709,7 @@ export function forgetForTests(): void {
 export async function answerAt(ctx: Ctx, now: number): Promise<Answer> {
   const cDay = cryptoDay(now);
   const sDay = stockDay(now);
-  const cacheKey = `best-answer:v2:${cDay}:${sDay}`;
+  const cacheKey = `best-answer:v3:${cDay}:${sDay}`;
   const hit = await cacheGet<Answer>(cacheKey);
   if (hit && now - hit.data.at < (hit.data.retrySoon ? PENDING_MS : ANSWER_MS)) return hit.data;
 
