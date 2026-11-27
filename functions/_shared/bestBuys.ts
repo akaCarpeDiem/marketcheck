@@ -12,7 +12,7 @@
  *   day's are compared with them (coinDayRows). When the day before's closes were not saved
  *   (the first day, or a day nobody visited), every coin's start is read from Yahoo's daily
  *   bars instead, a share of the coins per request (CoinFill).
- * - Both: market cap of at least $1 million and at least $100,000 traded on the day,
+ * - Both: market cap of at least $50 million for stocks or $25 million for crypto, and at least $100,000 traded on the day,
  *   so a price that jumped on a handful of trades does not count. Warrants, rights,
  *   units, preferred shares and notes are not stocks and are left out.
  * - Every row shown is checked against Yahoo's daily closes; a row whose figures disagree is
@@ -22,8 +22,16 @@
  */
 import { dateKey, etParts, prevTradingDay, tradingDay } from './marketCalendar';
 
-/** Nothing smaller than this (USD) is listed, so the list is not always tiny coins that ran. */
-export const BEST_MIN_CAP = 1_000_000;
+/** Stocks smaller than this (USD market cap) are not listed, so the list is not penny stocks that ran. */
+export const BEST_MIN_CAP_STOCK = 50_000_000;
+/** Coins smaller than this (USD market cap) are not listed, so the list is not tiny coins that ran. */
+export const BEST_MIN_CAP_CRYPTO = 25_000_000;
+/** The lower of the two floors (what any row must clear). */
+export const BEST_MIN_CAP = Math.min(BEST_MIN_CAP_STOCK, BEST_MIN_CAP_CRYPTO);
+/** The size floor for one kind of row. */
+export function minCapFor(kind: BestKind): number {
+  return kind === 'stock' ? BEST_MIN_CAP_STOCK : BEST_MIN_CAP_CRYPTO;
+}
 /** At least this much (USD) must have traded over the day. */
 export const BEST_MIN_TRADED = 100_000;
 /** Rows kept per group. */
@@ -178,7 +186,7 @@ export function yahooStockQuery(size: number, gainersOnly: boolean): Record<stri
   const operands: unknown[] = [
     { operator: 'EQ', operands: ['region', 'us'] },
     { operator: 'OR', operands: US_LISTED.map((x) => ({ operator: 'EQ', operands: ['exchange', x] })) },
-    { operator: 'GTE', operands: ['intradaymarketcap', BEST_MIN_CAP] },
+    { operator: 'GTE', operands: ['intradaymarketcap', BEST_MIN_CAP_STOCK] },
   ];
   if (gainersOnly) operands.push({ operator: 'GT', operands: ['percentchange', 0] });
   return { size, offset: 0, sortField: 'percentchange', sortType: 'DESC', quoteType: 'EQUITY', query: { operator: 'AND', operands }, userId: '', userIdType: 'guid' };
@@ -382,7 +390,7 @@ export function coinDayRows(coins: YahooCoin[], before: Record<string, number>):
     both++;
     if (from === c.prevClose) same++;
     const marketCap = capAtClose(c);
-    if (marketCap < BEST_MIN_CAP) continue;
+    if (marketCap < BEST_MIN_CAP_CRYPTO) continue;
     compared++;
     const change = (c.prevClose / from - 1) * 100;
     // Loosely on the 24h volume at the time of reading: the day's own volume (from CoinGecko's file, when the
@@ -553,7 +561,7 @@ export function startFill(coins: YahooCoin[], day: string, at: string): CoinFill
   let checked = 0;
   for (const c of coins) {
     const m = capAtClose(c);
-    if (m < BEST_MIN_CAP) continue;
+    if (m < BEST_MIN_CAP_CRYPTO) continue;
     checked++;
     // One that barely traded cannot make the list, whatever it did: no need to read its bars.
     if (c.volume < COIN_PREFILTER_TRADED) continue;
@@ -616,7 +624,7 @@ export function trailFrom(closesBefore: number[], from: number, to: number): num
 /** The biggest gainers, largest first, above the size floor. */
 export function rankBest(rows: BestRow[], keep = BEST_KEEP): BestRow[] {
   return rows
-    .filter((r) => r.marketCap >= BEST_MIN_CAP && r.change > 0 && Number.isFinite(r.change) && (r.traded == null || r.traded >= BEST_MIN_TRADED))
+    .filter((r) => r.marketCap >= minCapFor(r.kind) && r.change > 0 && Number.isFinite(r.change) && (r.traded == null || r.traded >= BEST_MIN_TRADED))
     .sort((a, b) => b.change - a.change || b.marketCap - a.marketCap)
     .slice(0, keep);
 }

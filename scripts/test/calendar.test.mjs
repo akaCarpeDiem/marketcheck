@@ -56,6 +56,8 @@ s = at('2026-11-27T17:00:00Z');
 assert.equal(s.state, 'open');
 assert.equal(new Date(s.closesAt).toISOString(), '2026-11-27T18:00:00.000Z');
 assert.equal(at('2026-11-27T18:30:00Z').state, 'post');
+assert.equal(at('2026-11-27T21:30:00Z').state, 'post', 'after-hours until 5:00 pm on an early-close day');
+assert.equal(at('2026-11-27T22:30:00Z').state, 'closed', 'after-hours ends at 5:00 pm on an early-close day');
 // Friday evening: next open is Monday.
 assert.equal(new Date(at('2026-10-17T02:00:00Z').nextOpen).toISOString(), '2026-10-19T13:30:00.000Z');
 

@@ -50,7 +50,7 @@ function marketSentence(now: number): string {
   const sameDay = openDay.key === p.key;
   const when = sameDay ? `at ${etClock(opens)} ET, in ${until(opens - now)}` : `${weekdayFmt.format(opens)} at ${etClock(opens)} ET`;
   if (s.state === 'pre') return `US stock markets open ${when}. Pre-market trading is under way.`;
-  if (s.state === 'post') return `US stock markets have closed for the day and reopen ${when}. After-hours trading runs until 8:00 PM ET.`;
+  if (s.state === 'post') return `US stock markets have closed for the day and reopen ${when}. After-hours trading runs until ${s.early ? '5:00' : '8:00'} PM ET.`;
   const reason = s.reason ?? closedReason(p.y, p.m, p.d);
   if (reason === 'Weekend') return `US stock markets are closed for the weekend and reopen ${when}.`;
   if (reason) return `US stock markets are closed for ${reason} and reopen ${when}.`;

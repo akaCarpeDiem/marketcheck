@@ -36,7 +36,9 @@ import {
   type CgDay,
   type CoinCheck,
   type YahooCoinId,
-  BEST_MIN_CAP,
+  BEST_MIN_CAP_CRYPTO,
+  BEST_MIN_CAP_STOCK,
+  minCapFor,
   BEST_MIN_TRADED,
   BEST_SHOW,
   YAHOO_COIN_FIELDS,
@@ -139,6 +141,13 @@ const running = new Map<string, Promise<{ g: BestGroup | null; later: boolean }>
 const lastWhy = new Map<string, string>();
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** The group without rows under its kind's size floor. */
+function overFloor(kind: Kind, g: BestGroup): BestGroup {
+  const floor = minCapFor(kind === 'stocks' ? 'stock' : 'crypto');
+  const items = g.items.filter((r) => r.marketCap >= floor);
+  return items.length === g.items.length ? g : { ...g, items };
+}
+
 async function readSnap(kv: KvLike | undefined, kind: Kind, day: string): Promise<BestGroup | null> {
   const key = snapKey(kind, day);
   const held = mem.get(key);
@@ -147,8 +156,10 @@ async function readSnap(kv: KvLike | undefined, kind: Kind, day: string): Promis
   try {
     const raw = await kv.get(key);
     if (!raw) return null;
-    const g = JSON.parse(raw) as BestGroup;
-    if (!g || !Array.isArray(g.items)) return null;
+    const parsed = JSON.parse(raw) as BestGroup;
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    // Lists saved under an older, lower size floor: drop rows under today's floor (a short list is worked out again).
+    const g = overFloor(kind, parsed);
     if (mem.size > 40) mem.clear();
     mem.set(key, g);
     return g;
@@ -164,7 +175,7 @@ async function saveSnap(kv: KvLike | undefined, kind: Kind, g: BestGroup): Promi
   try {
     // Another location may have saved it first; the first full copy stands. A short one is replaced.
     const raw = await kv.get(key);
-    const have = raw ? (JSON.parse(raw) as BestGroup) : null;
+    const have = raw ? overFloor(kind, JSON.parse(raw) as BestGroup) : null;
     if (!have?.items || have.items.length < Math.min(BEST_SHOW, g.items.length)) await kv.put(key, JSON.stringify(g), { expirationTtl: SNAP_TTL });
   } catch {
     /* write allowance used up: this location still has it in memory */
@@ -283,7 +294,7 @@ async function captureStocks(latest: string, now: number): Promise<Capture> {
 
 /** A session's list from market-wide rows (`checked`: how many were compared, when the rows are not all of them). */
 async function stockList(rows: ScreenRow[], day: string, now: number, checked: number, source: string): Promise<Capture> {
-  const eligible = rows.filter((r) => isCommonStock(r.sym, r.name) && r.marketCap >= BEST_MIN_CAP);
+  const eligible = rows.filter((r) => isCommonStock(r.sym, r.name) && r.marketCap >= BEST_MIN_CAP_STOCK);
   // The likeliest gainers by the list's own figures...
   const pool = eligible.filter((r) => r.change > 0 && r.price * r.volume >= BEST_MIN_TRADED).sort((a, b) => b.change - a.change);
   if (!pool.length) return `No stock in the list gained on ${day}`;
@@ -361,7 +372,7 @@ async function yahooCoins(): Promise<YahooCoin[] | string> {
     if (!res.ok) throw new Error(`Yahoo's coin list answered HTTP ${res.status}`);
     return parseYahooCoins(await res.text());
   };
-  const deepEnough = (list: YahooCoin[]) => list.length < 200 || list[list.length - 1]!.marketCap < BEST_MIN_CAP / 4;
+  const deepEnough = (list: YahooCoin[]) => list.length < 200 || list[list.length - 1]!.marketCap < BEST_MIN_CAP_CRYPTO / 4;
   try {
     const pages = await mapPool(Array.from({ length: YAHOO_FIRST_PAGES }, (_, i) => i), 5, page);
     let last = pages[pages.length - 1]!;
@@ -695,7 +706,7 @@ async function refreshNow(a: BestAnswer, env: Env | undefined, waitUntil: WaitUn
   }
 }
 
-type Answer = BestAnswer & { minCap: number; minTraded: number; at: number; retrySoon: boolean };
+type Answer = BestAnswer & { minCap: number; minCapStock: number; minCapCrypto: number; minTraded: number; at: number; retrySoon: boolean };
 
 /** Forget what this isolate holds in memory (saved lists, fills, reasons, Yahoo's session). For the tests only. */
 export function forgetForTests(): void {
@@ -768,7 +779,9 @@ export async function answerAt(ctx: Ctx, now: number): Promise<Answer> {
   const answer: Answer = {
     crypto: structuredClone(c.g),
     stocks: structuredClone(s.g),
-    minCap: BEST_MIN_CAP,
+    minCap: BEST_MIN_CAP_CRYPTO,
+    minCapStock: BEST_MIN_CAP_STOCK,
+    minCapCrypto: BEST_MIN_CAP_CRYPTO,
     minTraded: BEST_MIN_TRADED,
     at: now,
     retrySoon: c.retrySoon || s.retrySoon,
