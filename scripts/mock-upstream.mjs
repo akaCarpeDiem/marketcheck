@@ -408,7 +408,7 @@ export function createMock({ universePrices = {}, shares = {}, names = {}, calen
       // Some coins are priced in millionths of a dollar, as many are (one of them a runner).
       const micro = !special && (i % 9 === 4 || (i % 41 === 9 && i % 3 === 2));
       const price = Math.pow(10, -3 + r() * 5) * (micro ? 1e-5 : 1);
-      const cap = special === 'tiny' ? 400_000 : 5e9 * Math.pow(0.985, i) * (0.8 + r() * 0.4);
+      const cap = special === 'tiny' ? 400_000 : 5e10 * Math.pow(0.985, i) * (0.8 + r() * 0.4);
       const volume = special === 'thin' ? 2_000 : cap * (0.03 + r() * 0.1);
       const day = special ? 300 : gauss(r) * 5 + (i % 41 === 9 ? 45 + (i % 5) * 11 : 0);
       list.push({ i, id, name: special ? `${special} coin` : `Coin ${i}`, symbol: special ? special.toUpperCase() : `C${i}`, base: price, price, cap, volume, day, today: gauss(r) * 1.5 });

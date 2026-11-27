@@ -181,7 +181,7 @@ export function marketEarlyCloses(year: number): Map<string, string> {
   return out;
 }
 
-export const SESSION = { pre: 4 * 60, open: 9 * 60 + 30, close: 16 * 60, earlyClose: 13 * 60, post: 20 * 60 };
+export const SESSION = { pre: 4 * 60, open: 9 * 60 + 30, close: 16 * 60, earlyClose: 13 * 60, post: 20 * 60, earlyPost: 17 * 60 };
 
 export type TradingDay = {
   key: string;
@@ -291,8 +291,9 @@ export function marketStatus(at: number = Date.now()): MarketStatus {
 
   const next = nextTradingDay(p.y, p.m, p.d, false);
   const nextOpen = at0(next, next.open);
-  // After-hours trading follows a full session, and also the 1:00 pm early closes.
-  if (today && p.minutes < SESSION.post) {
+  // After-hours trading follows a full session (until 8:00 pm), and also the 1:00 pm early closes (until 5:00 pm).
+  const postEnd = today?.early ? SESSION.earlyPost : SESSION.post;
+  if (today && p.minutes < postEnd) {
     return {
       state: 'post',
       open: false,
@@ -300,7 +301,7 @@ export function marketStatus(at: number = Date.now()): MarketStatus {
       early: today.early,
       nextOpen,
       closesAt: null,
-      nextChange: at0(today, SESSION.post),
+      nextChange: at0(today, postEnd),
       today: p.key,
     };
   }

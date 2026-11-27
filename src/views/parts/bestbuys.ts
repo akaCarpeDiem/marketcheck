@@ -26,6 +26,8 @@ type Answer = {
   crypto?: BestGroup;
   stocks?: BestGroup;
   minCap?: number;
+  minCapStock?: number;
+  minCapCrypto?: number;
   minTraded?: number;
   /** A list is still to be worked out: ask again in a minute. */
   retrySoon?: boolean;
@@ -249,7 +251,10 @@ export function mountBestBuys(el: HTMLElement, scope: Scope): void {
       parts.push(`Crypto: ${dayLabel(c.day)} (UTC)${c.pending ? ' (the latest saved; yesterday’s is on its way)' : ''}, ${c.checked.toLocaleString('en-US')} coins compared`);
     if (tab !== 'crypto' && s?.items.length)
       parts.push(`Stocks: ${dayLabel(s.day)} session${s.pending ? ' (the latest available; the newest is on its way)' : ''}, ${s.checked.toLocaleString('en-US')} US stocks compared`);
-    parts.push(`market cap over ${dollars(answer.minCap ?? 1e6)}, ${dollars(answer.minTraded ?? 1e5)}+ traded`);
+    const capS = answer.minCapStock ?? answer.minCap ?? 5e7;
+    const capC = answer.minCapCrypto ?? answer.minCap ?? 2.5e7;
+    const cap = tab === 'stocks' ? `market cap over ${dollars(capS)}` : tab === 'crypto' ? `market cap over ${dollars(capC)}` : `market cap over ${dollars(capS)} (stocks) or ${dollars(capC)} (crypto)`;
+    parts.push(`${cap}, ${dollars(answer.minTraded ?? 1e5)}+ traded`);
     noteEl.textContent = parts.join(' · ');
     if (animateIn) intro();
   }

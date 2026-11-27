@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { alignTo, correlation, dailyLast, maxDrawdown, pairedDailyReturns, rebase, returns, sma, sumHoldings, volatility } from '../../src/lib/stats.ts';
 import {
   BEST_MIN_CAP,
+  BEST_MIN_CAP_CRYPTO,
+  BEST_MIN_CAP_STOCK,
   BEST_MIN_TRADED,
   TRAIL_DAYS,
   barsAgree,
@@ -195,7 +197,7 @@ const DAY = 86_400_000;
   assert.equal(trailFrom(Array.from({ length: 30 }, (_, i) => i + 1), 30, 31).length, TRAIL_DAYS);
 
   const row = (sym, change, marketCap, traded) => ({ kind: 'crypto', sym, name: sym, marketCap, from: 1, to: 1 + change / 100, change, traded, now: null, trail: [] });
-  const ranked = rankBest([row('A', 5, 2e9), row('TINY', 400, BEST_MIN_CAP - 1), row('B', 12, 5e6), row('C', -3, 9e9), row('D', 12, 9e9), row('THIN', 300, 9e9, 50)]);
+  const ranked = rankBest([row('A', 5, 2e9), row('TINY', 400, BEST_MIN_CAP - 1), row('B', 12, 5e7), row('SMALL', 90, BEST_MIN_CAP_CRYPTO - 1), row('C', -3, 9e9), row('D', 12, 9e9), row('THIN', 300, 9e9, 50), { ...row('PENNY', 80, BEST_MIN_CAP_STOCK - 1), kind: 'stock' }]);
   assert.deepEqual(ranked.map((r) => r.sym), ['D', 'B', 'A'], 'gainers only, biggest first, ties by size, nothing under the floors');
   assert.equal(rankBest(Array.from({ length: 30 }, (_, i) => row(`X${i}`, i + 1, 1e9))).length, 10, 'ten kept per group');
 
@@ -216,12 +218,12 @@ const DAY = 86_400_000;
     symbol,
   });
   const page = (quotes) => JSON.stringify({ finance: { result: [{ id: 'x', start: 0, count: quotes.length, total: 8000, quotes }], error: null } });
-  const many = Array.from({ length: 120 }, (_, i) => quote(`K${i}-USD`, `Coin "${i}"`, 2 + i, 1 + i, 5e6 + i, 2e5, 9000 + i));
-  many.push(quote('AI28846-USD', 'Sleepless AI', 0.0143, 0.0142, 9e6, 5e6, 28846), quote('C98-USD', 'Coin98', 0.03, 0.029, 3e7, 4e6, 10903));
+  const many = Array.from({ length: 120 }, (_, i) => quote(`K${i}-USD`, `Coin "${i}"`, 2 + i, 1 + i, 5e7 + i, 2e5, 9000 + i));
+  many.push(quote('AI28846-USD', 'Sleepless AI', 0.0143, 0.0142, 9e7, 5e6, 28846), quote('C98-USD', 'Coin98', 0.03, 0.029, 3e7, 4e6, 10903));
   const coins = parseYahooCoins(page(many));
   assert.equal(coins.length, 122, 'every row read');
   assert.equal(coinLabel(coins[3]).name, 'Coin "3"', 'names unescaped, " USD" dropped');
-  assert.deepEqual([coins[0].price, coins[0].prevClose, coins[0].marketCap, coins[0].volume], [2, 1, 5e6, 2e5]);
+  assert.deepEqual([coins[0].price, coins[0].prevClose, coins[0].marketCap, coins[0].volume], [2, 1, 5e7, 2e5]);
   assert.equal(coinLabel(coins.find((c) => c.yahoo === 'AI28846-USD')).sym, 'AI', "CoinMarketCap's id is not part of the ticker");
   assert.equal(coinLabel(coins.find((c) => c.yahoo === 'C98-USD')).sym, 'C98', 'a ticker that just ends in digits is kept');
   assert.equal(coinTicker('BTC-USD', null), 'BTC');

@@ -16,7 +16,7 @@ import { onRequestGet as trending } from '../../functions/api/trending.ts';
 import { onRequestGet as sparklines } from '../../functions/api/sparklines.ts';
 import { onRequestGet as chartApi } from '../../functions/api/chart.ts';
 import { answerAt, forgetForTests, onRequestGet as yesterday } from '../../functions/api/yesterday.ts';
-import { BEST_MIN_CAP, BEST_MIN_TRADED, BEST_SHOW, COIN_MICRO, TRAIL_DAYS, cryptoDay, prevDayKey, sessionBefore, stockDay } from '../../functions/_shared/bestBuys.ts';
+import { BEST_MIN_CAP, BEST_MIN_CAP_CRYPTO, BEST_MIN_CAP_STOCK, BEST_MIN_TRADED, BEST_SHOW, COIN_MICRO, TRAIL_DAYS, cryptoDay, prevDayKey, sessionBefore, stockDay } from '../../functions/_shared/bestBuys.ts';
 
 // Stand-ins for the Cloudflare runtime.
 const edge = new Map();
@@ -453,7 +453,7 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
       assert.ok(group.length >= BEST_SHOW && group.length <= 10, `${label}: a full ${g} list (${group.length} rows; ${body[g].why ?? ''})`);
       group.forEach((r, i) => {
         assert.ok(r.change > 0, `${r.sym} gained`);
-        assert.ok(r.marketCap >= BEST_MIN_CAP, `${r.sym} is over the size floor`);
+        assert.ok(r.marketCap >= (g === 'stocks' ? BEST_MIN_CAP_STOCK : BEST_MIN_CAP_CRYPTO), `${r.sym} is over the size floor`);
         assert.ok(r.traded == null || r.traded >= BEST_MIN_TRADED, `${r.sym} traded enough`);
         assert.ok(Math.abs(r.change - (r.to / r.from - 1) * 100) < 1e-6, `${r.sym} change is close to close`);
         assert.equal(r.trail[r.trail.length - 1], r.to, `${r.sym} trend ends on the day`);
@@ -590,7 +590,8 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const { status, body } = await call(yesterday, '/api/yesterday');
   assert.equal(status, 200);
   assert.ok(body.ok, 'answers');
-  assert.equal(body.minCap, BEST_MIN_CAP);
+  assert.equal(body.minCapStock, BEST_MIN_CAP_STOCK);
+  assert.equal(body.minCapCrypto, BEST_MIN_CAP_CRYPTO);
   assert.equal(body.minTraded, BEST_MIN_TRADED);
   const again = upstream.length;
   const second = await call(yesterday, '/api/yesterday');
@@ -730,7 +731,7 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const s7 = mock.yahooCloses(prevDayKey(d7));
   const yChange = (e7[yTop] / s7[yTop] - 1) * 100;
   const cgRow = (id, symbol, name, from, change, marketCap, traded) => ({ id, symbol, name, image: null, from, to: from * (1 + change / 100), change, marketCap, traded });
-  const kyo = cgRow('kyo', 'KYO', 'KYO', 0.01, 128.6, 4.25e6, 1.8e6);
+  const kyo = cgRow('kyo', 'KYO', 'KYO', 0.01, 128.6, 4.25e7, 1.8e6);
   {
     // The change must be exactly to / from, as the file writes it.
     kyo.change = (kyo.to / kyo.from - 1) * 100;
@@ -738,9 +739,9 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   const rows7 = [
     kyo,
     cgRow('tiny-cg', 'TCG', 'Tiny CG', 0.5, 300, 400_000, 5e6),
-    cgRow('thin-cg', 'THCG', 'Thin CG', 0.5, 250, 5e6, 30_000),
+    cgRow('thin-cg', 'THCG', 'Thin CG', 0.5, 250, 5e7, 30_000),
     // Yahoo's biggest gainer, as CoinGecko measures it: the same coin, with the day's own volume.
-    { ...cgRow(`cg-${yc.symbol.toLowerCase()}`, yc.symbol, yc.name, s7[yTop], yChange, 9e6, 777_777), to: e7[yTop], change: yChange },
+    { ...cgRow(`cg-${yc.symbol.toLowerCase()}`, yc.symbol, yc.name, s7[yTop], yChange, 9e7, 777_777), to: e7[yTop], change: yChange },
   ].map((r) => ({ ...r, change: (r.to / r.from - 1) * 100 }));
   cgFiles.set(d7, { day: d7, compared: 2_500, rows: rows7 });
   got = await untilCoins(t8);
